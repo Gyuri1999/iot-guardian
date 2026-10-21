@@ -282,3 +282,67 @@
 .sc-b.sc-3d { width: auto; padding: 0 0.5rem; gap: 0.25rem; display: inline-flex; align-items: center; font-family: var(--font-label); font-weight: 700; font-size: 0.78rem; letter-spacing: 0.06em; }
 .sc-b.sc-3d.on { background: var(--teal); color: #fff; }
 .sc-b.sc-3d .ic { width: 1.05rem; height: 1.05rem; }
+
+/* ---------- θεματικό σκηνικό (δωμάτιο πίσω από τη σκηνή) */
+.scene-wrap > svg.scene-bg { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; }
+.scene-bg {
+  --rm-floor: #c99a63; --rm-plank: #b3854f; --rm-wall-a: #dcc49a; --rm-wall-b: #ccb07f; --rm-base: #8e6a43; --rm-edge: #5e4a33;
+  --rm-frame: #6b5a45; --rm-art-a: #9cc3c0; --rm-art-b: #e0a37a; --rm-door: #b98a5c; --rm-dframe: #7d5a38; --rm-sky: #9fd0f0;
+}
+.scene-bg .room.night { --rm-floor: #4a3e33; --rm-plank: #3d332a; --rm-wall-a: #48557a; --rm-wall-b: #3c476a; --rm-base: #2c3450; --rm-edge: #1d2333; --rm-art-a: #4f6f7a; --rm-art-b: #7a5a4a; --rm-door: #5a4a3a; --rm-dframe: #3d3226; }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .scene-bg { --rm-floor: #4a3a2b; --rm-plank: #3e3024; --rm-wall-a: #34405f; --rm-wall-b: #2c3753; --rm-base: #222a40; --rm-edge: #10141f; --rm-sky: #24365c; --rm-door: #7a5a3c; --rm-dframe: #4a3826; } }
+:root[data-theme="dark"] .scene-bg { --rm-floor: #4a3a2b; --rm-plank: #3e3024; --rm-wall-a: #34405f; --rm-wall-b: #2c3753; --rm-base: #222a40; --rm-edge: #10141f; --rm-sky: #24365c; --rm-door: #7a5a3c; --rm-dframe: #4a3826; }
+.rm-floor { fill: var(--rm-floor); }
+.rm-plank { stroke: var(--rm-plank); stroke-width: 0.8; fill: none; }
+.rm-wall-a { fill: var(--rm-wall-a); stroke: #1c2130; stroke-width: 1; }
+.rm-wall-b { fill: var(--rm-wall-b); stroke: #1c2130; stroke-width: 1; }
+.rm-floor { stroke: #1c2130; stroke-width: 1; }
+.rm-base, .rm-base-b { fill: var(--rm-base); }
+.rm-edge { fill: none; stroke: var(--rm-edge); stroke-width: 2; }
+.rm-frame, .rm-wframe { fill: var(--rm-frame); stroke: #1c2130; stroke-width: 0.6; }
+.rm-art-a { fill: var(--rm-art-a); } .rm-art-b { fill: var(--rm-art-b); } .rm-art { fill: var(--rm-art-a); }
+.rm-sky { fill: var(--rm-sky); }
+.rm-wbar { stroke: var(--rm-frame); stroke-width: 1.4; fill: none; }
+.rm-moon { fill: #fff6c8; }
+.rm-door { fill: var(--rm-door); stroke: #1c2130; stroke-width: 0.6; }
+.rm-dframe { fill: var(--rm-dframe); }
+.rm-dglass { fill: #cfe6f2; opacity: 0.8; }
+.rm-knob { fill: #e2b52d; stroke: #1c2130; stroke-width: 0.5; }
+.rm-mat { fill: #8a5a3a; opacity: 0.85; }
+.rm-runner { fill: #7a3e3e; opacity: 0.55; }
+.rm-pot { fill: #c46a3a; stroke: #1c2130; stroke-width: 0.6; }
+.rm-leaf { fill: none; stroke: #3f8f5a; stroke-width: 3; stroke-linecap: round; }
+/* φωτιστικά: σβηστά μέχρι να ανάψει το LED */
+.lamp-base { fill: #2b2f3a; } .lamp-pole { stroke: #2b2f3a; stroke-width: 2.4; }
+.lamp-shade { fill: #e0b05a; stroke: #1c2130; stroke-width: 0.8; }
+.lamp-bulb, .porch-bulb, .ceil-lamp { fill: #8a8572; transition: fill 0.15s; }
+.porch-lamp { fill: #2b2f3a; }
+.bell-plate { fill: #d7d2c4; stroke: #1c2130; stroke-width: 0.5; }
+.bell-btn { fill: #b33a2a; stroke: #1c2130; stroke-width: 0.5; transition: fill 0.12s; }
+.bell-waves path { fill: none; stroke: #e2b52d; stroke-width: 1.6; stroke-linecap: round; opacity: 0; }
+.th-glow { fill: url(#g-warm); opacity: 0; transition: opacity 0.2s; }
+.th-pool { fill: #ffd27a; opacity: 0; transition: opacity 0.2s; }
+.th-cone { fill: #ffe7a8; opacity: 0; transition: opacity 0.2s; }
+.pir-zone { fill: #e0a32e; opacity: 0.08; stroke: #e0a32e; stroke-dasharray: 3 3; stroke-width: 0.8; transition: opacity 0.2s; }
+.scene-bg.led-on .th-glow { opacity: 0.95; }
+.scene-bg.led-on .th-pool { opacity: 0.35; }
+.scene-bg.led-on .th-cone { opacity: 0.22; }
+.scene-bg.led-on .lamp-bulb, .scene-bg.led-on .porch-bulb, .scene-bg.led-on .ceil-lamp { fill: #fff2b3; }
+.scene-bg.btn-on .bell-btn { fill: #ff6a4d; }
+.scene-bg.btn-on .bell-waves path { opacity: 1; }
+.scene-bg.pir-on .pir-zone { opacity: 0.22; }
+/* η γιαγιά του διαδρόμου (σέρνεται) */
+.sc-actors { cursor: grab; }
+.sc-actors.dragging { cursor: grabbing; }
+.actor:focus { outline: none; }
+.actor:focus-visible .actor-head { stroke: var(--accent); stroke-width: 2; }
+.actor-shadow { fill: #000; opacity: 0.18; }
+.actor-dress { fill: #7a5aa8; stroke: #1c2130; stroke-width: 1; }
+.actor-arm { stroke: #f0c9a8; stroke-width: 2.6; stroke-linecap: round; fill: none; }
+.actor-cane { stroke: #6b4a2a; stroke-width: 2; stroke-linecap: round; }
+.actor-head { fill: #f0c9a8; stroke: #1c2130; stroke-width: 1; }
+.actor-hair { fill: #e9e6df; stroke: #1c2130; stroke-width: 0.8; }
+.actor-tip rect { fill: var(--surface); stroke: var(--line-strong); stroke-width: 0.8; }
+.actor-tip text { font: 600 8px var(--font-label); fill: var(--ink); letter-spacing: 0.04em; }
+.sc-actors:hover .actor-dress { stroke: var(--accent); stroke-width: 1.6; }
+@media (max-width: 720px) { .scene-wrap > svg.scene-bg { position: absolute; top: 0; height: 17rem; } }

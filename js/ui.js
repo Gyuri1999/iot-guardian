@@ -143,6 +143,7 @@
     play: '<path d="M7 4l13 8-13 8z"/>',
     pause: '<path d="M7 4v16M17 4v16"/>',
     stop: '<rect x="6" y="6" width="12" height="12" rx="1.5"/>',
+    flag: '<path d="M5 21V4"/><path d="M5 4h11l-2 4 2 4H5"/>',
     step: '<path d="M5 4l10 8-10 8z"/><path d="M19 4v16"/>',
     reset: '<path d="M4 12a8 8 0 1 0 3-6.2"/><path d="M4 3v5h5"/>',
     check: '<path d="M4 12l5 5L20 6"/>',
@@ -243,11 +244,16 @@
     on('sc-zoom-out', pz.zoomOut);
     on('sc-fit', pz.reset);
     S.scene = svg;
+    S.theme = null;
+    const theme = S.task && modeOf(S.task) === 'code' && window.IoTThemes ? window.IoTThemes.themeOf(S.task) : null;
+    if (theme) S.theme = window.IoTThemes.mount(wrap, svg, theme, { pir: S.inputs.pir, onPir: v => { if (!!S.inputs.pir !== v) toggleInput('pir'); } });
     bindParts(wrap, svg);
     const motion = !P.settings.reducedMotion && !matchMedia('(prefers-reduced-motion: reduce)').matches;
     // 3D εξαρτήματα (Three.js) κάτω από την SVG· χωρίς WebGL μένει η επίπεδη σκηνή.
     const has3d = !!(window.IoTScene3D && window.IoTScene3D.mount(wrap, svg, window.IoTScene.manifest, { animate: motion }));
-    if (motion) window.IoTScene.buildIn(svg);
+    if (motion) {
+      window.IoTScene.buildIn(svg);
+    }
     bindOrbit(wrap, svg, has3d, pz);
     return svg;
   }
@@ -262,6 +268,7 @@
     const normalHint = hint ? hint.textContent : '';
     const show = () => {
       const on = D3.orbiting();
+      if (S.theme) S.theme.hide(on);
       btn.setAttribute('aria-pressed', String(on));
       btn.classList.toggle('on', on);
       btn.title = on ? 'Επιστροφή στην κανονική όψη (Esc)' : '3D: γύρνα τη σκηνή γύρω γύρω';
@@ -269,7 +276,7 @@
     };
     D3.onState(show);
     const toggle = () => {
-      if (D3.orbiting()) D3.orbit(false); else D3.orbit(true, { auto: !P.settings.reducedMotion && !matchMedia('(prefers-reduced-motion: reduce)').matches });
+      if (D3.orbiting()) D3.orbit(false); else { if (S.theme) S.theme.hide(true); D3.orbit(true, { auto: !P.settings.reducedMotion && !matchMedia('(prefers-reduced-motion: reduce)').matches }); }
       show();
       announce(D3.orbiting() ? '3D περιστροφή: η σκηνή γυρίζει. Οι ετικέτες κρύβονται μέχρι να επιστρέψεις.' : 'Κανονική όψη.');
     };
@@ -844,6 +851,7 @@
         ${header(`Κεφ. ${chNum(l.chapter)} · ${ch.title}`, doneCh, ls.length, 'Εικονικός χρόνος', '00:00.000')}
         <div class="ws">
           <section class="stage" aria-label="Σκηνή εργαστηρίου">
+            ${missionHTML(l)}
             <div class="scene-wrap" id="scene">${sceneControls()}${mode === 'code' ? inputsCardHTML(hw, w) : ''}</div>
             ${dock}
           </section>
@@ -893,6 +901,8 @@
       window.IoTReal.mount($('#real-slot'), { mode, getCode: () => $('#code').value, consts: () => worldOf(l).consts || {} });
     }
     bindOutputs();
+    S.msPrev = false;
+    refreshMission(60);
     renderQuiz();
     renderHints();
     updateAll();
@@ -1378,6 +1388,42 @@
     syncScroll();
   }
 
+  // ---------- Αποστολή: η ιστορία του μαθήματος και οι στόχοι του, που τσεκάρονται μόλις ο κώδικας τους πετυχαίνει.
+  // Οι στόχοι είναι οι ίδιοι έλεγχοι συμπεριφοράς με το «Έλεγχος λύσης» (τρέχουν σε δικό τους εικονικό κόσμο).
+  function missionHTML(l) {
+    if (modeOf(l) !== 'code' || !l.validationTests || !l.validationTests.length) return '';
+    const th = window.IoTThemes ? window.IoTThemes.themeOf(l) : null;
+    return `<section class="mission" id="mission" aria-label="Αποστολή">
+      <div class="ms-head">${icon('flag')}<b>Αποστολή</b><span class="ms-count" id="ms-count" aria-live="polite"></span></div>
+      ${th ? `<p class="ms-story">${esc(th.story)}</p>` : ''}
+      <ul class="ms-goals">${l.validationTests.map((t, i) => `<li data-i="${i}"><span class="ms-box" aria-hidden="true"></span><span>${esc(t.name)}</span><span class="sr-only ms-sr"> · δεν έχει γίνει ακόμα</span></li>`).join('')}</ul>
+    </section>`;
+  }
+  function refreshMission(delay) {
+    clearTimeout(S.msTimer);
+    S.msTimer = setTimeout(evalMission, delay || 0);
+  }
+  function evalMission() {
+    const el = $('#mission');
+    const ta = $('#code');
+    if (!el || !ta || !S.task) return;
+    let res = null;
+    try { res = VAL.runTests(ta.value, S.task.validationTests, S.task); } catch (e) { res = null; }
+    let n = 0;
+    el.querySelectorAll('li').forEach((li, i) => {
+      const ok = !!(res && res[i] && res[i].pass);
+      if (ok && !li.classList.contains('done') && S.msPrev) li.classList.add('just');
+      li.classList.toggle('done', ok);
+      li.querySelector('.ms-sr').textContent = ok ? ' · έγινε' : ' · δεν έχει γίνει ακόμα';
+      if (ok) n++;
+    });
+    S.msPrev = true;
+    const total = el.querySelectorAll('li').length;
+    $('#ms-count').textContent = `${n}/${total}`;
+    el.classList.toggle('all', n === total);
+    setTimeout(() => el.querySelectorAll('li.just').forEach(li => li.classList.remove('just')), 900);
+  }
+
   // Όσο τρέχει το πρόγραμμα: φωτίζεται η γραμμή που εκτελείται τώρα, και ο editor κυλά ώστε να φαίνεται.
   function updateRunLine() {
     const hl = $('#hl');
@@ -1463,6 +1509,7 @@
   }
 
   function onCodeInput() {
+    refreshMission(800);
     const ta = $('#code');
     P.drafts[S.task.id] = ta.value;
     clearTimeout(S.saveTimer);
@@ -1615,6 +1662,7 @@
 
   function doRun() {
     if (S.runState === 'running') return;
+    refreshMission(0);
     if (!S.gen && !prepare()) return;
     S.runState = 'running';
     S.lastFrame = performance.now();
@@ -2072,6 +2120,7 @@
     // σκηνή
     if (sc && modeOf(S.task) === 'code') {
       cls('#sc-led', 'on', ledOn);
+      if (S.theme) S.theme.update({ led: ledOn, button: S.inputs.button, pir: S.inputs.pir });
       cls('#sc-led-halo', 'on', ledOn);
       cls('#sc-d2', 'on', pin2);
       cls('#sc-d2-halo', 'on', pin2);
