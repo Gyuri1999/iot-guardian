@@ -24,6 +24,7 @@
     HIGH: 1, LOW: 0,
     INPUT: 1, OUTPUT: 3, INPUT_PULLUP: 5,
     LED_PIN: 2, LED_BUILTIN: 2, BUTTON_PIN: 15, PIR_PIN: 4,
+    TRIG_PIN: 5, ECHO_PIN: 18, RED_PIN: 25, YELLOW_PIN: 26, GREEN_PIN: 27,
     WL_IDLE_STATUS: 0, WL_NO_SSID_AVAIL: 1, WL_CONNECTED: 3, WL_CONNECT_FAILED: 4, WL_DISCONNECTED: 6,
     WIFI_SSID: 'SmartHome-Lab', WIFI_PASSWORD: 'lab-pass-123',
     MQTT_HOST: 'broker.home.lan', HOME_CA: 'Home Lab CA',
@@ -35,7 +36,7 @@
   // Οι εντολές εκτός πυρήνα (αισθητήρες, WiFi, mqtt, JSON) εκτελούνται από την εικονική πλακέτα.
   const BUILTINS = {
     pinMode: [2], digitalWrite: [2], digitalRead: [1],
-    delay: [1], millis: [0],
+    delay: [1], millis: [0], delayMicroseconds: [1], micros: [0], pulseIn: [2, 3],
     'Serial.begin': [1], 'Serial.print': [1], 'Serial.println': [0, 1],
     abs: [1], min: [2], max: [2], isnan: [1], toInt: [1], toFloat: [1],
     readTemperature: [0], readHumidity: [0],
@@ -50,11 +51,11 @@
     esp_light_sleep_start: [0], esp_deep_sleep_start: [0], esp_sleep_get_wakeup_cause: [0]
   };
   const DEEP_SLEEP = { deepSleep: true }; // σήμα (όχι σφάλμα): η πλακέτα μπαίνει σε deep sleep
-  const CORE = new Set(['pinMode', 'digitalWrite', 'digitalRead', 'delay', 'millis', 'Serial.begin', 'Serial.print', 'Serial.println', 'abs', 'min', 'max', 'isnan', 'toInt', 'toFloat']);
-  const BUILTIN_RETURNS = { digitalRead: 'int', millis: 'int' };
+  const CORE = new Set(['pinMode', 'digitalWrite', 'digitalRead', 'delay', 'millis', 'delayMicroseconds', 'micros', 'Serial.begin', 'Serial.print', 'Serial.println', 'abs', 'min', 'max', 'isnan', 'toInt', 'toFloat']);
+  const BUILTIN_RETURNS = { digitalRead: 'int', millis: 'int', micros: 'int', pulseIn: 'int' };
   const EXAMPLES = {
     pinMode: 'pinMode(LED_PIN, OUTPUT)', digitalWrite: 'digitalWrite(LED_PIN, HIGH)', digitalRead: 'digitalRead(BUTTON_PIN)',
-    delay: 'delay(1000)', millis: 'millis()', 'WiFi.begin': 'WiFi.begin(WIFI_SSID, WIFI_PASSWORD)',
+    delay: 'delay(1000)', millis: 'millis()', delayMicroseconds: 'delayMicroseconds(10)', pulseIn: 'pulseIn(ECHO_PIN, HIGH)', 'WiFi.begin': 'WiFi.begin(WIFI_SSID, WIFI_PASSWORD)',
     'mqtt.connect': 'mqtt.connect("esp32-pir") ή mqtt.connect("esp32-pir", MQTT_USER, MQTT_PASS)',
     'mqtt.publish': 'mqtt.publish("home/motion", payload) ή mqtt.publish("home/temperature", payload, true)',
     'mqtt.setServer': 'mqtt.setServer(MQTT_HOST, 1883)', jsonGet: 'jsonGet(msg, "cmd")', jsonHas: 'jsonHas(msg, "id")'
@@ -974,6 +975,13 @@
           return VOID;
         }
         case 'millis': return V('int', Math.floor(b.micros / 1000));
+        case 'micros': return V('int', Math.floor(b.micros));
+        case 'delayMicroseconds': {
+          const us = num(args[0], line);
+          if (us < 0) throw new CodeError('Το delayMicroseconds δεν δέχεται αρνητικό χρόνο.', line);
+          b.advanceMicros(Math.round(us));
+          return VOID;
+        }
         case 'Serial.begin': b.serialBegin(num(args[0], line), line); return VOID;
         case 'Serial.print': b.serialWrite(formatValue(args[0]), false, line); return VOID;
         case 'Serial.println': b.serialWrite(args.length ? formatValue(args[0]) : '', true, line); return VOID;

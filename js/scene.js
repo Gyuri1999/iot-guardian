@@ -18,81 +18,185 @@
   const planeMatrix = h => `matrix(${(C * K).toFixed(4)},${(S * K).toFixed(4)},${(-C * K).toFixed(4)},${(S * K).toFixed(4)},0,${(-h * K).toFixed(2)})`;
 
   // Κουτί με τρία ορατά πρόσωπα: πάνω, αριστερό-μπροστά, δεξί-μπροστά.
+  // Σκιά στο πάτωμα (φως από πάνω αριστερά): μετατοπισμένο ορθογώνιο κάτω από το αντικείμενο.
+  function shadow(u, v, du, dv) {
+    const o = 3.2;
+    return poly([P(u + o, v - 0.6, 0), P(u + du + o, v - 0.6, 0), P(u + du + o, v + dv - 0.6, 0), P(u + o, v + dv - 0.6, 0)], 'shadow');
+  }
   function box(u, v, h, du, dv, dh, cls, id) {
     const t = h + dh;
+    const sh = h === 0 && du > 4 ? shadow(u, v, du, dv) : '';
     const top = [P(u, v, t), P(u + du, v, t), P(u + du, v + dv, t), P(u, v + dv, t)];
     const left = [P(u, v + dv, t), P(u + du, v + dv, t), P(u + du, v + dv, h), P(u, v + dv, h)];
     const right = [P(u + du, v, t), P(u + du, v + dv, t), P(u + du, v + dv, h), P(u + du, v, h)];
-    return `<g class="box ${cls}"${id ? ` id="${id}"` : ''}>${poly(left, 'f-l')}${poly(right, 'f-r')}${poly(top, 'f-t')}</g>`;
+    return `${sh}<g class="box ${cls}"${id ? ` id="${id}"` : ''}>${poly(left, 'f-l')}${poly(right, 'f-r')}${poly(top, 'f-t')}</g>`;
   }
 
-  // Ετικέτα τύπου «callout»: χάπι με κείμενο και γραμμή προς το σημείο.
-  function callout(p, dx, dy, text, id) {
+  // Μικρά εικονίδια (12×12) για τις ετικέτες, όπως στις κάρτες του πάγκου.
+  const ICON = {
+    chip: '<rect x="2.5" y="2.5" width="7" height="7" rx="1"/><path d="M4.5 0.5v2M7.5 0.5v2M4.5 9.5v2M7.5 9.5v2M0.5 4.5h2M0.5 7.5h2M9.5 4.5h2M9.5 7.5h2"/>',
+    pins: '<path d="M2 11h8M3.5 11V3M6 11V3M8.5 11V3M2.5 3h2M5 3h2M7.5 3h2"/>',
+    plug: '<path d="M4 1v3M8 1v3M3 4h6v2.5a3 3 0 0 1-6 0zM6 9.5V11.5"/>',
+    wifi: '<path d="M1 4.5a7 7 0 0 1 10 0M2.8 6.6a4.5 4.5 0 0 1 6.4 0M4.6 8.6a2 2 0 0 1 2.8 0"/><circle cx="6" cy="10.4" r="0.6"/>',
+    button: '<rect x="1" y="5.5" width="10" height="5" rx="1"/><path d="M4 5.5V3.5h4v2"/>',
+    bulb: '<path d="M6 1a3.6 3.6 0 0 0-2 6.6V9h4V7.6A3.6 3.6 0 0 0 6 1zM4.5 11h3"/>',
+    eye: '<circle cx="3.6" cy="6" r="2.6"/><circle cx="8.4" cy="6" r="2.6"/><circle cx="3.6" cy="6" r="0.9"/><circle cx="8.4" cy="6" r="0.9"/>',
+    thermo: '<path d="M5 1.5h2v6.2a2.5 2.5 0 1 1-2 0z"/>',
+    screen: '<rect x="1" y="2" width="10" height="7" rx="1"/><path d="M4 11h4"/>',
+    car: '<path d="M1.5 8V6.4L3 3.8h6L10.5 6.4V8zM1.5 6.4h9"/><circle cx="3.6" cy="8.6" r="1.1"/><circle cx="8.4" cy="8.6" r="1.1"/>',
+    traffic: '<rect x="3.5" y="0.8" width="5" height="10.4" rx="1.4"/><circle cx="6" cy="3.2" r="1"/><circle cx="6" cy="6" r="1"/><circle cx="6" cy="8.8" r="1"/>',
+    grid: '<rect x="1" y="2.5" width="10" height="7" rx="1"/><path d="M3 5h0.1M5 5h0.1M7 5h0.1M9 5h0.1M3 7h0.1M5 7h0.1M7 7h0.1M9 7h0.1"/>',
+    server: '<rect x="1.5" y="1.5" width="9" height="4" rx="0.8"/><rect x="1.5" y="6.5" width="9" height="4" rx="0.8"/><path d="M3.5 3.5h0.1M3.5 8.5h0.1"/>',
+    question: '<circle cx="6" cy="6" r="5"/><path d="M4.4 4.6a1.7 1.7 0 1 1 2.4 1.6c-.6.3-.8.6-.8 1.2M6 9h0.1"/>'
+  };
+  const PART_ICON = {
+    esp32: 'chip', 'esp-module': 'chip', 'esp-uart': 'chip', 'esp-reg': 'chip', pi: 'chip', 'pi-cpu': 'chip', 'pi-ram': 'chip', 'mini-esp': 'chip',
+    'esp-pins': 'pins', 'pi-gpio': 'pins', 'esp-usb': 'plug', 'pi-power': 'plug', 'pi-ports': 'plug', 'esp-antenna': 'wifi', router: 'wifi',
+    'esp-buttons': 'button', button: 'button', led: 'bulb', 'esp-led': 'bulb', pir: 'eye', ultrasonic: 'eye', 'us-pins': 'pins', sensor: 'thermo',
+    tablet: 'screen', laptop: 'screen', car: 'car', traffic: 'traffic', breadboard: 'grid', 'rpi-broker': 'server', 'unknown-device': 'question'
+  };
+
+  // Ετικέτα: τελεία πάνω στο κομμάτι, διακεκομμένη γραμμή, δαχτυλίδι και κουτί με εικονίδιο.
+  function callout(p, dx, dy, text, id, part) {
     const x = p[0] + dx;
     const y = p[1] + dy;
-    const w = text.length * 6.1 + 18;
+    const icon = part && ICON[PART_ICON[part]];
+    const w = text.length * 6.1 + 18 + (icon ? 15 : 0);
     const anchorLeft = dx >= 0;
-    const bx = anchorLeft ? x : x - w;
-    return `<g class="callout"${id ? ` id="${id}"` : ''}>
+    const bx = anchorLeft ? x + 4 : x - w - 4;
+    return `<g class="callout${part ? ' part-link' : ''}"${id ? ` id="${id}"` : ''}${part ? ` data-part="${part}" tabindex="0" role="button" aria-label="Τι είναι: ${text}"` : ''}>
       <path d="M${pt(p)} L${x.toFixed(1)},${y.toFixed(1)}" class="co-line"/>
-      <circle cx="${p[0].toFixed(1)}" cy="${p[1].toFixed(1)}" r="3.2" class="co-dot"/>
-      <rect x="${bx.toFixed(1)}" y="${(y - 9).toFixed(1)}" width="${w.toFixed(1)}" height="18" rx="4" class="co-box"/>
-      <text x="${(bx + 9).toFixed(1)}" y="${(y + 3.6).toFixed(1)}" class="co-txt">${text}</text>
+      <circle cx="${p[0].toFixed(1)}" cy="${p[1].toFixed(1)}" r="3.4" class="co-dot"/>
+      <rect x="${bx.toFixed(1)}" y="${(y - 10).toFixed(1)}" width="${w.toFixed(1)}" height="20" rx="4" class="co-box"/>
+      <circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="2.6" class="co-ring"/>
+      ${icon ? `<g class="co-ico" transform="translate(${(bx + 7).toFixed(1)},${(y - 6).toFixed(1)})">${icon}</g>` : ''}
+      <text x="${(bx + (icon ? 23 : 9)).toFixed(1)}" y="${(y + 3.6).toFixed(1)}" class="co-txt">${text}</text>
     </g>`;
   }
 
+  // Καλώδιο jumper (Dupont): αν δοθούν σημεία πάγκου {u, v, h}, σχεδιάζονται και τα πλαστικά βύσματα στις άκρες
+  // (θηλυκό πάνω στο pin της πλακέτας, αρσενικό μέσα στην τρύπα του breadboard).
   function wire(a, b, cls, lift, id) {
+    let plugs = '';
+    if (!Array.isArray(a)) {
+      const A = a;
+      const Bp = b;
+      plugs += box(A.u - 1.1, A.v - 1.1, A.h, 2.2, 2.2, 4.6, 'plug ' + cls);
+      plugs += box(Bp.u - 0.8, Bp.v - 0.8, Bp.h, 1.6, 1.6, 3.4, 'plug ' + cls);
+      a = P(A.u, A.v, A.h + 4.6);
+      b = P(Bp.u, Bp.v, Bp.h + 3.4);
+    }
     const l = lift || 40;
     const c1 = [a[0], a[1] - l];
     const c2 = [b[0], b[1] - l];
-    return `<path${id ? ` id="${id}"` : ''} d="M${pt(a)} C${pt(c1)} ${pt(c2)} ${pt(b)}" class="wire ${cls}"/>`;
+    const d = `M${pt(a)} C${pt(c1)} ${pt(c2)} ${pt(b)}`;
+    return `<g class="wire-g" data-part="wire-${cls.replace('w-', '')}"><path d="${d}" class="wire-ol"/><path${id ? ` id="${id}"` : ''} d="${d}" class="wire ${cls}"/><path d="${d}" class="wire-hl"/>`
+      + (plugs || `<circle cx="${a[0].toFixed(1)}" cy="${a[1].toFixed(1)}" r="2.2" class="wire-end ${cls}"/><circle cx="${b[0].toFixed(1)}" cy="${b[1].toFixed(1)}" r="2.2" class="wire-end ${cls}"/>`) + '</g>';
   }
 
   // ------------------------------------------------------------ αντικείμενα
 
-  // ESP32 DevKit: PCB 52×28, module, κεραία, USB-C, headers, LED, κουμπιά.
-  const ESP = { u: 0, v: 0 };
-  const PIN_U = i => 8 + i * 2.54;
-  const RIGHT_ROW = ['D23', 'D22', 'TX', 'RX', 'D21', 'D19', 'D18', 'D5', 'D17', 'D16', 'D4', 'D2', 'D15', 'GND', '3V3'];
-  function espPin(name) {
-    const i = RIGHT_ROW.indexOf(name);
-    return P(ESP.u + PIN_U(i), ESP.v + 26.4, 4.4);
+  // ESP32 DevKit 38 pins με USB-C (όπως το πραγματικό): μαύρο PCB 52×28 που «πατά» στα pins του.
+  // 19 pins σε κάθε πλευρά, βήμα 2,54 mm. Η μπροστινή σειρά (προς τον θεατή) έχει τα GPIO 2, 4, 15.
+  const ESP = { u: 0, v: 0, h: 7 };
+  const PIN_U = i => 2.6 + i * 2.54;
+  const RIGHT_ROW = ['GND', 'D23', 'D22', 'TX', 'RX', 'D21', 'GND2', 'D19', 'D18', 'D5', 'D17', 'D16', 'D4', 'D0', 'D2', 'D15', 'SD1', 'SD0', 'CLK'];
+  const LEFT_ROW = ['3V3', 'EN', 'VP', 'VN', 'D34', 'D35', 'D32', 'D33', 'D25', 'D26', 'D27', 'D14', 'D12', 'GND3', 'D13', 'SD2', 'SD3', 'CMD', '5V'];
+  const PCB_TOP = ESP.h + 1.6;
+  function espPinUV(name) {
+    let i = RIGHT_ROW.indexOf(name);
+    if (i >= 0) return { u: ESP.u + PIN_U(i), v: ESP.v + 26.6, h: PCB_TOP + 0.6 };
+    i = LEFT_ROW.indexOf(name);
+    return { u: ESP.u + PIN_U(Math.max(0, i)), v: ESP.v + 1.4, h: PCB_TOP + 0.6 };
   }
+  function espPin(name) { const q = espPinUV(name); return P(q.u, q.v, q.h + 0.4); }
+
+  // Επίπεδο v–h σε σταθερό u (δεξί πρόσωπο): local x = v, y = −h.
+  const planeVH = u => `matrix(${(-C * K).toFixed(4)},${(S * K).toFixed(4)},0,${K.toFixed(4)},${(u * C * K).toFixed(2)},${(u * S * K).toFixed(2)})`;
 
   function esp32() {
     const { u, v } = ESP;
-    let s = '<g id="sc-esp" class="sc-esp">';
-    s += box(u, v, 0, 52, 28, 1.6, 'pcb');
-    // σχέδια πάνω στο PCB (silkscreen, κεραία)
-    s += `<g transform="${planeMatrix(1.6)}" class="silk-g">
-      <path d="M${u + 1},${v + 6} h3 v16 h-2 v-14 h2" class="antenna2"/>
-      <text x="${u + 30}" y="${v + 14.6}" class="silk2" transform="rotate(0)">ESP32 DevKit</text>
+    const H = ESP.h;
+    let s = '<g id="sc-esp" class="sc-esp" data-part="esp32">';
+    s += shadow(u, v, 52, 28);
+    // από κάτω: πλαστικό των headers και οι ακίδες προς το τραπέζι
+    s += '<g data-part="esp-pins">';
+    for (const vv of [0.4, 25.6]) {
+      for (let i = 0; i < 19; i++) {
+        const a = P(u + PIN_U(i), v + vv + 1, H - 2.5);
+        const b = P(u + PIN_U(i), v + vv + 1, 0.3);
+        s += `<path d="M${pt(a)} L${pt(b)}" class="pin-leg"/>`;
+      }
+      s += box(u + 1.3, v + vv, H - 2.5, 48.8, 2, 2.5, 'pinhdr');
+    }
+    s += '</g>';
+    s += box(u, v, H, 52, 28, 1.6, 'pcb esp-black');
+    const T = PCB_TOP;
+    // τρύπες στερέωσης και silkscreen
+    for (const [hu, hv] of [[1.6, 4.6], [1.6, 23.4], [50.4, 4.6], [50.4, 23.4]]) {
+      const c = P(u + hu, v + hv, T);
+      s += `<ellipse cx="${c[0].toFixed(1)}" cy="${c[1].toFixed(1)}" rx="1.4" ry="0.8" class="hole"/>`;
+    }
+    s += `<g transform="${planeMatrix(T)}" class="silk-g">
+      <text x="${u + 30.5}" y="${v + 7.2}" class="silk3">3V3 EN VP VN</text>
+      <text x="${u + 29}" y="${v + 22.4}" class="silk3">GND 23 22 TX RX</text>
+      <text x="${u + 46.2}" y="${v + 4.8}" class="silk3">EN</text><text x="${u + 45.6}" y="${v + 25.2}" class="silk3">BOOT</text>
     </g>`;
-    s += box(u + 5, v + 4, 1.6, 18, 20, 0.6, 'mod-base');
-    s += box(u + 8, v + 5, 2.2, 15, 18, 1.4, 'shield', 'sc-shield');
-    s += `<g transform="${planeMatrix(3.6)}"><text x="${u + 10}" y="${v + 15}" class="shield-t">ESP-WROOM-32</text></g>`;
-    // headers
-    s += box(u + 6.6, v + 0.4, 1.6, 38.8, 2.4, 2.4, 'pinhdr');
-    s += box(u + 6.6, v + 25.2, 1.6, 38.8, 2.4, 2.4, 'pinhdr');
-    for (let i = 0; i < 15; i++) {
-      for (const vv of [1.6, 26.4]) {
-        const p = P(u + PIN_U(i), v + vv, 4.0);
-        s += `<ellipse cx="${p[0].toFixed(1)}" cy="${p[1].toFixed(1)}" rx="1.9" ry="1.1" class="pin-pad"/>`;
+    // module ESP-WROOM-32: κεραία στην άκρη, ασημένιο κάλυμμα, χρυσές επαφές γύρω-γύρω
+    s += `<g data-part="esp-antenna">${box(u + 0.4, v + 5, T, 6.2, 18, 0.8, 'mod-base')}<g transform="${planeMatrix(T + 0.8)}"><path d="M${u + 1.2},${v + 7} h3.6 v14 h-2.4 v-12 h2.4 v10" class="antenna2"/></g></g>`;
+    s += `<g data-part="esp-module">${box(u + 6.6, v + 5, T, 18.6, 18, 0.8, 'mod-base')}`;
+    s += `<g transform="${planeMatrix(T + 0.8)}">`;
+    for (let k = 0; k < 13; k++) s += `<rect x="${u + 7.4 + k * 1.35}" y="${v + 5.05}" width="0.7" height="1.2" class="castel"/><rect x="${u + 7.4 + k * 1.35}" y="${v + 21.75}" width="0.7" height="1.2" class="castel"/>`;
+    for (let k = 0; k < 10; k++) s += `<rect x="${u + 24.1}" y="${v + 6.8 + k * 1.45}" width="1.1" height="0.7" class="castel"/>`;
+    s += '</g>';
+    s += box(u + 7.6, v + 6.4, T + 0.8, 16.4, 15.2, 1.6, 'shield', 'sc-shield');
+    s += `<g transform="${planeMatrix(T + 2.4)}">`
+      + `<rect x="${u + 9}" y="${v + 8.2}" width="3.4" height="1.9" rx="0.9" class="shield-logo"/><text x="${u + 9.45}" y="${v + 9.65}" class="shield-l">WiFi</text>`
+      + `<text x="${u + 12.8}" y="${v + 9.75}" class="shield-t sm">ESP-WROOM-32</text>`
+      + `<text x="${u + 13.4}" y="${v + 12.6}" class="shield-c">CE</text><circle cx="${u + 18.6}" cy="${v + 12}" r="1" class="shield-ring"/>`
+      + `<text x="${u + 9.4}" y="${v + 15.4}" class="shield-s sm">FCC ID:2AC7Z-ESPWROOM32</text><text x="${u + 16}" y="${v + 17.4}" class="shield-s sm">211-161007</text>`
+      + `<circle cx="${u + 9.4}" cy="${v + 19.6}" r="0.8" class="shield-dot"/></g></g>`;
+    // λευκά περιγράμματα (silkscreen) γύρω από τα εξαρτήματα
+    s += `<g transform="${planeMatrix(T)}" class="silk-box">
+      <rect x="${u + 32.4}" y="${v + 9.9}" width="6.4" height="6.4"/><rect x="${u + 28}" y="${v + 17}" width="7.6" height="6"/>
+      <rect x="${u + 28.3}" y="${v + 8.5}" width="3.6" height="2.8"/><rect x="${u + 42}" y="${v + 8.4}" width="2.2" height="2.2"/><rect x="${u + 42}" y="${v + 17.4}" width="2.2" height="2.2"/>
+      <rect x="${u + 44.6}" y="${v + 2.2}" width="4.2" height="4.2"/><rect x="${u + 44.6}" y="${v + 21.6}" width="4.2" height="4.2"/>
+    </g>`;
+    // CP2102 (USB → Serial), ρυθμιστής 1117, κίτρινος πυκνωτής τανταλίου
+    s += `<g data-part="esp-uart">${box(u + 33, v + 10.5, T, 5.2, 5.2, 0.9, 'chip')}<g transform="${planeMatrix(T + 0.9)}"><text x="${u + 33.5}" y="${v + 13}" class="chip-t">CP2102</text></g></g>`;
+    s += `<g data-part="esp-reg">${box(u + 28.5, v + 17.5, T, 6.5, 3.6, 1.5, 'chip')}${box(u + 29.6, v + 21.1, T, 4.2, 1.6, 0.5, 'shield')}<g transform="${planeMatrix(T + 1.5)}"><text x="${u + 29}" y="${v + 19.8}" class="chip-t">1117</text></g></g>`;
+    s += box(u + 28.8, v + 9, T, 2.6, 1.8, 1.2, 'tant');
+    // μικρά SMD (αντιστάσεις, πυκνωτές)
+    for (const [cu, cv] of [[27, 6.5], [30, 6.5], [39.5, 9], [39.5, 12], [39.5, 17.5], [36, 19], [26.5, 14], [42, 14.5]]) s += box(u + cu, v + cv, T, 1.6, 0.9, 0.5, 'smd-c');
+    // USB-C και κουμπιά EN / BOOT
+    s += `<g data-part="esp-usb">${box(u + 46.4, v + 9.6, T, 7, 8.8, 3.2, 'usb')}`
+      + `<g transform="${planeVH(u + 53.4)}"><rect x="${v + 10.6}" y="${-(T + 2.7)}" width="6.8" height="2.2" rx="1.1" class="usbc-slot"/><rect x="${v + 11.8}" y="${-(T + 1.9)}" width="4.4" height="0.6" rx="0.3" class="usbc-tongue"/></g></g>`;
+    s += `<g data-part="esp-buttons">${box(u + 45, v + 2.6, T, 3.4, 3.4, 1.2, 'btn-s')}${box(u + 45, v + 22, T, 3.4, 3.4, 1.2, 'btn-s')}`;
+    const b1 = P(u + 46.7, v + 4.3, T + 1.3);
+    const b2 = P(u + 46.7, v + 23.7, T + 1.3);
+    s += `<ellipse cx="${b1[0].toFixed(1)}" cy="${b1[1].toFixed(1)}" rx="2.6" ry="1.5" class="btn-dot"/><ellipse cx="${b2[0].toFixed(1)}" cy="${b2[1].toFixed(1)}" rx="2.6" ry="1.5" class="btn-dot"/></g>`;
+    // LED τροφοδοσίας (κόκκινο) και LED του GPIO 2 (μπλε)
+    const pwr = P(u + 43, v + 9.5, T + 0.4);
+    const d2 = P(u + 43, v + 18.5, T + 0.4);
+    s += `<g data-part="esp-led"><circle cx="${pwr[0].toFixed(1)}" cy="${pwr[1].toFixed(1)}" r="1.7" class="smd pwr" id="sc-pwr"/>`;
+    s += `<circle cx="${d2[0].toFixed(1)}" cy="${d2[1].toFixed(1)}" r="9" class="halo blue" id="sc-d2-halo"/>`;
+    s += `<circle cx="${d2[0].toFixed(1)}" cy="${d2[1].toFixed(1)}" r="1.7" class="smd d2" id="sc-d2"/></g>`;
+    // pins που βγαίνουν και από πάνω: κόλληση στο PCB, κοντή ακίδα και στρογγυλεμένη κορυφή
+    s += '<g data-part="esp-pins">';
+    for (const vv of [1.4, 26.6]) {
+      for (let i = 0; i < 19; i++) {
+        const p = P(u + PIN_U(i), v + vv, T);
+        const q = P(u + PIN_U(i), v + vv, T + 1.9);
+        s += `<ellipse cx="${p[0].toFixed(1)}" cy="${p[1].toFixed(1)}" rx="1.7" ry="1" class="solder"/>`
+          + `<path d="M${pt(p)} L${pt(q)}" class="pin-stub"/><ellipse cx="${q[0].toFixed(1)}" cy="${q[1].toFixed(1)}" rx="0.95" ry="0.6" class="pin-tip"/>`;
       }
     }
-    // USB-C, κουμπιά, LED
-    s += box(u + 48.5, v + 10, 1.6, 4.6, 8, 1.8, 'usb');
-    s += box(u + 44, v + 4.5, 1.6, 3, 3, 1, 'btn-b') + box(u + 44, v + 20.5, 1.6, 3, 3, 1, 'btn-b');
-    const pwr = P(u + 38, v + 9, 2.2);
-    const d2 = P(u + 38, v + 19, 2.2);
-    s += `<circle cx="${pwr[0].toFixed(1)}" cy="${pwr[1].toFixed(1)}" r="2.2" class="smd pwr" id="sc-pwr"/>`;
-    s += `<circle cx="${d2[0].toFixed(1)}" cy="${d2[1].toFixed(1)}" r="9" class="halo blue" id="sc-d2-halo"/>`;
-    s += `<circle cx="${d2[0].toFixed(1)}" cy="${d2[1].toFixed(1)}" r="2.2" class="smd d2" id="sc-d2"/>`;
+    s += '</g>';
     // WiFi κύματα πάνω από την κεραία
-    const ant = P(u + 2.5, v + 14, 4);
+    const ant = P(u + 3, v + 14, T + 2);
     s += `<g id="sc-wifi" class="waves" transform="translate(${ant[0].toFixed(1)},${(ant[1] - 6).toFixed(1)})">
       <path d="M-7,-2 a9,9 0 0 1 14,0"/><path d="M-12,-7 a16,16 0 0 1 24,0"/><path d="M-17,-12 a23,23 0 0 1 34,0"/></g>`;
-    const zz = P(u + 15, v + 14, 6);
+    const zz = P(u + 15, v + 14, T + 4);
     s += `<text x="${zz[0].toFixed(1)}" y="${(zz[1] - 14).toFixed(1)}" class="zzz" id="sc-zzz">z z z</text>`;
     s += '</g>';
     return s;
@@ -102,7 +206,7 @@
   const BB = { u: 62, v: 2, du: 60, dv: 26 };
   function breadboard() {
     const { u, v, du, dv } = BB;
-    let s = box(u, v, 0, du, dv, 2.4, 'bb');
+    let s = '<g data-part="breadboard">' + box(u, v, 0, du, dv, 2.4, 'bb');
     let holes = '';
     for (let x = 3; x < du - 2; x += 2.54) {
       for (const y of [2.2, 4.6]) holes += `<rect x="${(u + x).toFixed(2)}" y="${(v + y).toFixed(2)}" width="0.9" height="0.9"/>`;
@@ -114,14 +218,15 @@
       <rect x="${u + 1}" y="${v + 6.2}" width="${du - 2}" height="0.25" class="rail-b"/>
       <rect x="${u + 1}" y="${v + dv - 6.6}" width="${du - 2}" height="0.25" class="rail-r"/>
       <rect x="${u + 1}" y="${v + dv - 1.6}" width="${du - 2}" height="0.25" class="rail-b"/>
-      <rect x="${u + 1}" y="${v + dv / 2 - 0.6}" width="${du - 2}" height="1.2" class="bb-gap"/></g>`;
+      <rect x="${u + 1}" y="${v + dv / 2 - 0.6}" width="${du - 2}" height="1.2" class="bb-gap"/></g></g>`;
     return s;
   }
 
   function led(u, v) {
     const base = P(u, v, 2.4);
     const top = P(u, v, 14);
-    return `<g id="sc-led" class="sc-led">
+    const sh = P(u + 4, v - 1, 2.4);
+    return `<ellipse cx="${sh[0].toFixed(1)}" cy="${sh[1].toFixed(1)}" rx="9" ry="4.5" class="shadow"/><g id="sc-led" class="sc-led" data-part="led">
       <path d="M${pt(P(u - 1.2, v, 2.4))} L${pt(P(u - 1.2, v, 6))} M${pt(P(u + 1.2, v, 2.4))} L${pt(P(u + 1.2, v, 6.5))}" class="legs"/>
       <circle cx="${top[0].toFixed(1)}" cy="${top[1].toFixed(1)}" r="36" class="halo red" id="sc-led-halo"/>
       <rect x="${(top[0] - 7).toFixed(1)}" y="${top[1].toFixed(1)}" width="14" height="${(base[1] - top[1] - 12).toFixed(1)}" class="led-body"/>
@@ -132,7 +237,7 @@
   }
 
   function button(u, v) {
-    let s = '<g id="sc-btn" class="sc-btn clickable" tabindex="0" role="button" aria-label="Κουμπί: πάτα για αλλαγή">';
+    let s = '<g id="sc-btn" class="sc-btn clickable" data-part="button" tabindex="0" role="button" aria-label="Κουμπί: πάτα για αλλαγή">';
     s += box(u - 4.5, v - 4.5, 2.4, 9, 9, 3, 'btn-body');
     const c = P(u, v, 6.6);
     s += `<g id="sc-btn-cap"><ellipse cx="${c[0].toFixed(1)}" cy="${(c[1] + 3.4).toFixed(1)}" rx="9.5" ry="5.2" class="cap-side"/><ellipse cx="${c[0].toFixed(1)}" cy="${c[1].toFixed(1)}" rx="9.5" ry="5.2" class="cap"/></g>`;
@@ -141,7 +246,7 @@
   }
 
   function pir(u, v) {
-    let s = '<g id="sc-pir" class="sc-pir clickable" tabindex="0" role="button" aria-label="Αισθητήρας PIR: πάτα για κίνηση">';
+    let s = '<g id="sc-pir" class="sc-pir clickable" data-part="pir" tabindex="0" role="button" aria-label="Αισθητήρας PIR: πάτα για κίνηση">';
     s += box(u - 7, v - 7, 2.4, 14, 14, 1.4, 'pir-pcb');
     const c = P(u, v, 3.8);
     s += `<path d="M${(c[0] - 18).toFixed(1)},${c[1].toFixed(1)} a18,10 0 0 0 36,0 a18,18 0 0 0 -36,0 z" class="dome"/>
@@ -153,7 +258,7 @@
   }
 
   function sensor(u, v) {
-    let s = '<g id="sc-sensor" class="sc-sensor">';
+    let s = '<g id="sc-sensor" class="sc-sensor" data-part="sensor">';
     s += box(u - 4.5, v - 6, 2.4, 9, 12, 7, 'dht');
     s += `<g transform="${planeMatrix(9.4)}">${[0, 1, 2, 3, 4].map(i => `<rect x="${u - 3.4 + i * 1.6}" y="${v - 4.6}" width="0.8" height="9.2" class="vent"/>`).join('')}</g>`;
     const c = P(u, v, 10);
@@ -163,7 +268,7 @@
   }
 
   function router(u, v) {
-    let s = '<g id="sc-router" class="sc-router clickable" tabindex="0" role="button" aria-label="Router WiFi: πάτα για να το σβήσεις ή να το ανάψεις">';
+    let s = '<g id="sc-router" class="sc-router clickable" data-part="router" tabindex="0" role="button" aria-label="Router WiFi: πάτα για να το σβήσεις ή να το ανάψεις">';
     s += box(u, v, 0, 18, 11, 3.2, 'router-body');
     const a1 = P(u + 4, v + 1, 3.2);
     const a2 = P(u + 14, v + 1, 3.2);
@@ -179,7 +284,7 @@
   }
 
   function rpi(u, v, id) {
-    let s = `<g id="${id || 'sc-pi'}" class="sc-pi clickable" tabindex="0" role="button" aria-label="Raspberry Pi με τον broker MQTT">`;
+    let s = `<g id="${id || 'sc-pi'}" class="sc-pi" data-part="rpi-broker">`;
     s += box(u, v, 0, 30, 20, 1.4, 'pi-pcb');
     s += box(u + 26, v + 2, 1.4, 5, 7, 4, 'port') + box(u + 26, v + 11, 1.4, 5, 7, 4, 'port');
     s += box(u + 5, v + 6, 1.4, 8, 8, 0.8, 'chip');
@@ -193,19 +298,31 @@
   // Η σειρά με τα μονά pins ακολουθεί το πραγματικό Pi: pin 7 = GPIO 4, 9 = GND, 11 = GPIO 17, 13 = GPIO 27.
   const PI_ODD = ['3V3', 'GPIO2', 'GPIO3', 'GPIO4', 'GND', 'GPIO17', 'GPIO27', 'GPIO22', '3V3b', 'GPIO10', 'GPIO9', 'GPIO11', 'GNDb', 'ID_SD', 'GPIO5', 'GPIO6', 'GPIO13', 'GPIO19', 'GPIO26', 'GNDc'];
   const PI_PIN_U = i => 6 + i * 2.4;
+  function piPinUV(name) {
+    const i = PI_ODD.indexOf(name);
+    return { u: ESP.u + PI_PIN_U(i), v: ESP.v + 30.6, h: 4.2 };
+  }
   function piPin(name) {
     const i = PI_ODD.indexOf(name);
     return P(ESP.u + PI_PIN_U(i), ESP.v + 31.6, 4.6);
   }
   function piHost() {
     const { u, v } = ESP;
-    let s = '<g id="sc-esp" class="sc-esp sc-pihost">';
+    let s = '<g id="sc-esp" class="sc-esp sc-pihost" data-part="pi">';
     s += box(u, v, 0, 56, 34, 1.6, 'pi-pcb');
     s += `<g transform="${planeMatrix(1.6)}"><text x="${u + 20}" y="${v + 25}" class="silk2">Raspberry Pi 5</text></g>`;
     // θύρες USB / Ethernet στην αριστερή στενή πλευρά
-    s += box(u - 2, v + 2, 1.6, 9, 9, 6, 'port') + box(u - 2, v + 12.5, 1.6, 9, 8, 6, 'port') + box(u - 2, v + 22, 1.6, 9, 9, 7, 'port');
-    s += box(u + 22, v + 6, 1.6, 12, 12, 1.4, 'chip') + box(u + 37, v + 7, 1.6, 8, 10, 1, 'chip');
+    for (const [hu, hv] of [[3.5, 3.5], [3.5, 30.5], [52.5, 3.5], [52.5, 30.5]]) {
+      const c = P(u + hu, v + hv, 1.6);
+      s += `<ellipse cx="${c[0].toFixed(1)}" cy="${c[1].toFixed(1)}" rx="2" ry="1.2" class="hole"/>`;
+    }
+    s += `<g data-part="pi-ports">${box(u - 2, v + 2, 1.6, 9, 9, 6, 'port')}${box(u - 2, v + 12.5, 1.6, 9, 8, 6, 'port')}${box(u - 2, v + 22, 1.6, 9, 9, 7, 'eth')}</g>`;
+    s += `<g data-part="pi-cpu">${box(u + 22, v + 6, 1.6, 12, 12, 1.4, 'chip')}<g transform="${planeMatrix(3)}"><text x="${u + 23.5}" y="${v + 12.6}" class="chip-t">BCM2712</text></g></g>`;
+    s += `<g data-part="pi-ram">${box(u + 37, v + 7, 1.6, 8, 10, 1, 'chip')}</g>`;
+    s += `<g data-part="pi-power">${box(u + 50, v + 12, 1.6, 6, 5, 2, 'usb')}</g>`;
+    for (const [cu, cv] of [[14, 8], [14, 11], [17, 20], [47, 22], [34, 22]]) s += box(u + cu, v + cv, 1.6, 1.6, 0.9, 0.5, 'smd-c');
     // header 2×20
+    s += '<g data-part="pi-gpio">';
     s += box(u + 4.6, v + 29.6, 1.6, 48.4, 4, 2.6, 'pinhdr');
     for (let i = 0; i < 20; i++) {
       for (const vv of [30.6, 32.6]) {
@@ -213,6 +330,7 @@
         s += `<ellipse cx="${p[0].toFixed(1)}" cy="${p[1].toFixed(1)}" rx="1.4" ry="0.8" class="pin-pad"/>`;
       }
     }
+    s += '</g>';
     const pwr = P(u + 50, v + 4, 2.2);
     const act = P(u + 50, v + 8, 2.2);
     s += `<circle cx="${pwr[0].toFixed(1)}" cy="${pwr[1].toFixed(1)}" r="2.2" class="smd pwr" id="sc-pwr"/>`;
@@ -223,7 +341,7 @@
 
   // Μικρό ESP32 που στέλνει μετρήσεις στο Pi (εικονικός client του broker).
   function miniEsp(u, v) {
-    let s = '<g id="sc-node" class="sc-node">';
+    let s = '<g id="sc-node" class="sc-node" data-part="mini-esp">';
     s += box(u, v, 0, 22, 12, 1.2, 'pcb');
     s += box(u + 3, v + 2, 1.2, 9, 8, 1.2, 'shield');
     s += `<g transform="${planeMatrix(1.2)}"><text x="${u + 13}" y="${v + 7.5}" class="silk2">ESP32</text></g>`;
@@ -231,8 +349,102 @@
     return s;
   }
 
+  // Επίπεδο u–h (κάθετο, σε σταθερό v): για ό,τι γράφεται στο μπροστινό πρόσωπο όρθιων πλακετών.
+  const planeUH = v => `matrix(${(C * K).toFixed(4)},${(S * K).toFixed(4)},0,${K.toFixed(4)},${(-v * C * K).toFixed(2)},${(v * S * K).toFixed(2)})`;
+
+  function hull(points) {
+    const pts = points.slice().sort((a, b) => a[0] - b[0] || a[1] - b[1]);
+    const cross = (o, a, b) => (a[0] - o[0]) * (b[1] - o[1]) - (a[1] - o[1]) * (b[0] - o[0]);
+    const lower = [];
+    for (const q of pts) { while (lower.length >= 2 && cross(lower[lower.length - 2], lower[lower.length - 1], q) <= 0) lower.pop(); lower.push(q); }
+    const upper = [];
+    for (const q of pts.slice().reverse()) { while (upper.length >= 2 && cross(upper[upper.length - 2], upper[upper.length - 1], q) <= 0) upper.pop(); upper.push(q); }
+    return lower.slice(0, -1).concat(upper.slice(0, -1));
+  }
+  // Κύλινδρος με άξονα προς +v (τα «μάτια» του HC-SR04).
+  function cylinderV(cu, cv, ch, r, len) {
+    const ring = (vv, rr) => Array.from({ length: 28 }, (_, i) => { const t = (i / 28) * Math.PI * 2; return P(cu + rr * Math.cos(t), vv, ch + rr * Math.sin(t)); });
+    const back = ring(cv, r);
+    const front = ring(cv + len, r);
+    return poly(hull(back.concat(front)), 'cyl-side') + poly(front, 'cyl-face') + poly(ring(cv + len + 0.01, r * 0.7), 'cyl-mesh') + poly(ring(cv + len + 0.02, r * 0.25), 'cyl-core');
+  }
+
+  // Αισθητήρας απόστασης HC-SR04: όρθια μπλε πλακέτα στο breadboard, «μάτια» προς τον θεατή (+v).
+  const US = { u: 98, v: 9, w: 20 };
+  function ultrasonic() {
+    const { u, v, w } = US;
+    const H = 2.4;
+    let s = '<g id="sc-us" class="sc-us" data-part="ultrasonic">';
+    // 4 pins στο breadboard
+    for (let i = 0; i < 4; i++) s += box(u + 6.2 + i * 2.54, v + 0.2, H, 0.6, 0.6, 2.4, 'pinhdr');
+    s += box(u, v, H + 2, w, 1.2, 10, 'us-pcb');
+    s += `<g transform="${planeUH(v + 1.2)}"><text x="${u + 7.2}" y="${-(H + 11)}" class="us-t">HC-SR04</text>`
+      + `<text x="${u + 6.4}" y="${-(H + 2.7)}" class="us-s">VCC TRIG ECHO GND</text></g>`;
+    s += box(u + 8.6, v + 1.2, H + 9, 2.8, 0.8, 1.6, 'shield');
+    s += cylinderV(u + 4.6, v + 1.2, H + 7, 3.7, 4);
+    s += cylinderV(u + w - 4.6, v + 1.2, H + 7, 3.7, 4);
+    // κύματα (40 kHz) προς το εμπόδιο
+    const c = P(u + w / 2, v + 6, H + 7);
+    s += `<g id="sc-us-waves" class="us-waves" transform="translate(${c[0].toFixed(1)},${c[1].toFixed(1)})">`;
+    for (const r of [8, 15, 22]) s += `<path d="M${(-r * 0.87).toFixed(1)},${(r * 0.1).toFixed(1)} Q${(-r * 0.3).toFixed(1)},${(r * 0.75).toFixed(1)} ${(r * 0.25).toFixed(1)},${(r * 0.62).toFixed(1)}"/>`;
+    s += '</g></g>';
+    return s;
+  }
+  function usPinUV(i) { return { u: US.u + 6.5 + i * 2.54, v: US.v + 2.6, h: 2.4 }; }
+
+  // Φανάρι: μαύρη κολόνα με τρία φώτα, στο breadboard.
+  const TL = { u: 80, v: 16 };
+  function trafficLight() {
+    const { u, v } = TL;
+    let s = '<g id="sc-tl" class="sc-tl" data-part="traffic">';
+    s += box(u - 1, v - 1, 2.4, 2, 2, 4, 'tl-pole');
+    s += box(u - 2.6, v - 1.6, 6.4, 5.2, 3.2, 16, 'tl-body');
+    const lamps = [['r', 18.4], ['y', 13.4], ['g', 8.4]];
+    s += `<g transform="${planeUH(v + 1.6)}">`;
+    for (const [k, hh] of lamps) {
+      s += `<circle cx="${u}" cy="${-hh}" r="3.4" class="tl-halo tl-${k}" id="sc-tl-${k}-halo"/>`;
+      s += `<circle cx="${u}" cy="${-hh}" r="1.7" class="tl-lamp tl-${k}" id="sc-tl-${k}"/>`;
+    }
+    s += '</g></g>';
+    return s;
+  }
+  function tlPinUV(i) { return { u: TL.u - 2.54 + i * 2.54, v: TL.v + 5, h: 2.4 }; }
+
+  // Αυτοκινητάκι-εμπόδιο: το σέρνεις κατά μήκος του άξονα +v (πιο κοντά ή πιο μακριά από τον αισθητήρα).
+  const CAR = { u: US.u + US.w / 2, v0: 31 };
+  const CAR_SCALE = 0.2; // μονάδες πάγκου ανά εκατοστό
+  function carV(cm) { return CAR.v0 + Math.max(2, Math.min(200, cm)) * CAR_SCALE; }
+  function car() {
+    const u = CAR.u;
+    const v = 0;
+    let s = `<g id="sc-car" class="sc-car clickable draggable" data-part="car" tabindex="0" role="slider" aria-label="Εμπόδιο: σύρε το για να αλλάξει η απόσταση" aria-valuemin="2" aria-valuemax="200">`;
+    s += shadow(u - 4, v, 8, 15);
+    for (const [wu, wv] of [[3.6, 3], [3.6, 11.2]]) {
+      const ring = Array.from({ length: 20 }, (_, i) => { const t = (i / 20) * Math.PI * 2; return P(u + wu, v + wv + 1.6 * Math.cos(t), 1.6 + 1.6 * Math.sin(t)); });
+      s += poly(ring, 'car-wheel');
+    }
+    s += box(u - 3.8, v, 0.9, 7.6, 15, 3.6, 'car-body');
+    s += box(u - 3.2, v + 4, 4.5, 6.4, 7, 3, 'car-cabin');
+    s += poly([P(u + 3.2, v + 4.6, 5), P(u + 3.2, v + 10.4, 5), P(u + 3.2, v + 10, 7.1), P(u + 3.2, v + 5, 7.1)], 'car-glass');
+    s += poly([P(u - 2.6, v + 11, 5), P(u + 2.6, v + 11, 5), P(u + 2.6, v + 11, 7.1), P(u - 2.6, v + 11, 7.1)], 'car-glass');
+    for (const [wu, wv] of [[3.9, 3], [3.9, 11.2]]) {
+      const ring = Array.from({ length: 20 }, (_, i) => { const t = (i / 20) * Math.PI * 2; return P(u + wu, v + wv + 1.6 * Math.cos(t), 1.6 + 1.6 * Math.sin(t)); });
+      s += poly(ring, 'car-wheel') + poly(ring.map((q, i) => { const t = (i / 20) * Math.PI * 2; return P(u + wu + 0.05, v + wv + 0.7 * Math.cos(t), 1.6 + 0.7 * Math.sin(t)); }), 'car-hub');
+    }
+    s += '</g>';
+    return s;
+  }
+  // Μετατόπιση της ομάδας του αυτοκινήτου για απόσταση cm (σε μονάδες SVG).
+  function carOffset(cm) { const q = P(0, carV(cm), 0); return `translate(${q[0].toFixed(1)},${q[1].toFixed(1)})`; }
+  // Πόσο αλλάζει η απόσταση (cm) όταν το ποντίκι κινείται (dx, dy) σε μονάδες SVG.
+  function dragToCm(dx, dy) {
+    const ax = -C * K;
+    const ay = S * K;
+    return (dx * ax + dy * ay) / (ax * ax + ay * ay) / CAR_SCALE;
+  }
+
   function tablet(u, v) {
-    let s = '<g id="sc-dash" class="sc-dash">';
+    let s = '<g id="sc-dash" class="sc-dash" data-part="tablet">';
     s += box(u, v, 0, 26, 18, 1.2, 'tab-body');
     s += `<g transform="${planeMatrix(1.2)}"><rect x="${u + 1.5}" y="${v + 1.5}" width="23" height="15" rx="0.8" class="tab-screen"/>
       <text x="${u + 3}" y="${v + 5.5}" class="tab-h">Dashboard</text>
@@ -243,7 +455,7 @@
   }
 
   function laptop(u, v, cls, id) {
-    let s = `<g id="${id}" class="sc-laptop ${cls}">`;
+    let s = `<g id="${id}" class="sc-laptop ${cls}" data-part="${cls === 'unk' ? 'unknown-device' : 'laptop'}">`;
     s += box(u, v, 0, 18, 13, 1, 'lap-base');
     const a = [P(u, v, 1), P(u + 18, v, 1), P(u + 18, v - 3, 13), P(u, v - 3, 13)];
     s += poly(a, 'lap-lid');
@@ -282,7 +494,7 @@
     let back = '';
     let mid = piHost();
     let front = '';
-    const labels = [callout(P(28, 16, 4), -96, -58, net ? 'RASPBERRY PI · BROKER + PYTHON' : 'RASPBERRY PI')];
+    const labels = [callout(P(28, 16, 4), -96, -58, net ? 'RASPBERRY PI · BROKER + PYTHON' : 'RASPBERRY PI', null, 'pi'), callout(piPin('GPIO22'), -40, 40, 'GPIO HEADER · 40 PINS', null, 'pi-gpio')];
     const wires = [];
     mid += breadboard();
     const LED_AT = [72, 15];
@@ -290,33 +502,33 @@
     const PIR_AT = [102, 15];
     if (hw.includes('led') || hw.includes('button') || hw.includes('pir') || !(net || hw.includes('web'))) {
       front += led(LED_AT[0], LED_AT[1]);
-      wires.push(wire(piPin('GPIO17'), P(LED_AT[0] - 0.8, LED_AT[1], 2.6), 'w-led', 46, 'sc-w-led'));
-      wires.push(wire(piPin('GND'), P(LED_AT[0] + 1.5, BB.v + BB.dv - 1.5, 2.6), 'w-gnd', 30));
-      labels.push(callout(P(LED_AT[0], LED_AT[1], 14), -40, -60, 'LED · GPIO 17'));
+      wires.push(wire(piPinUV('GPIO17'), { u: LED_AT[0] - 2.54, v: LED_AT[1] + 2.54, h: 2.4 }, 'w-led', 46, 'sc-w-led'));
+      wires.push(wire(piPinUV('GND'), { u: LED_AT[0] + 2.54, v: BB.v + BB.dv - 2, h: 2.4 }, 'w-gnd', 30));
+      labels.push(callout(P(LED_AT[0], LED_AT[1], 14), -40, -60, 'LED · GPIO 17', null, 'led'));
     }
     if (hw.includes('button')) {
       front += button(BTN_AT[0], BTN_AT[1]);
-      wires.push(wire(piPin('GPIO27'), P(BTN_AT[0] - 2.5, BTN_AT[1] + 3, 2.6), 'w-btn', 54, 'sc-w-btn'));
-      labels.push(callout(P(BTN_AT[0], BTN_AT[1], 5), 10, -66, 'ΚΟΥΜΠΙ · GPIO 27'));
+      wires.push(wire(piPinUV('GPIO27'), { u: BTN_AT[0] - 5.1, v: BTN_AT[1] + 2.54, h: 2.4 }, 'w-btn', 54, 'sc-w-btn'));
+      labels.push(callout(P(BTN_AT[0], BTN_AT[1], 5), 10, -66, 'ΚΟΥΜΠΙ · GPIO 27', null, 'button'));
     }
     if (hw.includes('pir')) {
       front += pir(PIR_AT[0], PIR_AT[1]);
-      wires.push(wire(piPin('GPIO4'), P(PIR_AT[0] - 4, PIR_AT[1] + 5, 2.6), 'w-pir', 62, 'sc-w-pir'));
-      labels.push(callout(P(PIR_AT[0] + 4, PIR_AT[1], 4), 34, -28, 'PIR · GPIO 4'));
+      wires.push(wire(piPinUV('GPIO4'), { u: PIR_AT[0] - 8.9, v: PIR_AT[1] + 5, h: 2.4 }, 'w-pir', 62, 'sc-w-pir'));
+      labels.push(callout(P(PIR_AT[0] + 4, PIR_AT[1], 4), 34, -28, 'PIR · GPIO 4', null, 'pir'));
     }
     let links = '';
     const web = hw.includes('web');
     if (net || web) {
       back += router(-14, -40);
-      labels.push(callout(P(-5, -38, 9), -60, -22, 'ROUTER'));
+      labels.push(callout(P(-5, -38, 9), -60, -22, 'ROUTER', null, 'router'));
       back += tablet(100, -40);
-      labels.push(callout(P(112, -32, 2), 40, -36, web ? (net ? 'DASHBOARD · BROWSER' : 'TABLET · BROWSER') : 'DASHBOARD'));
+      labels.push(callout(P(112, -32, 2), 40, -36, web ? (net ? 'DASHBOARD · BROWSER' : 'TABLET · BROWSER') : 'DASHBOARD', null, 'tablet'));
       links += `<path id="sc-link-wifi" d="M${pt(P(-5, -32, 4))} Q${pt(P(0, -14, 26))} ${pt(P(10, 10, 2))}" class="link"/>`;
       links += `<path id="sc-link-pi-dash" d="M${pt(P(40, 6, 2))} Q${pt(P(80, -20, 30))} ${pt(P(106, -32, 1.2))}" class="link"/>`;
     }
     if (net) {
       back += miniEsp(40, -52);
-      labels.push(callout(P(51, -46, 2), -20, -44, hw.includes('sensor') ? 'ESP32 · ΑΙΣΘΗΤΗΡΑΣ' : 'ESP32 · ΣΥΣΚΕΥΗ'));
+      labels.push(callout(P(51, -46, 2), -20, -44, hw.includes('sensor') ? 'ESP32 · ΑΙΣΘΗΤΗΡΑΣ' : 'ESP32 · ΣΥΣΚΕΥΗ', null, 'mini-esp'));
       if (hw.includes('sensor')) back += sensor(68, -46);
       links += `<path id="sc-link-esp-pi" d="M${pt(P(51, -44, 2))} Q${pt(P(40, -20, 34))} ${pt(P(28, 6, 2))}" class="link"/>`;
     }
@@ -334,16 +546,16 @@
     const labels = [];
     if (wifi) {
       back += router(-14, -38);
-      labels.push(callout(P(-5, -36, 9), -60, -22, 'ROUTER WIFI'));
+      labels.push(callout(P(-5, -36, 9), -60, -22, 'ROUTER WIFI', null, 'router'));
     }
     if (net) {
       back += rpi(52, -50);
       back += tablet(98, -44);
-      labels.push(callout(P(66, -44, 6), -10, -40, 'RASPBERRY PI · BROKER'));
-      labels.push(callout(P(110, -36, 2), 40, -36, 'DASHBOARD'));
+      labels.push(callout(P(66, -44, 6), -10, -40, 'RASPBERRY PI · BROKER', null, 'rpi-broker'));
+      labels.push(callout(P(110, -36, 2), 40, -36, 'DASHBOARD', null, 'tablet'));
     }
     mid += esp32();
-    labels.push(callout(P(14, 14, 4), -84, -48, 'ESP32'));
+    labels.push(callout(P(14, 14, 4), -84, -48, 'ESP32', null, 'esp32'));
     mid += breadboard();
     // καλώδια από τα pins στο breadboard
     const wires = [];
@@ -351,28 +563,48 @@
     const BTN_AT = [86, 15];
     const PIR_AT = [102, 15];
     const SEN_AT = [116, 10];
-    front += led(LED_AT[0], LED_AT[1]);
-    wires.push(wire(espPin('D2'), P(LED_AT[0] - 0.8, LED_AT[1], 2.6), 'w-led', 46, 'sc-w-led'));
-    wires.push(wire(espPin('GND'), P(LED_AT[0] + 1.5, BB.v + BB.dv - 1.5, 2.6), 'w-gnd', 30));
-    labels.push(callout(P(LED_AT[0], LED_AT[1], 14), -40, -60, 'LED · GPIO 2'));
+    // Το LED μπαίνει στα μαθήματα που δεν έχουν αισθητήρα απόστασης/φανάρι (ή όταν το ζητούν ρητά).
+    if (hw.includes('led') || !(hw.includes('ultrasonic') || hw.includes('traffic'))) {
+      front += led(LED_AT[0], LED_AT[1]);
+      wires.push(wire(espPinUV('D2'), { u: LED_AT[0] - 2.54, v: LED_AT[1] + 2.54, h: 2.4 }, 'w-led', 46, 'sc-w-led'));
+      wires.push(wire(espPinUV('GND'), { u: LED_AT[0] + 2.54, v: BB.v + BB.dv - 2, h: 2.4 }, 'w-gnd', 30));
+      labels.push(callout(P(LED_AT[0], LED_AT[1], 14), 26, -92, 'LED · GPIO 2', null, 'led'));
+    }
     if (hw.includes('button')) {
       front += button(BTN_AT[0], BTN_AT[1]);
-      wires.push(wire(espPin('D15'), P(BTN_AT[0] - 2.5, BTN_AT[1] + 3, 2.6), 'w-btn', 54, 'sc-w-btn'));
-      labels.push(callout(P(BTN_AT[0], BTN_AT[1], 5), 10, -66, 'ΚΟΥΜΠΙ · GPIO 15'));
+      wires.push(wire(espPinUV('D15'), { u: BTN_AT[0] - 5.1, v: BTN_AT[1] + 2.54, h: 2.4 }, 'w-btn', 54, 'sc-w-btn'));
+      labels.push(callout(P(BTN_AT[0], BTN_AT[1], 5), 10, -66, 'ΚΟΥΜΠΙ · GPIO 15', null, 'button'));
     }
     if (hw.includes('pir')) {
       front += pir(PIR_AT[0], PIR_AT[1]);
-      wires.push(wire(espPin('D4'), P(PIR_AT[0] - 4, PIR_AT[1] + 5, 2.6), 'w-pir', 62, 'sc-w-pir'));
-      labels.push(callout(P(PIR_AT[0] + 4, PIR_AT[1], 4), 34, -28, 'PIR · GPIO 4'));
+      wires.push(wire(espPinUV('D4'), { u: PIR_AT[0] - 8.9, v: PIR_AT[1] + 5, h: 2.4 }, 'w-pir', 62, 'sc-w-pir'));
+      labels.push(callout(P(PIR_AT[0] + 4, PIR_AT[1], 4), hw.includes('sensor') ? 70 : 34, hw.includes('sensor') ? -78 : -28, 'PIR · GPIO 4', null, 'pir'));
     }
     if (hw.includes('sensor')) {
       front += sensor(SEN_AT[0], SEN_AT[1]);
-      labels.push(callout(P(SEN_AT[0] + 3, SEN_AT[1] + 4, 4), 30, 30, 'ΑΙΣΘΗΤΗΡΑΣ'));
+      labels.push(callout(P(SEN_AT[0] + 3, SEN_AT[1] + 4, 4), 30, 30, 'ΑΙΣΘΗΤΗΡΑΣ', null, 'sensor'));
+    }
+    if (hw.includes('ultrasonic')) {
+      front += ultrasonic();
+      wires.push(wire(espPinUV('D5'), usPinUV(1), 'w-trig', 70, 'sc-w-trig'));
+      wires.push(wire(espPinUV('D18'), usPinUV(2), 'w-echo', 64, 'sc-w-echo'));
+      wires.push(wire(espPinUV('GND'), usPinUV(3), 'w-gnd', 40));
+      labels.push(callout(P(US.u + US.w - 3, US.v, 14), 40, -50, 'HC-SR04 · TRIG 5 · ECHO 18', null, 'ultrasonic'));
+      front += `<g id="sc-car-move" transform="${carOffset(50)}">${car()}</g>`;
+      front += `<g id="sc-dist" class="dist-line"><path id="sc-dist-path" d=""/><g id="sc-dist-tag"><rect x="-26" y="-9" width="52" height="18" rx="9" class="dist-pill"/><text x="0" y="3.6" text-anchor="middle" class="dist-t" id="sc-dist-t">50 cm</text></g></g>`;
+      labels.push(`<g id="sc-car-label">${callout(P(CAR.u + 4, 6, 4), 50, 26, 'ΕΜΠΟΔΙΟ · ΣΥΡΕ ΤΟ', null, 'car')}</g>`);
+    }
+    if (hw.includes('traffic')) {
+      front += trafficLight();
+      wires.push(wire(espPinUV('D25'), tlPinUV(0), 'w-red', 58, 'sc-w-red'));
+      wires.push(wire(espPinUV('D26'), tlPinUV(1), 'w-yel', 52, 'sc-w-yel'));
+      wires.push(wire(espPinUV('D27'), tlPinUV(2), 'w-grn', 46, 'sc-w-grn'));
+      labels.push(callout(P(TL.u, TL.v + 1.6, 22), 40, -60, 'ΦΑΝΑΡΙ · 25 · 26 · 27', null, 'traffic'));
     }
     let links = '';
-    if (wifi) links += `<path id="sc-link-wifi" d="M${pt(P(-5, -30, 4))} Q${pt(P(-4, -12, 30))} ${pt(P(2, 14, 4))}" class="link"/>`;
+    if (wifi) links += `<path id="sc-link-wifi" d="M${pt(P(-5, -30, 4))} Q${pt(P(-4, -12, 30))} ${pt(P(3, 14, PCB_TOP + 1))}" class="link"/>`;
     if (net) {
-      links += `<path id="sc-link-esp-pi" d="M${pt(P(2, 14, 4))} Q${pt(P(30, -20, 40))} ${pt(P(64, -40, 2))}" class="link"/>`;
+      links += `<path id="sc-link-esp-pi" d="M${pt(P(3, 14, PCB_TOP + 1))} Q${pt(P(30, -20, 40))} ${pt(P(64, -40, 2))}" class="link"/>`;
       links += `<path id="sc-link-pi-dash" d="M${pt(P(70, -36, 2))} Q${pt(P(92, -30, 26))} ${pt(P(104, -36, 1.2))}" class="link"/>`;
     }
     const inner = `<g class="sc-back">${back}</g><g class="sc-links">${links}</g><g class="sc-mid">${mid}</g><g class="sc-wires">${wires.join('')}</g><g class="sc-front">${front}</g><g class="sc-labels">${labels.join('')}</g><g id="sc-packets"></g>`;
@@ -383,12 +615,15 @@
   // Αρχική: η πλακέτα μόνη της, με ετικέτες για τα μέρη της.
   function homeScene() {
     let inner = esp32();
-    inner += callout(P(14, 14, 4.6), -96, -60, 'ESP-WROOM-32');
-    inner += callout(P(1.5, 14, 1.6), -70, 10, 'ΚΕΡΑΙΑ WIFI');
-    inner += callout(P(51, 14, 3.4), 40, 36, 'USB-C');
-    inner += callout(espPin('D2'), 60, 26, 'PINS GPIO');
-    inner += callout(P(38, 19, 2.2), 70, -40, 'LED D2 (GPIO 2)');
-    inner += callout(P(45.5, 6, 2.6), 40, -66, 'ΚΟΥΜΠΙΑ EN / BOOT');
+    const T = PCB_TOP;
+    inner += callout(P(16, 14, T + 2.4), -96, -66, 'ESP-WROOM-32', null, 'esp-module');
+    inner += callout(P(3, 14, T + 0.8), -80, 6, 'ΚΕΡΑΙΑ WIFI', null, 'esp-antenna');
+    inner += callout(P(52, 14, T + 1.6), 74, 6, 'USB-C', null, 'esp-usb');
+    inner += callout(espPin('D2'), 70, 40, 'PINS GPIO · 38', null, 'esp-pins');
+    inner += callout(P(43, 18.5, T + 0.4), 76, -26, 'LED GPIO 2', null, 'esp-led');
+    inner += callout(P(46.7, 4.3, T + 1.3), 40, -70, 'ΚΟΥΜΠΙΑ EN / BOOT', null, 'esp-buttons');
+    inner += callout(P(35.6, 13, T + 0.9), 30, -96, 'CP2102 · USB → SERIAL', null, 'esp-uart');
+    inner += callout(P(31.7, 19.3, T + 1.5), -30, 66, 'ΡΥΘΜΙΣΤΗΣ 3,3 V', null, 'esp-reg');
     return fit(`<g class="sc-mid">${inner}</g>`, [-150, -120, 320, 200], 'home', 'Η πλακέτα ESP32 με ετικέτες για τα μέρη της');
   }
 
@@ -412,7 +647,7 @@
     const hub = nodeCenter('192.168.1.10');
     for (const [ip, n] of Object.entries(NET_NODES)) {
       if (n.kind === 'pi') nodes += rpi(n.u, n.v, 'sc-pi');
-      else if (n.kind === 'esp') nodes += `<g class="mini-esp" id="sc-node-${ip.split('.').pop()}">${box(n.u, n.v, 0, 18, 12, 1.4, 'pcb')}${box(n.u + 3, n.v + 2, 1.4, 8, 8, 1.6, 'shield')}</g>`;
+      else if (n.kind === 'esp') nodes += `<g class="mini-esp" data-part="mini-esp" id="sc-node-${ip.split('.').pop()}">${box(n.u, n.v, 0, 18, 12, 1.4, 'pcb')}${box(n.u + 3, n.v + 2, 1.4, 8, 8, 1.6, 'shield')}</g>`;
       else nodes += laptop(n.u, n.v, n.kind === 'unk' ? 'unk' : '', `sc-node-${ip.split('.').pop()}`);
       if (ip !== '192.168.1.10') {
         const c = nodeCenter(ip);
@@ -481,13 +716,20 @@
     const apply = () => svg.setAttribute('viewBox', vb.map(n => n.toFixed(1)).join(' '));
     let drag = null;
     svg.addEventListener('pointerdown', e => {
+      svg._moved = false;
       if (e.target.closest('.clickable')) return;
-      drag = { x: e.clientX, y: e.clientY, vb: vb.slice() };
-      svg.setPointerCapture(e.pointerId);
-      svg.classList.add('dragging');
+      drag = { x: e.clientX, y: e.clientY, vb: vb.slice(), id: e.pointerId, started: false };
     });
     svg.addEventListener('pointermove', e => {
       if (!drag) return;
+      // Το σύρσιμο ξεκινά μόνο αν το ποντίκι κουνηθεί λίγο· αλλιώς είναι απλό κλικ (π.χ. σε ένα κομμάτι).
+      if (!drag.started) {
+        if (Math.hypot(e.clientX - drag.x, e.clientY - drag.y) < 5) return;
+        drag.started = true;
+        svg._moved = true;
+        svg.setPointerCapture(drag.id);
+        svg.classList.add('dragging');
+      }
       const r = svg.getBoundingClientRect();
       const kx = vb[2] / r.width;
       vb[0] = drag.vb[0] - (e.clientX - drag.x) * kx;
@@ -520,5 +762,55 @@
     };
   }
 
-  root.IoTScene = { labScene, piScene, homeScene, netScene, attachPanZoom, animatePacket, NET_NODES };
+  // «Στήσιμο» του κυκλώματος, όπως όταν αλλάζεις μάθημα: τα εξαρτήματα πέφτουν ένα-ένα στη θέση τους,
+  // μετά τα καλώδια σχεδιάζονται από άκρη σε άκρη, και στο τέλος εμφανίζονται οι ετικέτες.
+  // Μόνο animations που δεν αφήνουν ίχνος (fill: backwards): όταν τελειώσουν, ισχύει πάλι το κανονικό CSS.
+  function buildIn(svg) {
+    if (!svg || !svg.animate) return;
+    const bounce = 'cubic-bezier(.2,.9,.25,1.18)';
+    const fade = (el, delay, dur) => el.animate([{ opacity: 0 }, { opacity: 1 }], { duration: dur || 380, delay, fill: 'backwards' });
+    const drop = (el, delay) => {
+      if (el.hasAttribute('transform')) return fade(el, delay);
+      el.animate([{ opacity: 0, transform: 'translate(0px,-28px)' }, { opacity: 1, transform: 'translate(0px,0px)' }], { duration: 520, delay, easing: bounce, fill: 'backwards' });
+    };
+    const draw = (path, delay, dur) => {
+      let len = 0;
+      try { len = path.getTotalLength(); } catch (e) { len = 0; }
+      if (!len) return fade(path, delay);
+      const da = `${len.toFixed(1)} ${len.toFixed(1)}`;
+      path.animate([{ strokeDasharray: da, strokeDashoffset: len }, { strokeDasharray: da, strokeDashoffset: 0 }], { duration: dur, delay, easing: 'ease-in-out', fill: 'backwards' });
+    };
+    const floor = svg.querySelector('.floor');
+    if (floor) fade(floor, 0, 300);
+    // 1. εξαρτήματα (οι σκιές εμφανίζονται μαζί με το αντικείμενο που ακολουθεί)
+    const parts = [];
+    for (const sel of ['.sc-back', '.sc-mid', '.sc-front']) {
+      const g = svg.querySelector(sel);
+      if (g) parts.push(...g.children);
+    }
+    const objects = parts.filter(el => !el.classList.contains('shadow'));
+    const step = Math.min(110, 1100 / Math.max(1, objects.length));
+    let t = 120;
+    parts.forEach(el => {
+      if (el.classList.contains('shadow')) { fade(el, t + 200, 320); return; }
+      drop(el, t);
+      t += step;
+    });
+    // 2. καλώδια και συνδέσεις δικτύου
+    let w = t + 260;
+    svg.querySelectorAll('.sc-wires .wire-g').forEach(g => {
+      g.querySelectorAll('path').forEach(p => draw(p, w, 620));
+      g.querySelectorAll('.box, circle').forEach(x => fade(x, w + 520, 240));
+      w += 170;
+    });
+    svg.querySelectorAll('.sc-links path').forEach((p, i) => draw(p, t + 200 + i * 120, 700));
+    // 3. ετικέτες
+    let l = Math.max(w, t + 600) + 120;
+    svg.querySelectorAll('.sc-labels > *').forEach(el => {
+      el.animate([{ opacity: 0, transform: 'translate(0px,8px)' }, { opacity: 1, transform: 'translate(0px,0px)' }], { duration: 340, delay: l, easing: 'ease-out', fill: 'backwards' });
+      l += 70;
+    });
+  }
+
+  root.IoTScene = { buildIn, carOffset, carV, dragToCm, CAR, US, P, labScene, piScene, homeScene, netScene, attachPanZoom, animatePacket, NET_NODES };
 })(typeof window !== 'undefined' ? window : globalThis);

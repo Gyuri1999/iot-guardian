@@ -163,6 +163,14 @@
 
   const CHECKS = {
     led(b, c) { return { pass: b.led === c.is, vars: { v: b.led ? 'αναμμένο' : 'σβηστό' } }; },
+    // Φανάρι: { check: 'lights', red: true, yellow: false, green: false } (όσα δοθούν)
+    lights(b, c) {
+      const now = { red: b.light(PINS.RED), yellow: b.light(PINS.YELLOW), green: b.light(PINS.GREEN) };
+      const pass = ['red', 'yellow', 'green'].every(k => c[k] === undefined || now[k] === c[k]);
+      const gr = { red: 'κόκκινο', yellow: 'κίτρινο', green: 'πράσινο' };
+      const on = Object.keys(now).filter(k => now[k]).map(k => gr[k]);
+      return { pass, vars: { v: on.length ? on.join(' + ') : 'όλα σβηστά' } };
+    },
     ledOutput(b) { return { pass: b.modes[PINS.LED] === 3, vars: { v: b.modeName(PINS.LED) || 'δεν ορίστηκε' } }; },
     count(b, c) {
       const n = countOf(b, c.text);

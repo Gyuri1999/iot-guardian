@@ -4,3 +4,4 @@ real-lab/.work/
 # Συστήματος
 .DS_Store
 node_modules/
+.claude/

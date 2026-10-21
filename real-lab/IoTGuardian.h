@@ -15,6 +15,11 @@
 #define LED_PIN 2
 #define BUTTON_PIN 15
 #define PIR_PIN 4
+#define TRIG_PIN 5
+#define ECHO_PIN 18
+#define RED_PIN 25
+#define YELLOW_PIN 26
+#define GREEN_PIN 27
 
 // ---- αισθητήρας DHT
 static DHT guardianDht(GUARDIAN_DHT_PIN, GUARDIAN_DHT_TYPE);

@@ -6,9 +6,10 @@
 (function (root) {
   'use strict';
 
-  const PINS = { LED: 2, BUTTON: 15, PIR: 4 };
+  const PINS = { LED: 2, BUTTON: 15, PIR: 4, TRIG: 5, ECHO: 18, RED: 25, YELLOW: 26, GREEN: 27 };
   const MODE_NAMES = { 1: 'INPUT', 3: 'OUTPUT', 5: 'INPUT_PULLUP' };
-  const PIN_LABELS = { 2: 'LED (GPIO 2)', 15: 'κουμπί (GPIO 15)', 4: 'PIR (GPIO 4)' };
+  const PIN_LABELS = { 2: 'LED (GPIO 2)', 15: 'κουμπί (GPIO 15)', 4: 'PIR (GPIO 4)', 5: 'TRIG του HC-SR04 (GPIO 5)', 18: 'ECHO του HC-SR04 (GPIO 18)', 25: 'κόκκινο φως (GPIO 25)', 26: 'κίτρινο φως (GPIO 26)', 27: 'πράσινο φως (GPIO 27)' };
+  const INPUT_PINS = new Set([15, 4, 18]);
   // Ενδεικτικό ρεύμα του ESP32 σε κάθε κατάσταση (mA). Πραγματικές τιμές διαφέρουν ανά πλακέτα.
   const POWER_MA = { active: 40, wifi: 120, light: 0.8, deep: 0.01 };
 
@@ -33,6 +34,8 @@
     }
 
     get led() { return this.modes[PINS.LED] === 3 && this.outputs[PINS.LED] === 1; }
+    // Φανάρι: ένα φως ανάβει μόνο αν το pin του είναι OUTPUT και HIGH.
+    light(pin) { return this.modes[pin] === 3 && this.outputs[pin] === 1; }
     get millis() { return Math.floor(this.micros / 1000); }
     modeName(pin) { return MODE_NAMES[this.modes[pin]] || null; }
     // Κάθε πέρασμα χρόνου χρεώνεται στην «μπαταρία» με το ρεύμα της τρέχουσας κατάστασης.
@@ -110,7 +113,7 @@
       if (!PIN_LABELS[pin]) {
         this.warnOnce('nc' + pin, line, `Στο GPIO ${pin} δεν είναι συνδεδεμένο τίποτα στην εικονική πλακέτα.`, 'Χρησιμοποίησε LED_PIN, BUTTON_PIN ή PIR_PIN.');
       }
-      if ((pin === PINS.BUTTON || pin === PINS.PIR) && mode === 3) {
+      if (INPUT_PINS.has(pin) && mode === 3) {
         this.warnOnce('outIn' + pin, line, `Το ${PIN_LABELS[pin]} είναι είσοδος, αλλά το ρύθμισες ως OUTPUT.`, 'Για να διαβάζεις από κουμπί ή αισθητήρα, χρησιμοποίησε INPUT.');
       }
       if (pin === PINS.LED && mode !== 3) {
@@ -124,19 +127,66 @@
       if (pin === PINS.LED && this.modes[pin] !== 3) {
         this.warnOnce('ledMode', line, 'Γράφεις στο LED_PIN χωρίς να το έχεις ρυθμίσει ως OUTPUT. Στην εικονική πλακέτα το LED μένει σβηστό.', 'Πρόσθεσε pinMode(LED_PIN, OUTPUT); μέσα στο setup(), πριν από το digitalWrite.');
       }
-      if (pin === PINS.BUTTON || pin === PINS.PIR) {
+      if (INPUT_PINS.has(pin)) {
         this.warnOnce('writeIn' + pin, line, `Γράφεις τιμή στο ${PIN_LABELS[pin]}, που είναι είσοδος. Δεν θα αλλάξει τίποτα.`, 'Το digitalWrite χρησιμοποιείται για εξόδους, π.χ. LED_PIN.');
       }
       if (!PIN_LABELS[pin]) {
         this.warnOnce('ncw' + pin, line, `Γράφεις στο GPIO ${pin}, όπου δεν είναι συνδεδεμένο τίποτα.`, 'Το LED είναι στο LED_PIN (GPIO 2).');
       }
+      // TRIG του HC-SR04: ένας παλμός HIGH τουλάχιστον 10 µs «οπλίζει» μία μέτρηση.
+      if (pin === PINS.TRIG) {
+        const was = this.outputs[pin] || 0;
+        if (!was && v) this.trig.highAt = this.micros;
+        if (was && !v && this.trig.highAt !== null) {
+          const len = this.micros - this.trig.highAt;
+          this.trig.highAt = null;
+          if (len >= 8) this.trig.armed = true;
+          else this.warnOnce('trigshort', line, `Ο παλμός TRIG κράτησε μόνο ${len} µs. Το HC-SR04 θέλει τουλάχιστον 10 µs.`, 'Γράψε digitalWrite(TRIG_PIN, HIGH); delayMicroseconds(10); digitalWrite(TRIG_PIN, LOW);');
+        }
+      }
       this.outputs[pin] = v;
+    }
+
+    // pulseIn(ECHO_PIN, HIGH): πόσα µs κράτησε η ηχώ. ~58 µs ανά εκατοστό (πάει και έρχεται με 343 m/s).
+    pulseIn(pin, level, timeout, line) {
+      const limit = timeout === undefined ? 1000000 : timeout;
+      if (pin !== PINS.ECHO) {
+        this.warnOnce('pulsepin' + pin, line, `Το pulseIn διαβάζει το GPIO ${pin}, αλλά η ηχώ του HC-SR04 είναι στο ECHO_PIN (GPIO 18). Επιστρέφει 0.`, 'Γράψε pulseIn(ECHO_PIN, HIGH).');
+        this.advanceMicros(limit);
+        return 0;
+      }
+      if (this.modes[pin] === 3) {
+        // Ένα pin OUTPUT δεν «ακούει»: η ηχώ δεν διαβάζεται ποτέ.
+        this.warnOnce('echomode', line, 'Το ECHO_PIN είναι ρυθμισμένο ως OUTPUT, άρα δεν μπορεί να διαβάσει την ηχώ: το pulseIn επιστρέφει 0.', 'Γράψε pinMode(ECHO_PIN, INPUT); στο setup().');
+        this.trig.armed = false;
+        this.advanceMicros(limit);
+        return 0;
+      }
+      if (this.modes[pin] !== 1 && this.modes[pin] !== 5) {
+        this.warnOnce('echomode', line, 'Το ECHO_PIN δεν ρυθμίστηκε ως INPUT.', 'Πρόσθεσε pinMode(ECHO_PIN, INPUT); στο setup().');
+      }
+      if (!level) { this.advanceMicros(Math.min(limit, 100)); return 0; }
+      if (!this.trig.armed) {
+        this.warnOnce('notrig', line, 'Το pulseIn περίμενε ηχώ, αλλά δεν στάλθηκε παλμός στο TRIG: επιστρέφει 0 μετά το timeout.', 'Πριν από το pulseIn στείλε παλμό: digitalWrite(TRIG_PIN, HIGH); delayMicroseconds(10); digitalWrite(TRIG_PIN, LOW);');
+        this.advanceMicros(limit);
+        return 0;
+      }
+      this.trig.armed = false;
+      const cm = this.inputs.distance;
+      const echo = cm > 400 || cm < 2 ? 0 : Math.round(cm * 58.3);
+      this.us = { at: this.micros, cm };
+      this.advanceMicros(450); // 8 παλμοί των 40 kHz πριν ξεκινήσει η ηχώ
+      if (!echo || echo > limit) { this.advanceMicros(Math.min(limit, 38000)); return 0; }
+      this.advanceMicros(echo);
+      return echo;
     }
 
     digitalRead(pin, line) {
       if (pin === PINS.BUTTON) return this.inputs.button ? 1 : 0;
       if (pin === PINS.PIR) return this.inputs.pir ? 1 : 0;
       if (pin === PINS.LED) return this.outputs[pin] || 0;
+      if (pin === PINS.ECHO) return 0;
+      if (this.outputs[pin] !== undefined) return this.outputs[pin];
       this.warnOnce('ncr' + pin, line, `Διαβάζεις από το GPIO ${pin}, όπου δεν είναι συνδεδεμένο τίποτα. Η τιμή θα είναι πάντα LOW (0).`, 'Το κουμπί είναι στο BUTTON_PIN και ο PIR στο PIR_PIN.');
       return 0;
     }
@@ -174,6 +224,9 @@
       this.inputs.humidity = typeof world.humidity === 'number' ? world.humidity : 45;
       this.inputs.sensorFault = !!world.sensorFault;
       this.inputs.router = world.router !== false;
+      this.inputs.distance = typeof world.distance === 'number' ? world.distance : 50;
+      this.trig = { highAt: null, armed: false };
+      this.us = null;
       const connected = world.wifi === 'connected';
       this.wifi = { status: connected ? 3 : 0, pending: null, begins: 0, reconnects: 0, creds: connected ? { ssid: world.ssid || 'SmartHome-Lab', pass: world.wifiPass || 'lab-pass-123' } : null };
       this.expected = { ssid: world.ssid || 'SmartHome-Lab', pass: world.wifiPass || 'lab-pass-123' };
@@ -235,6 +288,7 @@
         return a[i];
       };
       switch (name) {
+        case 'pulseIn': return V('int', this.pulseIn(a[0], a[1], a[2], line));
         case 'readTemperature': return V('float', this.inputs.sensorFault ? NaN : this.inputs.temp);
         case 'readHumidity': return V('float', this.inputs.sensorFault ? NaN : this.inputs.humidity);
         case 'jsonValid': return B(root.IoTNet.jsonValid(String(a[0])));

@@ -5,7 +5,7 @@ const fs = require('fs');
 const path = require('path');
 const ROOT = path.join(__dirname, '..');
 const lessonFiles = fs.readdirSync(path.join(ROOT, 'js', 'lessons')).filter(f => f.endsWith('.js')).sort().map(f => 'js/lessons/' + f);
-const scripts = ['js/interpreter.js', 'js/pyinterp.js', 'js/pyweb.js', 'js/device.js', 'js/network.js', 'js/validator.js', 'js/pisys.js', 'js/scene.js', 'js/lessons.js', ...lessonFiles, 'js/storage.js', 'js/real.js', 'js/ui.js']
+const scripts = ['js/interpreter.js', 'js/pyinterp.js', 'js/pyweb.js', 'js/device.js', 'js/network.js', 'js/validator.js', 'js/pisys.js', 'js/scene.js', 'js/parts.js', 'js/lessons.js', ...lessonFiles, 'js/storage.js', 'js/real.js', 'js/ui.js']
   .map(s => `<script src="${s}"></script>`).join('\n');
 const fonts = `<link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>

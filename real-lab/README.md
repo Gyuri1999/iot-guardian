@@ -28,6 +28,9 @@ arduino-cli lib install PubSubClient "DHT sensor library" "Adafruit Unified Sens
 | PIR (HC-SR501) | VCC → VIN (5 V), GND → GND, OUT → GPIO 4 |
 | DHT22 ή DHT11 | VCC → 3V3, GND → GND, DATA → GPIO 13 (με 10 kΩ προς 3V3 αν δεν είναι πλακέτα-module) |
 
+| HC-SR04 | VCC → VIN (5 V), TRIG → GPIO 5, ECHO → GPIO 18 **μέσω διαιρέτη τάσης** (π.χ. 1 kΩ + 2 kΩ, γιατί το ECHO βγάζει 5 V), GND → GND |
+| Φανάρι | Κόκκινο → GPIO 25, κίτρινο → GPIO 26, πράσινο → GPIO 27, το καθένα με αντίσταση 220 Ω, κοινό GND |
+
 Το GPIO του DHT και ο τύπος του ορίζονται στο `--setup`.
 
 ## Εκκίνηση

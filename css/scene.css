@@ -115,3 +115,134 @@
 :root[data-reduced-motion="true"] .waves.on path, :root[data-reduced-motion="true"] .sc-router.on .waves path, :root[data-reduced-motion="true"] .sc-pir.on .pwaves path { opacity: 0.85; }
 .smd.act.on { fill: #39d98a; }
 .sc-node .shield { opacity: 0.9; }
+
+/* ---------- εμφάνιση «μελανιού»: περίγραμμα, σκιές, λεπτομέρειες (όπως σχέδιο με πενάκι) */
+.scene { --ink-line: #1c2130; }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .scene { --ink-line: #05080e; } }
+:root[data-theme="dark"] .scene { --ink-line: #05080e; }
+.box polygon { stroke: var(--ink-line); stroke-width: 0.75; }
+.shadow { fill: #2a2418; opacity: 0.13; stroke: none; }
+.hole { fill: var(--paper, #f7f0e1); stroke: #c9a24a; stroke-width: 0.9; }
+.silk3 { font: 700 1.5px var(--font-code); fill: #cfd7e3; }
+.shield-s { font: 600 1.4px var(--font-code); fill: #6b737c; }
+.chip-t { font: 700 1.5px var(--font-code); fill: #8b939c; }
+.ant-zone { fill: #18202d; }
+.smd-c .f-t { fill: #c8a86a; } .smd-c .f-l { fill: #8d7444; } .smd-c .f-r { fill: #a88a52; }
+.smd-c polygon { stroke-width: 0.35; }
+.btn-dot { fill: #2b2b2e; stroke: var(--ink-line); stroke-width: 0.5; }
+.eth .f-t { fill: #d9dde1; } .eth .f-l { fill: #9aa1a8; } .eth .f-r { fill: #b8bec4; }
+.smd, .led-body, .led-dome, .led-rim, .cap, .cap-side, .dome, .rled { stroke: var(--ink-line); stroke-width: 0.8; }
+.antenna-rod { stroke: var(--ink-line); }
+.legs { stroke-width: 1.6; }
+.wire-ol { fill: none; stroke: var(--ink-line); stroke-width: 4.6; stroke-linecap: round; }
+.wire-end { stroke: var(--ink-line); stroke-width: 0.8; }
+.wire-end.w-led { fill: #e8892f; } .wire-end.w-btn { fill: #18a196; } .wire-end.w-pir { fill: #e2b52d; } .wire-end.w-gnd { fill: #34383f; }
+.lap-lid { stroke: var(--ink-line); }
+.tab-screen { stroke: var(--ink-line); stroke-width: 0.3; }
+
+/* ---------- κομμάτια που εξηγούνται («τι είναι») */
+.scene [data-part] { cursor: pointer; }
+.scene.dragging [data-part] { cursor: grabbing; }
+.scene .part-hot > .box polygon, .scene .part-hot > g > .box polygon, .scene .part-hot.box polygon { stroke: var(--accent); stroke-width: 1.3; }
+.scene .part-hot .wire-ol { stroke: var(--accent); }
+.scene .part-sel > .box polygon, .scene .part-sel > g > .box polygon { stroke: var(--teal); stroke-width: 1.6; }
+.scene .part-sel .wire-ol { stroke: var(--teal); }
+.callout.part-link:hover .co-box, .callout.part-link:focus-visible .co-box { stroke: var(--accent); stroke-width: 1.6; }
+.callout.part-link:focus { outline: none; }
+.callout.part-sel .co-box { fill: var(--teal); stroke: var(--teal); }
+.callout.part-sel .co-txt { fill: #fff; }
+
+.part-info {
+  position: absolute; right: 0.7rem; top: 0.7rem; z-index: 3; width: min(19rem, calc(100% - 1.4rem)); max-height: calc(100% - 4.6rem); overflow: auto;
+  background: var(--surface); border: 1px solid var(--line-strong); border-left: 4px solid var(--teal); border-radius: 10px; padding: 0.7rem 0.8rem; font-size: 0.85rem; line-height: 1.5;
+  box-shadow: 0 6px 18px rgba(20, 24, 36, 0.12);
+}
+.part-info h4 { margin: 0 1.6rem 0.2rem 0; font-family: var(--font-label); font-size: 1rem; letter-spacing: 0.04em; }
+.part-info .pi-kind { font-family: var(--font-label); font-size: 0.7rem; letter-spacing: 0.1em; text-transform: uppercase; color: var(--teal); }
+.part-info dl { margin: 0.5rem 0 0; display: grid; gap: 0.35rem; }
+.part-info dt { font-family: var(--font-label); font-size: 0.72rem; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); }
+.part-info dd { margin: 0; }
+.part-info .pi-close { position: absolute; top: 0.4rem; right: 0.4rem; width: 1.8rem; height: 1.8rem; border: 0; border-radius: 6px; background: transparent; color: var(--ink); cursor: pointer; font-size: 1.1rem; }
+.part-info .pi-close:hover { background: var(--surface-2); }
+.part-tip { position: absolute; z-index: 4; pointer-events: none; padding: 0.15rem 0.5rem; border-radius: 5px; background: var(--ink); color: var(--bg); font-size: 0.75rem; white-space: nowrap; transform: translate(-50%, -140%); }
+@media (max-width: 720px) { .part-info { position: static; width: auto; max-height: none; margin: 0 0.6rem 0.6rem; order: 4; } }
+
+/* ---------- ESP32 38 pins (μαύρο PCB όπως το πραγματικό) */
+.esp-black .f-t { fill: #1b1c20; } .esp-black .f-l { fill: #0f1013; } .esp-black .f-r { fill: #15161a; }
+.pin-leg { stroke: #b9bec4; stroke-width: 1.1; stroke-linecap: round; }
+.solder { fill: #d7dbe0; stroke: #8d939a; stroke-width: 0.5; }
+.castel { fill: #d6aa48; }
+.shield-dot { fill: #3b4048; }
+.tant .f-t { fill: #f0b429; } .tant .f-l { fill: #b9821a; } .tant .f-r { fill: #d39b20; }
+.usbc-slot { fill: #3a3f46; stroke: #1c2130; stroke-width: 0.25; }
+.esp-black ~ g .silk3, .silk3 { fill: #dfe5ee; }
+
+/* ---------- καλώδια Dupont: βύσματα και γυαλάδα */
+.wire-hl { fill: none; stroke: #ffffff; stroke-width: 0.7; stroke-linecap: round; opacity: 0.35; transform: translate(-0.6px, -0.8px); pointer-events: none; }
+.plug .f-t { fill: #2b2f37; } .plug .f-l { fill: #15181d; } .plug .f-r { fill: #1e2228; }
+.plug.w-led .f-t { fill: #c96f1f; } .plug.w-btn .f-t { fill: #11806f; } .plug.w-pir .f-t { fill: #b98f17; }
+.plug.w-trig .f-t { fill: #2e8a3e; } .plug.w-echo .f-t { fill: #c79a14; } .plug.w-red .f-t { fill: #b33a2e; } .plug.w-yel .f-t { fill: #c79a14; } .plug.w-grn .f-t { fill: #2e8a3e; }
+.w-trig { stroke: #3fae55; } .w-echo { stroke: #f2c230; } .w-red { stroke: #e0503f; } .w-yel { stroke: #f2c230; } .w-grn { stroke: #3fae55; } .w-vcc { stroke: #e0503f; }
+.plug.w-vcc .f-t { fill: #b33a2e; }
+
+/* ---------- ετικέτες: διακεκομμένη γραμμή, δαχτυλίδι, εικονίδιο */
+.callout .co-line { stroke-dasharray: 3 3; stroke-width: 1; }
+.callout .co-ring { fill: var(--surface); stroke: var(--teal); stroke-width: 1.4; }
+.callout .co-dot { r: 3.4; }
+.callout .co-ico { fill: none; stroke: var(--ink); stroke-width: 1.1; stroke-linecap: round; stroke-linejoin: round; }
+.callout.part-sel .co-ico { stroke: #fff; }
+
+/* ---------- HC-SR04 */
+.us-pcb .f-t { fill: #3557b8; } .us-pcb .f-l { fill: #2a4aa6; } .us-pcb .f-r { fill: #22398a; }
+.us-t { font: 700 2.2px var(--font-code); fill: #dfe7ff; }
+.us-s { font: 600 0.95px var(--font-code); fill: #c9d6ff; }
+.cyl-side { fill: #b8bec6; stroke: var(--ink-line); stroke-width: 0.8; stroke-linejoin: round; }
+.cyl-face { fill: #d9dde2; stroke: var(--ink-line); stroke-width: 0.8; }
+.cyl-mesh { fill: #3a3f47; stroke: #23272e; stroke-width: 0.4; }
+.cyl-core { fill: #6b717a; }
+.us-waves path { fill: none; stroke: var(--teal); stroke-width: 1.6; stroke-linecap: round; opacity: 0; }
+.us-waves.on path { animation: wave 0.9s ease-out infinite; }
+.us-waves.on path:nth-child(2) { animation-delay: 0.15s; }
+.us-waves.on path:nth-child(3) { animation-delay: 0.3s; }
+
+/* ---------- φανάρι */
+.tl-pole .f-t { fill: #2b2f37; } .tl-pole .f-l { fill: #15181d; } .tl-pole .f-r { fill: #1e2228; }
+.tl-body .f-t { fill: #2a2d33; } .tl-body .f-l { fill: #1b1d22; } .tl-body .f-r { fill: #121418; }
+.tl-lamp { stroke: var(--ink-line); stroke-width: 0.3; transition: fill 0.12s; }
+.tl-lamp.tl-r { fill: #5a2420; } .tl-lamp.tl-y { fill: #5a4a18; } .tl-lamp.tl-g { fill: #1e4a2a; }
+.tl-lamp.tl-r.on { fill: #ff4a3a; } .tl-lamp.tl-y.on { fill: #ffd23a; } .tl-lamp.tl-g.on { fill: #44e07a; }
+.tl-halo { opacity: 0; transition: opacity 0.12s; pointer-events: none; }
+.tl-halo.tl-r { fill: #ff4a3a; } .tl-halo.tl-y { fill: #ffd23a; } .tl-halo.tl-g { fill: #44e07a; }
+.tl-halo.on { opacity: 0.45; }
+
+/* ---------- αυτοκινητάκι και απόσταση */
+.car-body .f-t { fill: #e4573f; } .car-body .f-l { fill: #b83c28; } .car-body .f-r { fill: #cc4932; }
+.car-cabin .f-t { fill: #e86a52; } .car-cabin .f-l { fill: #bf4632; } .car-cabin .f-r { fill: #d2563e; }
+.car-glass { fill: #cfe3ea; stroke: var(--ink-line); stroke-width: 0.6; }
+.car-wheel { fill: #1f2228; stroke: var(--ink-line); stroke-width: 0.6; }
+.car-hub { fill: #9aa1aa; }
+.sc-car { cursor: grab; }
+.sc-car.dragging, .scene.car-drag { cursor: grabbing; }
+.sc-car:focus-visible .car-body polygon { stroke: var(--accent); stroke-width: 1.4; }
+.dist-line path { fill: none; stroke: var(--ink); stroke-width: 1; stroke-dasharray: 3 3; opacity: 0.7; }
+.dist-pill { fill: var(--surface); stroke: var(--ink); stroke-width: 0.9; }
+.dist-t { font: 700 9px var(--font-code); fill: var(--ink); }
+@media (prefers-reduced-motion: reduce) { .us-waves.on path { animation: none; opacity: 0.8; } }
+
+/* ---------- ESP32 όπως στην εικόνα αναφοράς */
+.esp-black .f-l { fill: #7b6c4f; } .esp-black .f-r { fill: #6a5c42; }
+.pin-stub { stroke: #c9ced4; stroke-width: 1.3; stroke-linecap: round; }
+.pin-tip { fill: #eef1f4; stroke: #7f868d; stroke-width: 0.45; }
+.solder { fill: #b9bec4; stroke: #6f767d; stroke-width: 0.45; }
+.silk-box rect { fill: none; stroke: #e9edf2; stroke-width: 0.22; opacity: 0.85; }
+.shield .f-t { fill: #d4d8dc; } .shield .f-l { fill: #9aa1a8; } .shield .f-r { fill: #b6bcc2; }
+.shield-logo { fill: none; stroke: #7d848c; stroke-width: 0.22; }
+.shield-l { font: 700 0.95px var(--font-code); fill: #7d848c; }
+.shield-c { font: 700 1.5px var(--font-code); fill: #7d848c; }
+.shield-ring { fill: none; stroke: #7d848c; stroke-width: 0.25; }
+.btn-s .f-t { fill: #c9ced3; } .btn-s .f-l { fill: #8d949b; } .btn-s .f-r { fill: #a9afb5; }
+.usb .f-t { fill: #d9dde1; } .usb .f-l { fill: #9aa1a8; } .usb .f-r { fill: #c3c8cd; }
+.usbc-slot { fill: #2f343b; stroke: #1c2130; stroke-width: 0.3; }
+.usbc-tongue { fill: #6d747c; }
+.shield-t.sm { font-size: 1.45px; }
+.shield-s.sm { font-size: 0.82px; }

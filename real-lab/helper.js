@@ -103,7 +103,7 @@ function wrapStrings(src) {
   return out;
 }
 
-const PROVIDED = new Set(['WIFI_SSID', 'WIFI_PASSWORD', 'MQTT_HOST', 'HOME_CA', 'LED_PIN', 'BUTTON_PIN', 'PIR_PIN']);
+const PROVIDED = new Set(['WIFI_SSID', 'WIFI_PASSWORD', 'MQTT_HOST', 'HOME_CA', 'LED_PIN', 'BUTTON_PIN', 'PIR_PIN', 'TRIG_PIN', 'ECHO_PIN', 'RED_PIN', 'YELLOW_PIN', 'GREEN_PIN']);
 
 function transpile(code, consts) {
   const head = ['#include "IoTGuardian.h"'];

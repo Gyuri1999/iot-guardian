@@ -17,6 +17,8 @@
   const NET = window.IoTNet;
   const VAL = window.IoTValidator;
   const PY = window.IoTPy;
+  // Πρώτα το Μέρος Α (ESP32, μαζί με τα επιπλέον κεφάλαια), μετά το Μέρος Β (Python).
+  CHAPTERS.sort((a, b) => (a.lang === 'python') - (b.lang === 'python') || a.n - b.n);
   // Γλώσσα της άσκησης: 'cpp' (ESP32) ή 'python' (Raspberry Pi).
   const langOf = l => (l && l.lang) || 'cpp';
   const isPy = () => !!S.task && langOf(S.task) === 'python';
@@ -199,7 +201,68 @@
     on('sc-zoom-out', pz.zoomOut);
     on('sc-fit', pz.reset);
     S.scene = svg;
+    bindParts(wrap, svg);
+    if (!P.settings.reducedMotion && !matchMedia('(prefers-reduced-motion: reduce)').matches) window.IoTScene.buildIn(svg);
     return svg;
+  }
+
+  // ---------- «Τι είναι;»: κάθε κομμάτι της σκηνής εξηγείται με κλικ ή Enter.
+  function bindParts(wrap, svg) {
+    const PARTS = window.IoTParts || {};
+    const tip = document.createElement('div');
+    tip.className = 'part-tip';
+    tip.hidden = true;
+    wrap.appendChild(tip);
+    const card = document.createElement('div');
+    card.className = 'part-info';
+    card.hidden = true;
+    card.setAttribute('role', 'dialog');
+    card.setAttribute('aria-live', 'polite');
+    wrap.appendChild(card);
+    const findPart = t => { const el = t && t.closest && t.closest('[data-part]'); return el && svg.contains(el) && PARTS[el.dataset.part] ? el : null; };
+    const groupsOf = key => [...svg.querySelectorAll(`[data-part="${key}"]`)];
+    const mark = (cls, key) => {
+      svg.querySelectorAll('.' + cls).forEach(x => x.classList.remove(cls));
+      if (key) groupsOf(key).forEach(x => x.classList.add(cls));
+    };
+    svg.addEventListener('mouseover', e => {
+      const el = findPart(e.target);
+      mark('part-hot', el && el.dataset.part);
+      if (!el) { tip.hidden = true; return; }
+      const r = wrap.getBoundingClientRect();
+      tip.textContent = PARTS[el.dataset.part].title + ' · πάτα για «τι είναι»';
+      tip.style.left = (e.clientX - r.left) + 'px';
+      tip.style.top = (e.clientY - r.top) + 'px';
+      tip.hidden = false;
+    });
+    svg.addEventListener('mouseleave', () => { mark('part-hot', null); tip.hidden = true; });
+    const open = key => {
+      const p = PARTS[key];
+      if (!p) return;
+      mark('part-sel', key);
+      card.innerHTML = `<button class="pi-close" aria-label="Κλείσιμο">×</button>
+        <div class="pi-kind">${esc(p.kind)}</div><h4>${esc(p.title)}</h4>
+        <dl><dt>Τι είναι</dt><dd>${esc(p.what)}</dd><dt>Τι κάνει</dt><dd>${esc(p.does)}</dd>
+        ${p.pins && p.pins !== '—' ? `<dt>Συνδέσεις</dt><dd>${esc(p.pins)}</dd>` : ''}<dt>Στο παιχνίδι</dt><dd>${esc(p.game)}</dd></dl>`;
+      card.hidden = false;
+      card.querySelector('.pi-close').onclick = () => { card.hidden = true; mark('part-sel', null); };
+      announce(`${p.title}. ${p.what}`);
+    };
+    svg.addEventListener('click', e => {
+      if (svg._moved) return;
+      const el = findPart(e.target);
+      if (!el) return;
+      // Κουμπί, PIR, router: το κλικ πάνω τους αλλάζει την είσοδο. Το «τι είναι» ανοίγει από την ετικέτα τους.
+      if (el.classList.contains('clickable') && !el.classList.contains('callout')) return;
+      open(el.dataset.part);
+    });
+    svg.addEventListener('keydown', e => {
+      if (e.key !== 'Enter' && e.key !== ' ') return;
+      const el = e.target.closest && e.target.closest('.callout.part-link');
+      if (!el) return;
+      e.preventDefault();
+      open(el.dataset.part);
+    });
   }
 
   // Είσοδοι της πλακέτας (κάρτα πάνω στη σκηνή). Τα ίδια χειριστήρια υπάρχουν και πάνω στα αντικείμενα.
@@ -215,11 +278,13 @@
       rows.push(sw('fault-toggle', 'Αισθητήρας', I.sensorFault, 'Σφάλμα · nan', 'Λειτουργεί'));
     }
     if (hw.includes('router')) rows.push(sw('router-toggle', 'Router', I.router, 'Ενεργό', 'Σβηστό'));
+    if (hw.includes('ultrasonic')) rows.push(`<div class="in-row"><label class="in-l" for="dist-range">Εμπόδιο <output id="dist-out">${Math.round(I.distance)} cm</output></label><input type="range" id="dist-range" min="2" max="200" step="1" value="${I.distance}"></div>`);
     const netInfo = hw.includes('router') || hw.includes('broker') || world.broker || world.wifi;
     if (netInfo) rows.push(`<div class="in-status"><div id="wifi-text">WiFi: —</div><div id="mqtt-text">MQTT: —</div></div>`);
     if (hw.includes('broker')) rows.push(`<div class="btn-row"><button class="btn sm" id="broker-restart">Επανεκκίνηση broker</button><button class="btn sm" id="broker-dup" title="Ο broker ξαναστέλνει στη συσκευή το τελευταίο μήνυμα, όπως μπορεί να γίνει με QoS 1">Διπλή παράδοση</button></div>`);
     const py = S.task && langOf(S.task) === 'python';
-    if (!py || hw.some(h => ['led', 'button', 'pir'].includes(h)) || !(world.broker || hw.includes('web'))) rows.push(`<div class="in-led"><span class="dot" id="led-dot"></span><span id="led-text">LED σβηστό</span> · <span id="led-mode">pinMode: δεν ορίστηκε</span></div>`);
+    const noLed = hw.includes('ultrasonic') || hw.includes('traffic');
+    if (!(noLed && !hw.includes('led')) && (!py || hw.some(h => ['led', 'button', 'pir'].includes(h)) || !(world.broker || hw.includes('web')))) rows.push(`<div class="in-led"><span class="dot" id="led-dot"></span><span id="led-text">LED σβηστό</span> · <span id="led-mode">pinMode: δεν ορίστηκε</span></div>`);
     if (!rows.length) return '';
     return `<div class="inputs-card" aria-label="Είσοδοι της πλακέτας"><div class="ic-head">Είσοδοι · πάτα και πάνω στα εξαρτήματα</div>${rows.join('')}</div>`;
   }
@@ -354,7 +419,8 @@
       button: !!w.button, pir: !!w.pir,
       temp: typeof w.temp === 'number' ? w.temp : 22.5,
       humidity: typeof w.humidity === 'number' ? w.humidity : 45,
-      sensorFault: !!w.sensorFault, router: w.router !== false
+      sensorFault: !!w.sensorFault, router: w.router !== false,
+      distance: typeof w.distance === 'number' ? w.distance : 50
     };
   }
 
@@ -761,6 +827,48 @@
     if (tr) tr.oninput = () => { S.inputs.temp = Number(tr.value); if (S.board) S.board.inputs.temp = S.inputs.temp; $('#temp-out').textContent = S.inputs.temp.toFixed(1) + ' °C'; updateBoard(); };
     const hr = $('#hum-range');
     if (hr) hr.oninput = () => { S.inputs.humidity = Number(hr.value); if (S.board) S.board.inputs.humidity = S.inputs.humidity; $('#hum-out').textContent = Math.round(S.inputs.humidity) + ' %'; };
+    const dr = $('#dist-range');
+    if (dr) dr.oninput = () => setDistance(Number(dr.value));
+    bindCar();
+  }
+
+  // Απόσταση του εμποδίου (cm): από το ρυθμιστικό, από το σύρσιμο του αυτοκινήτου ή από τα βελάκια.
+  function setDistance(cm, announceIt) {
+    S.inputs.distance = Math.max(2, Math.min(200, Math.round(cm)));
+    if (S.board) S.board.inputs.distance = S.inputs.distance;
+    const dr = $('#dist-range');
+    if (dr && Number(dr.value) !== S.inputs.distance) dr.value = S.inputs.distance;
+    if ($('#dist-out')) $('#dist-out').textContent = S.inputs.distance + ' cm';
+    updateBoard();
+    if (announceIt) announce(`Εμπόδιο στα ${S.inputs.distance} εκατοστά.`);
+  }
+
+  function bindCar() {
+    const carEl = S.scene && S.scene.querySelector('#sc-car');
+    if (!carEl) return;
+    const svg = S.scene;
+    let drag = null;
+    carEl.addEventListener('pointerdown', e => {
+      e.stopPropagation();
+      drag = { x: e.clientX, y: e.clientY, cm: S.inputs.distance };
+      carEl.setPointerCapture(e.pointerId);
+      svg.classList.add('car-drag');
+    });
+    carEl.addEventListener('pointermove', e => {
+      if (!drag) return;
+      const r = svg.getBoundingClientRect();
+      const vb = svg.viewBox.baseVal;
+      const k = vb.width / r.width;
+      setDistance(drag.cm + window.IoTScene.dragToCm((e.clientX - drag.x) * k, (e.clientY - drag.y) * k));
+    });
+    const end = () => { if (drag) announce(`Εμπόδιο στα ${S.inputs.distance} εκατοστά.`); drag = null; svg.classList.remove('car-drag'); };
+    carEl.addEventListener('pointerup', end);
+    carEl.addEventListener('pointercancel', end);
+    carEl.addEventListener('keydown', e => {
+      const step = e.shiftKey ? 10 : 2;
+      if (e.key === 'ArrowLeft' || e.key === 'ArrowDown') { e.preventDefault(); setDistance(S.inputs.distance + step, true); }
+      if (e.key === 'ArrowRight' || e.key === 'ArrowUp') { e.preventDefault(); setDistance(S.inputs.distance - step, true); }
+    });
   }
 
   function toggleInput(key) {
@@ -1610,6 +1718,31 @@
       const sensorNode = net && [...net.sessions.keys()].some(c => c !== 'device' && c !== 'dashboard');
       cls('#sc-link-esp-pi', 'on', isPy() ? !!sensorNode : !!(net && net.connected('device')));
       cls('#sc-link-pi-dash', 'on', !!(net && net.connected('dashboard')));
+      for (const [k, pin] of [['r', 25], ['y', 26], ['g', 27]]) {
+        const on = !!(b && b.light(pin));
+        cls('#sc-tl-' + k, 'on', on);
+        cls('#sc-tl-' + k + '-halo', 'on', on);
+      }
+      const move = sc.querySelector('#sc-car-move');
+      if (move) {
+        const cm = S.inputs.distance;
+        const tr = window.IoTScene.carOffset(cm);
+        move.setAttribute('transform', tr);
+        const lab = sc.querySelector('#sc-car-label');
+        if (lab) lab.setAttribute('transform', tr);
+        const carEl = sc.querySelector('#sc-car');
+        if (carEl) carEl.setAttribute('aria-valuenow', String(cm));
+        const { P, US, CAR, carV } = window.IoTScene;
+        const a = P(US.u + US.w / 2, US.v + 5.6, 9.4);
+        const z = P(CAR.u, carV(cm), 4.5);
+        const path = sc.querySelector('#sc-dist-path');
+        if (path) path.setAttribute('d', `M${a[0].toFixed(1)},${a[1].toFixed(1)} L${z[0].toFixed(1)},${z[1].toFixed(1)}`);
+        const tag = sc.querySelector('#sc-dist-tag');
+        if (tag) tag.setAttribute('transform', `translate(${((a[0] + z[0]) / 2 - 22).toFixed(1)},${((a[1] + z[1]) / 2).toFixed(1)})`);
+        const t = sc.querySelector('#sc-dist-t');
+        if (t) t.textContent = cm + ' cm';
+        cls('#sc-us-waves', 'on', !!(b && b.us && b.micros - b.us.at < 400000));
+      }
       const temp = sc.querySelector('#sc-temp');
       if (temp) {
         temp.textContent = S.inputs.sensorFault ? 'nan · σφάλμα' : `${Number(S.inputs.temp).toFixed(1)} °C`;
@@ -1790,6 +1923,7 @@
     if (hw.includes('pir')) cols.push(['PIR', r => (r.inputs.pir ? '1 · HIGH' : '0 · LOW')]);
     if (hw.includes('sensor')) cols.push(['Θερμ.', r => (r.inputs.sensorFault ? 'nan' : Number(r.inputs.temp).toFixed(1))]);
     if (hw.includes('router')) cols.push(['Router', r => (r.inputs.router ? 'on' : 'off')]);
+    if (hw.includes('ultrasonic')) cols.push(['Εμπόδιο', r => `${Math.round(r.inputs.distance)} cm`]);
     const rows = m.loopLog.slice(-10);
     el.innerHTML = `<table><thead><tr><th scope="col">#</th>${cols.map(c => `<th scope="col">${c[0]}</th>`).join('')}${names.map(n => `<th scope="col">${esc(n)}</th>`).join('')}<th scope="col">Τύπωσε</th></tr></thead><tbody>
       ${rows.map(r => `<tr><td class="code">${r.index}</td>${cols.map(c => `<td class="code">${c[1](r)}</td>`).join('')}
