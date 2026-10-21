@@ -331,6 +331,50 @@
 .scene-bg.btn-on .bell-btn { fill: #ff6a4d; }
 .scene-bg.btn-on .bell-waves path { opacity: 1; }
 .scene-bg.pir-on .pir-zone { opacity: 0.22; }
+/* έπιπλα-κουτιά: η πλάγια πλευρά πιο σκούρα από την πάνω */
+.blk polygon { stroke: #1c2130; stroke-width: 0.6; }
+.blk .f-l { filter: brightness(0.86); } .blk .f-r { filter: brightness(0.72); }
+.rm-bench polygon { fill: #a87a4c; } .rm-crate polygon { fill: #d9b27a; } .rm-crate.b polygon { fill: #7aa0b8; }
+.rm-shelf polygon { fill: #8a8f99; }
+.rm-sofa polygon { fill: #5b7fa6; } .rm-cushion polygon { fill: #e8b04a; }
+.rm-rack polygon { fill: #2a3142; } .rm-rack .f-l { filter: none; fill: #1a1f2c; }
+/* εργαστήρι */
+.rm-peg { fill: #c9a678; stroke: #1c2130; stroke-width: 0.6; } .rm-peg-hole { fill: #6b5236; }
+.rm-tool { fill: none; stroke: #4a5160; stroke-width: 2; stroke-linecap: round; } .rm-tool-r { stroke: #c0392b; stroke-width: 3; }
+.rm-clock { fill: #fbf7ee; stroke: #1c2130; stroke-width: 1.2; } .rm-hands { stroke: #1c2130; stroke-width: 1.4; stroke-linecap: round; fill: none; }
+.lamp-pole.thin { stroke-width: 1.2; }
+/* θερμοκήπιο */
+.room.glass { --rm-wall-a: #cfe8e4; --rm-wall-b: #bcdcd6; --rm-floor: #b7a48a; --rm-plank: #a8957a; }
+.rm-mullion { stroke: #5e7a74; stroke-width: 1.2; fill: none; }
+.rm-leaf.thin { stroke-width: 2.2; }
+.rm-thermo { fill: #fbf7ee; stroke: #1c2130; stroke-width: 0.6; } .rm-thermo-lvl { fill: #d9534f; } .rm-thermo-hot { fill: #f1d6d4; transition: fill 0.2s; } .rm-thermo-bulb { fill: #d9534f; stroke: #1c2130; stroke-width: 0.6; }
+.scene-bg.led-on .rm-thermo-hot { fill: #d9534f; }
+.rm-fan circle { fill: #e9edf2; stroke: #1c2130; stroke-width: 0.8; } .rm-fan path { stroke: #5b6475; stroke-width: 2.4; stroke-linecap: round; }
+.grow-bar { stroke: #3a3f4c; stroke-width: 3; stroke-linecap: round; }
+/* σαλόνι */
+.rm-rug { fill: #b8574a; opacity: 0.45; }
+.rm-curtain { fill: #c0504d; opacity: 0.85; }
+.rm-tv { fill: #1c2130; } .rm-tv-screen { fill: #2f3a52; transition: fill 0.2s; }
+.scene-bg.led-on .rm-tv-screen { fill: #5fa8e0; }
+/* servers */
+.rm-tile { stroke: var(--rm-plank); stroke-width: 0.8; fill: none; }
+.rm-tray { stroke: #5b6475; stroke-width: 3; stroke-dasharray: 2 2; }
+.rm-rack-line { stroke: #3c4558; stroke-width: 0.8; }
+.rack-led { fill: #e0a32e; animation: rack-blink 1.6s steps(2) infinite; }
+.rack-led.st { fill: #5c6578; animation: none; }
+.scene-bg.led-on .rack-led.st { fill: #4fe08f; }
+@keyframes rack-blink { 50% { opacity: 0.25; } }
+@media (prefers-reduced-motion: reduce) { .rack-led { animation: none; } }
+.rm-sign { fill: #f2efe6; stroke: #1c2130; stroke-width: 0.6; } .rm-shield { fill: #3f8f5a; stroke: #1c2130; stroke-width: 0.6; }
+.th-glow.cool { fill: url(#g-cool); }
+/* γκαράζ */
+.room.concrete { --rm-floor: #b9b4aa; --rm-plank: #a9a398; --rm-wall-a: #d6d2c8; --rm-wall-b: #c7c2b6; }
+.rm-gdoor-frame { fill: #5b6475; } .rm-gdoor { fill: #9aa3b2; stroke: #1c2130; stroke-width: 0.6; } .rm-slat { stroke: #6f7888; stroke-width: 0.8; }
+.rm-pline { fill: #f2efe6; } .rm-stop { fill: #e2b52d; }
+.rm-tyre { fill: #2b2f3a; stroke: #111; stroke-width: 0.8; } .rm-tyre-in { fill: #5b6475; }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .scene-bg .room.glass { --rm-wall-a: #2f4a4a; --rm-wall-b: #284040; --rm-floor: #3e3a33; } :root:not([data-theme="light"]) .scene-bg .room.concrete { --rm-wall-a: #3c4150; --rm-wall-b: #333846; --rm-floor: #4a4a4c; --rm-plank: #3d3d40; } }
+:root[data-theme="dark"] .scene-bg .room.glass { --rm-wall-a: #2f4a4a; --rm-wall-b: #284040; --rm-floor: #3e3a33; }
+:root[data-theme="dark"] .scene-bg .room.concrete { --rm-wall-a: #3c4150; --rm-wall-b: #333846; --rm-floor: #4a4a4c; --rm-plank: #3d3d40; }
 /* η γιαγιά του διαδρόμου (σέρνεται) */
 .sc-actors { cursor: grab; }
 .sc-actors.dragging { cursor: grabbing; }
