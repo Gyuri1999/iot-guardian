@@ -140,7 +140,7 @@
         if (was && !v && this.trig.highAt !== null) {
           const len = this.micros - this.trig.highAt;
           this.trig.highAt = null;
-          if (len >= 8) this.trig.armed = true;
+          if (len >= 8) { this.trig.armed = true; this.trig.firedAt = this.micros; }
           else this.warnOnce('trigshort', line, `Ο παλμός TRIG κράτησε μόνο ${len} µs. Το HC-SR04 θέλει τουλάχιστον 10 µs.`, 'Γράψε digitalWrite(TRIG_PIN, HIGH); delayMicroseconds(10); digitalWrite(TRIG_PIN, LOW);');
         }
       }
@@ -181,11 +181,27 @@
       return echo;
     }
 
+    // Στάθμη του ECHO τη στιγμή αυτή (για κώδικα που μετρά μόνος του τον χρόνο, π.χ. Rust με Instant):
+    // ~450 µs μετά τον παλμό TRIG ανεβαίνει σε HIGH και μένει όσο ταξιδεύει ο ήχος (58,3 µs ανά cm).
+    echoLevel() {
+      const t = this.trig;
+      if (!t || t.firedAt === undefined || t.firedAt === null) return 0;
+      const cm = this.inputs.distance;
+      const echo = cm > 400 || cm < 2 ? 0 : Math.round(cm * 58.3);
+      const dt = this.micros - t.firedAt;
+      if (dt < 450) return 0;
+      if (!this.us || this.us.at !== t.firedAt) this.us = { at: t.firedAt, cm };
+      if (dt < 450 + echo) return 1;
+      t.firedAt = null;
+      t.armed = false;
+      return 0;
+    }
+
     digitalRead(pin, line) {
       if (pin === PINS.BUTTON) return this.inputs.button ? 1 : 0;
       if (pin === PINS.PIR) return this.inputs.pir ? 1 : 0;
       if (pin === PINS.LED) return this.outputs[pin] || 0;
-      if (pin === PINS.ECHO) return 0;
+      if (pin === PINS.ECHO) return this.echoLevel();
       if (this.outputs[pin] !== undefined) return this.outputs[pin];
       this.warnOnce('ncr' + pin, line, `Διαβάζεις από το GPIO ${pin}, όπου δεν είναι συνδεδεμένο τίποτα. Η τιμή θα είναι πάντα LOW (0).`, 'Το κουμπί είναι στο BUTTON_PIN και ο PIR στο PIR_PIN.');
       return 0;

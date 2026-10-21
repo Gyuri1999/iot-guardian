@@ -12,7 +12,7 @@ const onlyIdx = process.argv.indexOf('--only');
 const ONLY = onlyIdx > 0 ? process.argv[onlyIdx + 1] : null;
 const ctx = vm.createContext({ console });
 const loadErrors = [];
-for (const f of ['interpreter.js', 'pyinterp.js', 'pyweb.js', 'device.js', 'network.js', 'validator.js', 'pisys.js', 'lessons.js']) {
+for (const f of ['interpreter.js', 'pyinterp.js', 'pyweb.js', 'pymicro.js', 'device.js', 'network.js', 'validator.js', 'pisys.js', 'rsinterp.js', 'rsruntime.js', 'rslib.js', 'rscheck.js', 'lessons.js']) {
   vm.runInContext(fs.readFileSync(path.join(ROOT, 'js', f), 'utf8'), ctx, { filename: f });
 }
 const extra = fs.existsSync(path.join(ROOT, 'js', 'lessons')) ? fs.readdirSync(path.join(ROOT, 'js', 'lessons')).filter(f => f.endsWith('.js')).sort() : [];

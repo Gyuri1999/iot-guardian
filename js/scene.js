@@ -318,7 +318,11 @@
   const PI_T = 1.6;            // πάνω επιφάνεια του PCB
   const PI_PIN_L = i => 4 + i * 2.32;
   const PI_PIN_TOP = PI_T + 2.4 + 5.2;
+  // Η εξωτερική σειρά (ζυγά pins 2, 4, … 40): pin 16 = GPIO 23, 18 = GPIO 24, 36 = GPIO 16, 38 = GPIO 20, 40 = GPIO 21.
+  const PI_EVEN = ['5V', '5Vb', 'GND0', 'GPIO14', 'GPIO15', 'GPIO18', 'GND2', 'GPIO23', 'GPIO24', 'GND3', 'GPIO25', 'GPIO8', 'GPIO7', 'ID_SC', 'GND4', 'GPIO12', 'GND5', 'GPIO16', 'GPIO20', 'GPIO21'];
   function piPinUV(name) {
+    const j = PI_EVEN.indexOf(name);
+    if (j >= 0) return { u: ESP.u + 2.4, v: ESP.v + PI_PIN_L(j), h: PI_PIN_TOP };
     const i = PI_ODD.indexOf(name);
     return { u: ESP.u + 4.4, v: ESP.v + PI_PIN_L(i), h: PI_PIN_TOP };
   }
@@ -571,7 +575,8 @@
     const LED_AT = [72, 15];
     const BTN_AT = [86, 15];
     const PIR_AT = [102, 15];
-    if (hw.includes('led') || hw.includes('button') || hw.includes('pir') || !(net || hw.includes('web'))) {
+    const parking = hw.includes('ultrasonic') || hw.includes('traffic');
+    if (hw.includes('led') || hw.includes('button') || hw.includes('pir') || !(net || hw.includes('web') || parking)) {
       front += led(LED_AT[0], LED_AT[1]);
       wires.push(wire(piPinUV('GPIO17'), { u: LED_AT[0] - 2.54, v: LED_AT[1] + 2.54, h: 2.4 }, 'w-led', 46, 'sc-w-led'));
       wires.push(wire(piPinUV('GND'), { u: LED_AT[0] + 2.54, v: BB.v + BB.dv - 2, h: 2.4 }, 'w-gnd', 30));
@@ -586,6 +591,24 @@
       front += pir(PIR_AT[0], PIR_AT[1]);
       wires.push(wire(piPinUV('GPIO4'), { u: PIR_AT[0] - 8.9, v: PIR_AT[1] + 5, h: 2.4 }, 'w-pir', 62, 'sc-w-pir'));
       labels.push(callout(P(PIR_AT[0] + 4, PIR_AT[1], 4), 34, -28, 'PIR · GPIO 4', null, 'pir'));
+    }
+    // HC-SR04, αυτοκινητάκι και φανάρι (Rust στο Raspberry Pi): ίδιες θέσεις με του ESP32, καλώδια από το header του Pi
+    if (hw.includes('ultrasonic')) {
+      front += ultrasonic();
+      wires.push(wire(piPinUV('GPIO23'), usPinUV(1), 'w-trig', 70, 'sc-w-trig'));
+      wires.push(wire(piPinUV('GPIO24'), usPinUV(2), 'w-echo', 64, 'sc-w-echo'));
+      wires.push(wire(piPinUV('GND3'), usPinUV(3), 'w-gnd', 40));
+      labels.push(callout(P(US.u + US.w - 3, US.v, 14), 40, -50, 'HC-SR04 · TRIG 23 · ECHO 24', null, 'ultrasonic'));
+      front += `<g id="sc-car-move" transform="${carOffset(50)}">${car()}</g>`;
+      front += `<g id="sc-dist" class="dist-line"><path id="sc-dist-path" d=""/><g id="sc-dist-tag"><rect x="-26" y="-9" width="52" height="18" rx="9" class="dist-pill"/><text x="0" y="3.6" text-anchor="middle" class="dist-t" id="sc-dist-t">50 cm</text></g></g>`;
+      labels.push(`<g id="sc-car-label">${callout(P(CAR.u + 4, 6, 4), 50, 26, 'ΕΜΠΟΔΙΟ · ΣΥΡΕ ΤΟ', null, 'car')}</g>`);
+    }
+    if (hw.includes('traffic')) {
+      front += trafficLight();
+      wires.push(wire(piPinUV('GPIO16'), tlPinUV(0), 'w-red', 58, 'sc-w-red'));
+      wires.push(wire(piPinUV('GPIO20'), tlPinUV(1), 'w-yel', 52, 'sc-w-yel'));
+      wires.push(wire(piPinUV('GPIO21'), tlPinUV(2), 'w-grn', 46, 'sc-w-grn'));
+      labels.push(callout(P(TL.u, TL.v + 1.6, 22), 40, -60, 'ΦΑΝΑΡΙ · 16 · 20 · 21', null, 'traffic'));
     }
     let links = '';
     const web = hw.includes('web');

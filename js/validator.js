@@ -75,6 +75,7 @@
 
   // Η γλώσσα της άσκησης: 'cpp' (ESP32, προεπιλογή) ή 'python' (Raspberry Pi).
   function engine(lang) {
+    if (lang === 'rust') return { compile: root.IoTRust.compile, Machine: root.IoTRust.Machine };
     return lang === 'python' ? { compile: root.IoTPy.compile, Machine: root.IoTPy.Machine } : { compile, Machine };
   }
 
@@ -99,11 +100,12 @@
   class Runner {
     constructor(source, spec, inputs, lang) {
       const E = engine(lang);
-      const c = E.compile(source, { consts: (spec && spec.consts) || {} });
+      const opts = { consts: (spec && spec.consts) || {}, board: spec && spec.board };
+      const c = E.compile(source, opts);
       this.source = source;
       this.warnings = c.warnings;
       this.board = createWorld(spec, inputs);
-      this.machine = new E.Machine(c.program, this.board, { consts: (spec && spec.consts) || {} });
+      this.machine = new E.Machine(c.program, this.board, opts);
       this.gen = this.machine.main();
     }
     // Τρέχει μέχρι το γεγονός «kind». Σταματά νωρίτερα αν η πλακέτα κοιμάται και
@@ -342,7 +344,9 @@
 
   function runTests(code, tests, lesson) {
     const mode = lesson && lesson.mode;
-    const spec = lesson && lesson.world;
+    const world = lesson && lesson.world;
+    // η πλακέτα της άσκησης (Rust και MicroPython τρέχουν σε ESP32 ή Raspberry Pi)
+    const spec = lesson && lesson.board ? Object.assign({}, world || {}, { board: lesson.board }) : world;
     if (mode === 'config' && lesson.system) return tests.map(t => root.IoTSys.runTest(code, t, lesson));
     return tests.map(t => (mode === 'config' ? runConfigTest(code, t, spec) : runCodeTest(code, t, spec, lesson && lesson.lang)));
   }

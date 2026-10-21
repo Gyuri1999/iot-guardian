@@ -17,11 +17,41 @@
   const NET = window.IoTNet;
   const VAL = window.IoTValidator;
   const PY = window.IoTPy;
-  // Πρώτα το Μέρος Α (ESP32, μαζί με τα επιπλέον κεφάλαια), μετά το Μέρος Β (Python).
-  CHAPTERS.sort((a, b) => (a.lang === 'python') - (b.lang === 'python') || a.n - b.n);
-  // Γλώσσα της άσκησης: 'cpp' (ESP32) ή 'python' (Raspberry Pi).
+  CHAPTERS.sort((a, b) => a.n - b.n);
+  // Γλώσσα της άσκησης: 'cpp', 'python' ή 'rust'. Πλακέτα: 'esp32' ή 'pi'.
   const langOf = l => (l && l.lang) || 'cpp';
+  const boardOf = l => (l && l.board) || (langOf(l) === 'python' ? 'pi' : 'esp32');
   const isPy = () => !!S.task && langOf(S.task) === 'python';
+  const isRust = () => !!S.task && langOf(S.task) === 'rust';
+  const isPi = () => !!S.task && boardOf(S.task) === 'pi';
+
+  // Διαδρομές: γλώσσα + πλακέτα. Κάθε διαδρομή έχει δικά της κεφάλαια, πρόοδο και κάρτες ιστορίας.
+  const TRACKS = [
+    { id: 'cpp-esp32', lang: 'cpp', board: 'esp32', name: 'C++', boardName: 'ESP32', tag: 'Arduino C++', desc: 'Η κλασική γλώσσα των μικροελεγκτών: setup(), loop(), pinMode. Από το πρώτο LED ως ένα ασφαλές έξυπνο σπίτι με MQTT και TLS.' },
+    { id: 'py-esp32', lang: 'python', board: 'esp32', name: 'Python', boardName: 'ESP32', tag: 'MicroPython', desc: 'Η Python μέσα στο ESP32: machine.Pin, αισθητήρες, WiFi και MQTT με λίγες, καθαρές γραμμές.' },
+    { id: 'py-pi', lang: 'python', board: 'pi', name: 'Python', boardName: 'Raspberry Pi', tag: 'Python 3', desc: 'Το Raspberry Pi ως κέντρο του σπιτιού: gpiozero, broker MQTT, SQLite, Flask και ασφάλεια Linux.' },
+    { id: 'rs-esp32', lang: 'rust', board: 'esp32', name: 'Rust', boardName: 'ESP32', tag: 'esp-idf-hal', desc: 'Η γλώσσα που πιάνει τα λάθη πριν τρέξει ο κώδικας: ownership, Option, Result και match πάνω στο ESP32.' },
+    { id: 'rs-pi', lang: 'rust', board: 'pi', name: 'Rust', boardName: 'Raspberry Pi', tag: 'rppal', desc: 'Ασφαλής και γρήγορη Rust στο Raspberry Pi: GPIO με rppal, αισθητήρας στάθμευσης και κώδικας που δεν «σκάει».' }
+  ];
+  const LANGS = [
+    { lang: 'cpp', name: 'C++', mono: 'C++', color: '#3557b8', blurb: 'Η γλώσσα του Arduino. Γρήγορη και πολύ διαδεδομένη στους μικροελεγκτές.', code: 'void loop() {\n  digitalWrite(LED_PIN, HIGH);\n  delay(500);\n}' },
+    { lang: 'python', name: 'Python', mono: 'Py', color: '#2e7d5b', blurb: 'Απλή και καθαρή. Τρέχει στο Raspberry Pi και, ως MicroPython, μέσα στο ESP32.', code: 'while True:\n    led.on()\n    time.sleep(0.5)' },
+    { lang: 'rust', name: 'Rust', mono: 'Rs', color: '#c8642a', blurb: 'Νέα και ασφαλής. Ο compiler σε προστατεύει από λάθη μνήμης πριν τρέξει ο κώδικας.', code: 'loop {\n    led.toggle()?;\n    FreeRtos::delay_ms(500);\n}' }
+  ];
+  const trackOfCh = ch => (ch && ch.track) || (ch && ch.lang === 'python' ? 'py-pi' : 'cpp-esp32');
+  const chByN = n => CHAPTERS.find(c => c.n === n);
+  const trackOf = l => trackOfCh(chByN(l.chapter));
+  const curTrack = () => TRACKS.find(t => t.id === P.track) || null;
+  const trackLessons = id => lessons.filter(l => trackOf(l) === id);
+  // Ο αριθμός κεφαλαίου που βλέπει ο παίκτης: οι νέες διαδρομές μετρούν από το 1.
+  const LEGACY = new Set(['cpp-esp32', 'py-pi']);
+  function chNum(n) {
+    const ch = chByN(n);
+    const tr = trackOfCh(ch);
+    if (LEGACY.has(tr)) return n;
+    return trackChapters(tr).indexOf(ch) + 1;
+  }
+  const trackChapters = id => CHAPTERS.filter(c => trackOfCh(c) === id && c.ready && chapterLessons(c.n).length);
   // Σειρά: κεφάλαιο, μετά αριθμός μαθήματος (cN-lM), ανεξάρτητα από τη σειρά φόρτωσης των αρχείων.
   const lessonNo = l => Number((/-l(\d+)$/.exec(l.id) || [0, 0])[1]);
   lessons.sort((a, b) => a.chapter - b.chapter || lessonNo(a) - lessonNo(b));
@@ -79,22 +109,25 @@
 
   // ------------------------------------------------------------ Πρόοδος
 
-  const chapterLessons = n => lessons.filter(l => l.chapter === n);
-  const readyChapters = () => CHAPTERS.filter(c => c.ready && chapterLessons(c.n).length);
+  function chapterLessons(n) { return lessons.filter(l => l.chapter === n); }
+  const chapterDone = n => chapterLessons(n).every(l => P.completed[l.id]);
+  // Μέσα σε κάθε διαδρομή τα κεφάλαια ανοίγουν με τη σειρά· τα «επιπλέον» (bonus) μετά από το unlockAfter τους.
   function chapterUnlocked(n) {
-    const ch = CHAPTERS.find(c => c.n === n);
-    if (ch && ch.unlockAfter) return chapterLessons(ch.unlockAfter).every(l => P.completed[l.id]);
-    const ready = readyChapters().filter(c => !c.unlockAfter).map(c => c.n);
-    const idx = ready.indexOf(n);
+    const ch = chByN(n);
+    if (!ch) return false;
+    if (ch.bonus && ch.unlockAfter) return chapterDone(ch.unlockAfter);
+    const seq = trackChapters(trackOfCh(ch)).filter(c => !c.bonus).map(c => c.n);
+    const idx = seq.indexOf(n);
     if (idx <= 0) return idx === 0;
-    return chapterLessons(ready[idx - 1]).every(l => P.completed[l.id]);
+    return chapterDone(seq[idx - 1]);
   }
   function taskUnlocked(l) {
     if (P.completed[l.id]) return true;
     return chapterUnlocked(l.chapter) && l.prerequisites.every(p => P.completed[p]);
   }
-  function nextTask() {
-    return lessons.find(l => !P.completed[l.id] && taskUnlocked(l)) || null;
+  function nextTask(track) {
+    const id = track || P.track;
+    return (id ? trackLessons(id) : lessons).find(l => !P.completed[l.id] && taskUnlocked(l)) || null;
   }
 
   // ------------------------------------------------------------ Κοινά κομμάτια
@@ -117,7 +150,9 @@
     right: '<path d="M9 5l7 7-7 7"/>',
     plus: '<path d="M12 5v14M5 12h14"/>',
     minus: '<path d="M5 12h14"/>',
-    fit: '<path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/>'
+    fit: '<path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/>',
+    star: '<path d="M12 3l2.7 5.6 6.1.9-4.4 4.3 1 6.1L12 17l-5.4 2.9 1-6.1-4.4-4.3 6.1-.9z"/>',
+    lang: '<path d="M8 8l-4 4 4 4M16 8l4 4-4 4M13.5 5l-3 14"/>'
   };
   const icon = (name, label) => `<svg class="ic" viewBox="0 0 24 24" aria-hidden="true"${label ? '' : ''}>${IC[name]}</svg>`;
 
@@ -132,6 +167,7 @@
     lock: '<rect x="13" y="22" width="22" height="16" rx="2.5" fill="#1d2534"/><path d="M17 22v-5a7 7 0 0 1 14 0v5" stroke="#1d2534" stroke-width="3" fill="none"/><circle cx="24" cy="30" r="2.6" fill="#d6aa48"/>',
     scope: '<rect x="8" y="12" width="26" height="4" rx="1" fill="#c9bfa7"/><rect x="8" y="19" width="20" height="4" rx="1" fill="#c8642a"/><rect x="8" y="26" width="24" height="4" rx="1" fill="#c9bfa7"/><circle cx="31" cy="30" r="7" stroke="#1d2534" stroke-width="2.6" fill="none"/><path d="M36 35l5 5" stroke="#1d2534" stroke-width="3" stroke-linecap="round"/>',
     battery: '<rect x="10" y="16" width="26" height="16" rx="2.5" fill="none" stroke="#1d2534" stroke-width="2.4"/><rect x="36" y="21" width="3" height="6" rx="1" fill="#1d2534"/><rect x="13" y="19" width="9" height="10" rx="1" fill="#1f7a55"/><path d="M26 19l-3 6h4l-3 6" stroke="#e2b52d" stroke-width="1.8" fill="none"/>',
+    car: '<path d="M8 30l14-7 18 9-14 7z" fill="#e4533d"/><path d="M8 30v4l18 9v-4zM40 32v4l-14 7v-4z" fill="#a83a2a"/><path d="M17 26l7-3.5 8 4-7 3.5z" fill="#bfe3f2"/><circle cx="15" cy="37" r="2.6" fill="#1d1e22"/><circle cx="31" cy="42" r="2.6" fill="#1d1e22"/>',
     board: '<path d="M4 26l20-10 20 10-20 10z" fill="#1d2534"/><path d="M4 26v2l20 10v-2zM44 26v2l-20 10v-2z" fill="#0c121b"/><path d="M12 25l9-4.5 9 4.5-9 4.5z" fill="#cfd4d9"/><circle cx="31" cy="29" r="1.6" fill="#7cc4ff"/>'
   };
   const thumb = kind => `<svg class="thumb" viewBox="0 0 48 48" aria-hidden="true">${TH[kind] || TH.led}</svg>`;
@@ -139,7 +175,8 @@
     const hw = l.hardware || [];
     const w = worldOf(l);
     if (l.chapter === 16) return 'battery';
-    if (langOf(l) === 'python' && w.broker) return 'pi';
+    if (boardOf(l) === 'pi' && w.broker) return 'pi';
+    if (hw.includes('ultrasonic')) return 'car';
     if (modeOf(l) === 'config') return 'lock';
     if (modeOf(l) === 'analysis') return 'scope';
     if (l.chapter === 1 && lessonNo(l) === 1) return 'board';
@@ -157,6 +194,8 @@
       <div class="rail-logo" aria-hidden="true"><span></span></div>
       ${b('nav-home', 'home', 'Αρχική και χάρτης κεφαλαίων', active === 'home')}
       ${b('nav-lab', 'chip', 'Εργαστήριο: συνέχεια από εκεί που έμεινες', active === 'lab')}
+      ${b('nav-lang', 'lang', 'Γλώσσα και πλακέτα', active === 'lang')}
+      <button class="rail-btn" data-open="collection" title="Συλλογή: κάρτες ιστορίας και σήματα" aria-label="Συλλογή: κάρτες ιστορίας και σήματα">${icon('star')}</button>
       <button class="rail-btn" data-open="glossary" title="Γλωσσάρι" aria-label="Γλωσσάρι">${icon('book')}</button>
       <button class="rail-btn" data-open="data" title="Εξαγωγή ή εισαγωγή προόδου" aria-label="Εξαγωγή ή εισαγωγή προόδου">${icon('save')}</button>
       <span class="rail-space"></span>
@@ -295,7 +334,7 @@
   // ------------------------------------------------------------ Αρχική οθόνη
 
   function chapterCards() {
-    return CHAPTERS.map(ch => {
+    return trackChapters(P.track).map(ch => {
       const ls = chapterLessons(ch.n);
       if (!ch.ready || !ls.length) return '';
       const d = ls.filter(l => P.completed[l.id]).length;
@@ -303,7 +342,7 @@
       const first = ls.find(l => !P.completed[l.id] && taskUnlocked(l)) || ls[0];
       return `<button class="strip-card${d === ls.length ? ' done' : ''}" data-chapter="${ch.n}" ${ok ? '' : 'disabled'} title="${esc(ch.title)}">
         ${thumb(lessonIcon(first))}
-        <span class="sc-txt"><span class="sc-n">${ch.bonus ? 'Επιπλέον · ' : ''}${ch.lang === 'python' ? 'Python · ' : ''}Κεφ. ${ch.n}</span><span class="sc-t">${esc(ch.title)}</span><span class="sc-p">${ok ? `${d}/${ls.length}${d === ls.length ? ' · ολοκληρώθηκε' : ''}` : 'κλειδωμένο'}</span></span>
+        <span class="sc-txt"><span class="sc-n">${ch.bonus ? 'Επιπλέον · ' : ''}Κεφ. ${chNum(ch.n)}${P.completed && chapterDone(ch.n) && window.IoTStories && window.IoTStories[ch.n] ? ' · ★' : ''}</span><span class="sc-t">${esc(ch.title)}</span><span class="sc-p">${ok ? `${d}/${ls.length}${d === ls.length ? ' · ολοκληρώθηκε' : ''}` : 'κλειδωμένο'}</span></span>
       </button>`;
     }).join('');
   }
@@ -313,22 +352,23 @@
     S.task = null;
     document.title = 'IoT Guardian';
     S.inputs = { button: false, pir: false };
-    const total = lessons.length;
-    const done = lessons.filter(l => P.completed[l.id]).length;
+    const tr = curTrack();
+    if (!tr) { renderPicker(); return; }
+    const mine = trackLessons(tr.id);
+    const total = mine.length;
+    const done = mine.filter(l => P.completed[l.id]).length;
     const nxt = nextTask();
-    const allDone = done === total;
+    const allDone = total > 0 && done === total;
     const skills = Object.entries(SKILLS).map(([k, name]) => {
-      const ls = lessons.filter(l => l.skills.includes(k));
+      const ls = mine.filter(l => l.skills.includes(k));
       if (!ls.length) return '';
       const d = ls.filter(l => P.completed[l.id]).length;
       const pct = Math.round((d / ls.length) * 100);
       return `<li class="skill"><span>${esc(name)}</span><span class="num">${d}/${ls.length}</span>
         <span class="bar" role="img" aria-label="${esc(name)}: ${d} από ${ls.length}"><i style="width:${pct}%"></i></span></li>`;
     }).join('');
-    S.partShown = false;
-    const chapters = CHAPTERS.map(ch => {
+    const chapters = trackChapters(tr.id).map(ch => {
       const ls = chapterLessons(ch.n);
-      if (!ch.ready || !ls.length) return '';
       const unlocked = chapterUnlocked(ch.n);
       const items = ls.map(l => {
         const ok = taskUnlocked(l);
@@ -336,17 +376,17 @@
         const state = P.completed[l.id] ? 'ολοκληρώθηκε' : ok ? 'διαθέσιμο' : 'κλειδωμένο';
         return `<li><button class="task-link" data-task="${l.id}" ${ok ? '' : 'disabled'}><span class="mark" aria-hidden="true">${mark}</span><span>${esc(l.title)}<span class="kind">${esc(KIND_LABELS[l.kind])} · ${state}</span></span></button></li>`;
       }).join('');
-      const part = ch.lang === 'python' && !S.partShown ? (S.partShown = true, '<h4 class="part-h">Μέρος Β · Raspberry Pi και Python</h4>') : '';
-      return `${part}<details class="chap"${P.current && byId[P.current] && byId[P.current].chapter === ch.n ? ' open' : ''}><summary><span class="no">${String(ch.n).padStart(2, '0')}</span> ${esc(ch.title)}${ch.lang === 'python' ? ' <span class="py-tag">Python</span>' : ''} <span class="muted">· ${unlocked ? `${ls.filter(l => P.completed[l.id]).length}/${ls.length}` : 'κλειδωμένο'}</span></summary><ul class="task-list">${items}</ul></details>`;
+      const star = chapterDone(ch.n) && window.IoTStories && window.IoTStories[ch.n] ? ` <button class="story-chip" data-story="${ch.n}" title="Κάρτα ιστορίας: ${esc(window.IoTStories[ch.n].title)}">★ ${esc(window.IoTStories[ch.n].badge.name)}</button>` : '';
+      return `<details class="chap"${P.current && byId[P.current] && byId[P.current].chapter === ch.n ? ' open' : ''}><summary><span class="no">${String(chNum(ch.n)).padStart(2, '0')}</span> ${esc(ch.title)}${ch.bonus ? ' <span class="py-tag">Επιπλέον</span>' : ''}${star} <span class="muted">· ${unlocked ? `${ls.filter(l => P.completed[l.id]).length}/${ls.length}` : 'κλειδωμένο'}</span></summary><ul class="task-list">${items}</ul></details>`;
     }).join('');
 
     const cert = allDone ? `<div class="card certificate"><h2>Βεβαίωση ολοκλήρωσης</h2>
-        <p>Ολοκλήρωσες και τις ${total} ασκήσεις του IoT Guardian: από το πρώτο LED μέχρι ένα εικονικό έξυπνο σπίτι με ελεγχόμενα μηνύματα, μοναδικές ταυτότητες, ACLs, TLS με έλεγχο πιστοποιητικού και ασφαλή επανασύνδεση.</p>
+        <p>Ολοκλήρωσες και τις ${total} ασκήσεις της διαδρομής ${esc(tr.name)} · ${esc(tr.boardName)} στο IoT Guardian.</p>
         <p class="muted">Είναι βεβαίωση εκπαιδευτικής ολοκλήρωσης, όχι επαγγελματική πιστοποίηση. Για δοκιμές σε πραγματικό ESP32 ή Raspberry Pi, δούλεψε μόνο σε δικό σου ή εξουσιοδοτημένο εργαστήριο.</p></div>` : '';
 
     app().innerHTML = `<div class="app">${rail('home')}
       <div class="main">
-        ${header('Συνολική πρόοδος', done, total, 'Σήμερα', new Date().toLocaleDateString('el-GR', { day: 'numeric', month: 'short', year: 'numeric' }))}
+        ${header(`Πρόοδος · ${tr.name} · ${tr.boardName}`, done, total, 'Σήμερα', new Date().toLocaleDateString('el-GR', { day: 'numeric', month: 'short', year: 'numeric' }))}
         <div class="ws">
           <section class="stage" aria-label="Η πλακέτα">
             <div class="scene-wrap" id="scene">${sceneControls()}</div>
@@ -357,34 +397,41 @@
           </section>
           <aside class="side">
             <div class="card welcome">
-              <span class="kind-tag">Καλώς ήρθες</span>
+              <div class="track-line"><span class="kind-tag">${esc(tr.name)} · ${esc(tr.boardName)} · ${esc(tr.tag)}</span><button class="btn quiet sm" id="change-track">Άλλαξε γλώσσα</button></div>
               <h1>Από το πρώτο LED στο ασφαλές έξυπνο σπίτι</h1>
-              <p>Είσαι ο τεχνικός μιας εικονικής κατοικίας. Γράφεις μικρά προγράμματα για μια πλακέτα ESP32, τα τρέχεις βήμα-βήμα και βλέπεις γιατί ανάβει κάθε φως και φεύγει κάθε μήνυμα. Μετά συνδέεις WiFi, MQTT και dashboard, και ρυθμίζεις το σύστημα ώστε να είναι ασφαλές.</p>
-              <div class="btn-row"><button class="btn primary" id="continue">${icon('play')} ${nxt ? `${done ? 'Συνέχεια' : 'Ξεκίνα'}: ${esc(nxt.title)}` : 'Επανάληψη από την αρχή'}</button><button class="btn" id="restart">Νέα διαδρομή</button></div>
+              <p>Είσαι ο τεχνικός μιας εικονικής κατοικίας. ${esc(tr.desc)} Τρέχεις κάθε πρόγραμμα βήμα-βήμα και βλέπεις γιατί ανάβει κάθε φως και φεύγει κάθε μήνυμα.</p>
+              <div class="btn-row"><button class="btn primary" id="continue">${icon('play')} ${nxt ? `${done ? 'Συνέχεια' : 'Ξεκίνα'}: ${esc(nxt.title)}` : 'Επανάληψη από την αρχή'}</button><button class="btn" id="restart">Μηδενισμός προόδου</button></div>
               <div id="confirm-slot"></div>
             </div>
             ${cert}
             <div class="card"><div class="card-head"><h3>Δεξιότητες</h3><span class="muted" style="font-size:0.85rem">${done} από ${total} ασκήσεις</span></div><ul class="skills">${skills}</ul></div>
-            <div class="card"><h3>Γνώρισε την πλακέτα</h3><p class="muted" style="margin:0">Το ESP32 έχει επεξεργαστή, WiFi και Bluetooth σε ένα μικρό module. Τα pins (GPIO) συνδέουν LED, κουμπιά και αισθητήρες. Το μπλε LED «D2» είναι συνδεδεμένο στο GPIO 2. Σε πραγματικές πλακέτες τα GPIO διαφέρουν από μοντέλο σε μοντέλο.</p></div>
+            ${collectionTeaser(tr)}
+            <div class="card"><h3>Γνώρισε την πλακέτα</h3><p class="muted" style="margin:0">${tr.board === 'pi' ? 'Το Raspberry Pi 5 είναι ένας μικρός υπολογιστής με Linux. Το header με τα 40 pins (GPIO) συνδέει LED, κουμπιά και αισθητήρες: στον πάγκο το LED είναι στο GPIO 17, το κουμπί στο GPIO 27 και ο PIR στο GPIO 4.' : 'Το ESP32 έχει επεξεργαστή, WiFi και Bluetooth σε ένα μικρό module. Τα pins (GPIO) συνδέουν LED, κουμπιά και αισθητήρες. Το μπλε LED «D2» είναι συνδεδεμένο στο GPIO 2. Σε πραγματικές πλακέτες τα GPIO διαφέρουν από μοντέλο σε μοντέλο.'}</p></div>
           </aside>
         </div>
         <footer class="strip" aria-label="Κεφάλαια"><div class="strip-head">Κεφάλαια</div><div class="strip-row">${chapterCards()}</div></footer>
       </div></div>`;
 
-    mountScene(window.IoTScene.homeScene());
+    mountScene(tr.board === 'pi' ? window.IoTScene.piScene(['led', 'button'], {}) : window.IoTScene.homeScene());
     const d2 = $('#sc-d2'); if (d2) d2.classList.add('on');
     const halo = $('#sc-d2-halo'); if (halo) halo.classList.add('on');
     const pwr = $('#sc-pwr'); if (pwr) pwr.classList.add('on');
     bindRail();
-    $('#continue').onclick = () => openTask((nxt || lessons[0]).id);
+    $('#continue').onclick = () => openTask((nxt || mine[0]).id);
+    $('#change-track').onclick = renderPicker;
+    app().querySelectorAll('[data-story]').forEach(b => { b.onclick = e => { e.preventDefault(); e.stopPropagation(); showStory(Number(b.dataset.story)); }; });
+    const tz = $('#open-collection');
+    if (tz) tz.onclick = () => openCollection(tr.id);
     $('#restart').onclick = () => {
-      $('#confirm-slot').innerHTML = `<div class="confirm" role="alert"><p>Θα σβηστούν οι ολοκληρωμένες ασκήσεις, οι απαντήσεις και ο κώδικάς σου. Οι ρυθμίσεις εμφάνισης μένουν. Συνέχεια;</p>
+      $('#confirm-slot').innerHTML = `<div class="confirm" role="alert"><p>Θα σβηστούν οι ολοκληρωμένες ασκήσεις, οι απαντήσεις, ο κώδικας και οι κάρτες σου σε όλες τις γλώσσες. Οι ρυθμίσεις εμφάνισης μένουν. Συνέχεια;</p>
         <div class="btn-row"><button class="btn primary" id="restart-yes">Ναι, νέα διαδρομή</button><button class="btn" id="restart-no">Άκυρο</button></div></div>`;
       $('#restart-no').onclick = () => { $('#confirm-slot').innerHTML = ''; $('#restart').focus(); };
       $('#restart-yes').onclick = () => {
         const settings = P.settings;
+        const track = P.track;
         P = window.IoTStorage.defaults();
         P.settings = settings;
+        P.track = track;
         save();
         renderHome();
         announce('Η πρόοδος μηδενίστηκε.');
@@ -408,10 +455,156 @@
 
   function bindRail() {
     $('#nav-home').onclick = renderHome;
+    $('#nav-lang').onclick = renderPicker;
     $('#nav-lab').onclick = () => {
-      const t = (P.current && byId[P.current] && taskUnlocked(byId[P.current])) ? byId[P.current] : (nextTask() || lessons[0]);
-      openTask(t.id);
+      if (!curTrack()) { renderPicker(); return; }
+      const cur = P.current && byId[P.current];
+      const t = (cur && trackOf(cur) === P.track && taskUnlocked(cur)) ? cur : (nextTask() || trackLessons(P.track)[0]);
+      if (t) openTask(t.id);
     };
+  }
+
+  // ------------------------------------------------------------ Επιλογή γλώσσας και πλακέτας
+
+  function trackStats(id) {
+    const ls = trackLessons(id);
+    const done = ls.filter(l => P.completed[l.id]).length;
+    const chs = trackChapters(id);
+    const cards = chs.filter(c => chapterDone(c.n) && window.IoTStories && window.IoTStories[c.n]).length;
+    return { total: ls.length, done, chapters: chs.length, cards };
+  }
+
+  function renderPicker() {
+    stopMachine();
+    S.task = null;
+    document.title = 'Διάλεξε γλώσσα · IoT Guardian';
+    const langCards = LANGS.map(lg => {
+      const tracks = TRACKS.filter(t => t.lang === lg.lang);
+      const boards = tracks.map(t => {
+        const st = trackStats(t.id);
+        const pct = st.total ? Math.round((st.done / st.total) * 100) : 0;
+        const ready = st.total > 0;
+        return `<button class="board-pick${P.track === t.id ? ' current' : ''}" data-track="${t.id}" ${ready ? '' : 'disabled'}>
+          <span class="bp-head"><span class="bp-board">${esc(t.boardName)}</span><span class="bp-tag">${esc(t.tag)}</span></span>
+          <span class="bp-desc">${esc(t.desc)}</span>
+          ${ready ? `<span class="bp-prog"><span class="bar" aria-hidden="true"><i style="width:${pct}%"></i></span><span class="num">${st.done}/${st.total} ασκήσεις · ${st.chapters} κεφάλαια · ★ ${st.cards}</span></span>` : '<span class="bp-prog muted">Έρχεται σύντομα</span>'}
+          ${ready ? `<span class="bp-go">${P.track === t.id ? 'Συνέχεια εδώ' : st.done ? 'Συνέχεια' : 'Ξεκίνα'} ${icon('right')}</span>` : ''}
+        </button>`;
+      }).join('');
+      return `<section class="lang-card" aria-labelledby="lang-${lg.lang}">
+        <div class="lc-top"><span class="lc-mono" style="background:${lg.color}" aria-hidden="true">${esc(lg.mono)}</span>
+          <div><h2 id="lang-${lg.lang}">${esc(lg.name)}</h2><p class="muted">${esc(lg.blurb)}</p></div></div>
+        <pre class="lc-code" aria-hidden="true">${esc(lg.code)}</pre>
+        <div class="lc-boards">${boards}</div>
+      </section>`;
+    }).join('');
+    app().innerHTML = `<div class="app">${rail('lang')}
+      <div class="main picker">
+        ${header('Συνολική πρόοδος · όλες οι γλώσσες', lessons.filter(l => P.completed[l.id]).length, lessons.length, 'Σήμερα', new Date().toLocaleDateString('el-GR', { day: 'numeric', month: 'short', year: 'numeric' }))}
+        <div class="picker-intro card">
+          <span class="kind-tag">Καλώς ήρθες στο IoT Guardian</span>
+          <h1>Σε ποια γλώσσα θέλεις να προγραμματίσεις;</h1>
+          <p>Διάλεξε γλώσσα και πλακέτα. Κάθε διαδρομή έχει τα δικά της κεφάλαια και τη δική της πρόοδο, και μπορείς να αλλάξεις όποτε θέλεις: τίποτα δεν χάνεται. Σε κάθε κεφάλαιο που τελειώνεις κερδίζεις μια <strong>κάρτα ιστορίας</strong> και ένα <strong>σήμα</strong>.</p>
+        </div>
+        <div class="lang-grid">${langCards}</div>
+      </div></div>`;
+    bindRail();
+    app().querySelectorAll('[data-track]').forEach(b => {
+      b.onclick = () => {
+        P.track = b.dataset.track;
+        save();
+        renderHome();
+        announce(`Διαδρομή: ${curTrack().name} · ${curTrack().boardName}.`);
+      };
+    });
+    window.scrollTo(0, 0);
+    const first = app().querySelector('.board-pick.current') || app().querySelector('.board-pick');
+    if (first) first.focus();
+  }
+
+  // ------------------------------------------------------------ Κάρτες ιστορίας και σήματα
+
+  const BADGE_IC = {
+    bulb: '<path d="M12 3a6 6 0 0 0-3.5 10.9V17h7v-3.1A6 6 0 0 0 12 3zM9.5 20h5"/>',
+    chip: '<rect x="7" y="7" width="10" height="10" rx="1.5"/><path d="M10 3v4M14 3v4M10 17v4M14 17v4M3 10h4M3 14h4M17 10h4M17 14h4"/>',
+    bug: '<ellipse cx="12" cy="13" rx="4.5" ry="6"/><path d="M12 7V4M9 5l-1.5-1.5M15 5l1.5-1.5M7.5 11H4M7.5 15H4M16.5 11H20M16.5 15H20M12 9v10"/>',
+    key: '<circle cx="8" cy="15" r="4"/><path d="M11 12l8-8M16 7l2 2M14 9l2 2"/>',
+    shield: '<path d="M12 3l7 3v6c0 4.5-3 7.5-7 9-4-1.5-7-4.5-7-9V6z"/><path d="M9 12l2 2 4-4"/>',
+    lock: '<rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/>',
+    wave: '<path d="M3 12c2-4 4-4 6 0s4 4 6 0 4-4 6 0"/>',
+    wifi: '<path d="M3 9a13 13 0 0 1 18 0M6 12.5a8.5 8.5 0 0 1 12 0M9 16a4 4 0 0 1 6 0"/><circle cx="12" cy="19" r="0.8"/>',
+    radio: '<circle cx="12" cy="12" r="2"/><path d="M8 8a5.5 5.5 0 0 0 0 8M16 8a5.5 5.5 0 0 1 0 8M5 5a10 10 0 0 0 0 14M19 5a10 10 0 0 1 0 14"/>',
+    cloud: '<path d="M7 18a4 4 0 0 1-.5-8A6 6 0 0 1 18 9a4.5 4.5 0 0 1-.5 9z"/>',
+    crab: '<ellipse cx="12" cy="14" rx="6" ry="4"/><path d="M6 13l-3-3 1-3M18 13l3-3-1-3M8 17l-2 3M16 17l2 3M10 10V8M14 10V8"/>',
+    snake: '<path d="M5 18c0-3 3-3 5-3s5 0 5-3-3-3-5-3-4-1-4-3 2-3 4-3h5"/><circle cx="18" cy="3.5" r="0.6"/>',
+    gear: '<circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M4.9 4.9l2.1 2.1M17 17l2.1 2.1M4.9 19.1L7 17M17 7l2.1-2.1"/>',
+    star: '<path d="M12 3l2.7 5.6 6.1.9-4.4 4.3 1 6.1L12 17l-5.4 2.9 1-6.1-4.4-4.3 6.1-.9z"/>',
+    book: '<path d="M4 5a2 2 0 0 1 2-2h13v16H6a2 2 0 0 0-2 2z"/><path d="M4 19V5"/>',
+    rocket: '<path d="M12 3c3 2 5 6 4 11h-8C7 9 9 5 12 3z"/><path d="M8 14l-3 4h4M16 14l3 4h-4"/><circle cx="12" cy="9" r="1.5"/>',
+    eye: '<path d="M2 12s4-7 10-7 10 7 10 7-4 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/>',
+    clock: '<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>',
+    plug: '<path d="M9 2v6M15 2v6M6 8h12v3a6 6 0 0 1-12 0zM12 17v5"/>',
+    flag: '<path d="M5 21V4M5 4h11l-2 4 2 4H5"/>',
+    trophy: '<path d="M8 4h8v5a4 4 0 0 1-8 0zM8 6H4a3 3 0 0 0 4 4M16 6h4a3 3 0 0 1-4 4M12 13v4M8 21h8l-1-4H9z"/>',
+    battery: '<rect x="3" y="7" width="16" height="10" rx="2"/><path d="M21 10v4M6 10v4M9 10v4"/>',
+    database: '<ellipse cx="12" cy="5" rx="7" ry="2.5"/><path d="M5 5v14c0 1.4 3 2.5 7 2.5s7-1.1 7-2.5V5M5 12c0 1.4 3 2.5 7 2.5s7-1.1 7-2.5"/>',
+    terminal: '<rect x="3" y="4" width="18" height="16" rx="2"/><path d="M7 9l3 3-3 3M12 15h5"/>',
+    car: '<path d="M4 16v-3l2-5h12l2 5v3zM4 13h16"/><circle cx="8" cy="17" r="1.8"/><circle cx="16" cy="17" r="1.8"/>'
+  };
+  function medal(st, locked, size) {
+    const b = st && st.badge;
+    const ic = locked ? '<path d="M9.5 9.5a2.5 2.5 0 1 1 3.5 2.3c-.7.3-1 1-1 1.7M12 17h.01"/>' : BADGE_IC[b.icon] || BADGE_IC.star;
+    return `<span class="medal${locked ? ' locked' : ''}" style="${locked ? '' : `background:${b.color}`};width:${size}px;height:${size}px" aria-hidden="true"><svg viewBox="0 0 24 24">${ic}</svg></span>`;
+  }
+  function collectionTeaser(tr) {
+    if (!window.IoTStories) return '';
+    const chs = trackChapters(tr.id).filter(c => window.IoTStories[c.n]);
+    const got = chs.filter(c => chapterDone(c.n));
+    return `<div class="card collection-teaser"><div class="card-head"><h3>Η συλλογή σου</h3><span class="muted" style="font-size:0.85rem">★ ${got.length} από ${chs.length} κάρτες</span></div>
+      <div class="medal-row">${chs.map(c => medal(window.IoTStories[c.n], !chapterDone(c.n), 34)).join('')}</div>
+      <p class="muted" style="margin:0.4rem 0 0.6rem">Κάθε κεφάλαιο που τελειώνεις ξεκλειδώνει μια αληθινή ιστορία από τον κόσμο του κώδικα και των επεξεργαστών.</p>
+      <button class="btn sm" id="open-collection">Άνοιξε τη συλλογή</button></div>`;
+  }
+  function storyHTML(n, fresh) {
+    const st = window.IoTStories[n];
+    const ch = chByN(n);
+    return `<div class="story-card">
+      <div class="story-top">${medal(st, false, 64)}<div>
+        <div class="story-kind">${fresh ? 'Νέα κάρτα ιστορίας · ' : ''}Κεφάλαιο ${chNum(n)} · ${esc(ch ? ch.title : '')}</div>
+        <h3>${esc(st.title)}</h3>
+        <div class="story-meta">${esc(st.who)} · ${esc(st.year)}</div></div></div>
+      ${st.text.map(t => `<p>${esc(t)}</p>`).join('')}
+      <p class="story-link">${esc(st.link)}</p>
+      <div class="story-badge">Σήμα: <strong>${esc(st.badge.name)}</strong></div>
+    </div>`;
+  }
+  function showStory(n, fresh) {
+    if (!window.IoTStories || !window.IoTStories[n]) return;
+    const d = $('#dlg-story');
+    $('#dlg-story-body').innerHTML = storyHTML(n, fresh);
+    d.classList.toggle('fresh', !!fresh);
+    if (!d.open) d.showModal();
+    const btn = d.querySelector('[data-close]');
+    if (btn) btn.focus();
+  }
+  function openCollection(trackId) {
+    const host = $('#dlg-collection-body');
+    const tabs = TRACKS.filter(t => trackLessons(t.id).length);
+    const active = trackId || P.track || tabs[0].id;
+    const render = id => {
+      const chs = trackChapters(id).filter(c => window.IoTStories && window.IoTStories[c.n]);
+      host.innerHTML = `<div class="coll-tabs" role="tablist">${tabs.map(t => `<button role="tab" class="coll-tab${t.id === id ? ' on' : ''}" aria-selected="${t.id === id}" data-ct="${t.id}">${esc(t.name)} · ${esc(t.boardName)} <span class="muted">★ ${trackStats(t.id).cards}</span></button>`).join('')}</div>
+        <ul class="coll-grid">${chs.map(c => {
+          const got = chapterDone(c.n);
+          const st = window.IoTStories[c.n];
+          return `<li><button class="coll-item${got ? '' : ' locked'}" ${got ? `data-story="${c.n}"` : 'disabled'}>${medal(st, !got, 48)}
+            <span class="ci-n">Κεφ. ${chNum(c.n)}</span><span class="ci-t">${got ? esc(st.badge.name) : 'Κλειδωμένο'}</span><span class="ci-s">${got ? esc(st.title) : esc(c.title)}</span></button></li>`;
+        }).join('')}</ul>`;
+      host.querySelectorAll('[data-ct]').forEach(b => { b.onclick = () => render(b.dataset.ct); });
+      host.querySelectorAll('[data-story]').forEach(b => { b.onclick = () => showStory(Number(b.dataset.story)); });
+    };
+    render(active);
+    $('#dlg-collection').showModal();
   }
 
   // ------------------------------------------------------------ Εργαστήριο
@@ -470,7 +663,7 @@
       panels.push(['syntax', l.system ? systemHelpCard() : configHelpCard()]);
       return panels;
     }
-    if (p.includes('serial')) panels.push(['serial', `<div class="card-head"><span class="muted" id="serial-title" style="font-size:0.85rem">${langOf(l) === 'python' ? 'Ό,τι τυπώνει το print() στο τερματικό του Pi' : 'Ό,τι τυπώνει η πλακέτα'}</span>
+    if (p.includes('serial')) panels.push(['serial', `<div class="card-head"><span class="muted" id="serial-title" style="font-size:0.85rem">${serialTitle(l)}</span>
         <div class="mini-btns"><button class="btn sm" id="s-clear">Καθαρισμός</button><button class="btn sm" id="s-pause" aria-pressed="false">Πάγωμα</button><button class="btn sm" id="s-copy">Αντιγραφή</button></div></div>
         <div class="serial" id="serial" role="log" aria-labelledby="serial-title" tabindex="0"></div>`]);
     if (p.includes('net')) panels.push(['net', netCardHTML(mode === 'analysis')]);
@@ -502,7 +695,7 @@
   function lessonStrip(l) {
     const ch = CHAPTERS.find(c => c.n === l.chapter);
     const ls = chapterLessons(l.chapter);
-    const ready = readyChapters().map(c => c.n);
+    const ready = trackChapters(trackOf(l)).map(c => c.n);
     const i = ready.indexOf(l.chapter);
     const prev = ready[i - 1];
     const next = ready[i + 1];
@@ -512,11 +705,11 @@
         ${thumb(lessonIcon(x))}<span class="sc-txt"><span class="sc-n">${k + 1}. ${esc(KIND_LABELS[x.kind])}</span><span class="sc-t">${esc(x.title)}</span><span class="sc-p">${P.completed[x.id] ? '✓ ολοκληρώθηκε' : ok ? '' : 'κλειδωμένο'}</span></span></button>`;
     }).join('');
     return `<footer class="strip" aria-label="Μαθήματα του κεφαλαίου">
-      <div class="strip-head">Μαθήματα · Κεφάλαιο ${l.chapter}: ${esc(ch.title)}</div>
+      <div class="strip-head">Μαθήματα · Κεφάλαιο ${chNum(l.chapter)}: ${esc(ch.title)}</div>
       <div class="strip-row">
-        ${prev !== undefined ? `<button class="strip-nav" data-chapter="${prev}" ${chapterUnlocked(prev) ? '' : 'disabled'} aria-label="Κεφάλαιο ${prev}">${icon('left')}<span>Κεφ. ${prev}</span></button>` : ''}
+        ${prev !== undefined ? `<button class="strip-nav" data-chapter="${prev}" ${chapterUnlocked(prev) ? '' : 'disabled'} aria-label="Κεφάλαιο ${chNum(prev)}">${icon('left')}<span>Κεφ. ${chNum(prev)}</span></button>` : ''}
         ${cards}
-        ${next !== undefined ? `<button class="strip-nav" data-chapter="${next}" ${chapterUnlocked(next) ? '' : 'disabled'} aria-label="Κεφάλαιο ${next}"><span>Κεφ. ${next}</span>${icon('right')}</button>` : ''}
+        ${next !== undefined ? `<button class="strip-nav" data-chapter="${next}" ${chapterUnlocked(next) ? '' : 'disabled'} aria-label="Κεφάλαιο ${chNum(next)}"><span>Κεφ. ${chNum(next)}</span>${icon('right')}</button>` : ''}
       </div>
     </footer>`;
   }
@@ -587,6 +780,7 @@
         <p class="editor-help" id="editor-help">${isConfig
           ? 'Σχόλιο είναι μόνο γραμμή που ξεκινά με #. Tab: εσοχή · Esc και μετά Tab: έξοδος.'
           : langOf(l) === 'python' ? 'Tab: εσοχή 4 κενών · Enter μετά από «:» μεγαλώνει την εσοχή · Esc και μετά Tab: έξοδος · Ctrl+Enter: εκτέλεση'
+            : langOf(l) === 'rust' ? 'Tab: εσοχή 4 κενών · Enter μετά από { μεγαλώνει την εσοχή · Esc και μετά Tab: έξοδος · Ctrl+Enter: εκτέλεση (cargo run)'
             : 'Tab: εσοχή · Esc και μετά Tab: έξοδος · Ctrl+Enter: εκτέλεση · Ctrl+Shift+Enter: ένα βήμα'}</p>
         <button class="btn primary wide" id="b-check">${icon('check')} Έλεγχος λύσης</button>
         <div id="error-slot"></div>
@@ -598,13 +792,13 @@
     const panels = dockPanels(l);
     if (!S.dockTab || !panels.some(p => p[0] === S.dockTab)) S.dockTab = panels.length ? panels[0][0] : null;
     const dock = panels.length ? `<div class="card dock">
-        <div class="dock-tabs" role="tablist" aria-label="Έξοδος">${panels.map(([k]) => `<button role="tab" class="dtab" data-dtab="${k}" id="dtab-${k}" aria-controls="dock-${k}">${k === 'serial' && langOf(l) === 'python' ? 'Τερματικό' : k === 'summary' && l.system ? 'Πώς το διαβάζει το Pi' : DOCK_NAMES[k]}</button>`).join('')}</div>
+        <div class="dock-tabs" role="tablist" aria-label="Έξοδος">${panels.map(([k]) => `<button role="tab" class="dtab" data-dtab="${k}" id="dtab-${k}" aria-controls="dock-${k}">${k === 'serial' && boardOf(l) === 'pi' ? 'Τερματικό' : k === 'summary' && l.system ? 'Πώς το διαβάζει το Pi' : DOCK_NAMES[k]}</button>`).join('')}</div>
         ${panels.map(([k, html]) => `<div class="dock-panel" id="dock-${k}" role="tabpanel" aria-labelledby="dtab-${k}" ${k === S.dockTab ? '' : 'hidden'}>${html}</div>`).join('')}
       </div>` : '';
 
     app().innerHTML = `<div class="app">${rail('lab')}
       <div class="main">
-        ${header(`Κεφ. ${l.chapter} · ${ch.title}`, doneCh, ls.length, 'Εικονικός χρόνος', '00:00.000')}
+        ${header(`Κεφ. ${chNum(l.chapter)} · ${ch.title}`, doneCh, ls.length, 'Εικονικός χρόνος', '00:00.000')}
         <div class="ws">
           <section class="stage" aria-label="Σκηνή εργαστηρίου">
             <div class="scene-wrap" id="scene">${sceneControls()}${mode === 'code' ? inputsCardHTML(hw, w) : ''}</div>
@@ -615,7 +809,7 @@
         ${lessonStrip(l)}
       </div></div>`;
 
-    mountScene(mode !== 'code' ? window.IoTScene.netScene() : langOf(l) === 'python' ? window.IoTScene.piScene(hw, w) : window.IoTScene.labScene(hw, w));
+    mountScene(mode !== 'code' ? window.IoTScene.netScene() : boardOf(l) === 'pi' ? window.IoTScene.piScene(hw, w) : window.IoTScene.labScene(hw, w));
     bindRail();
     app().querySelectorAll('.strip [data-task]').forEach(b => { b.onclick = () => openTask(b.dataset.task); });
     bindChapterCards();
@@ -647,7 +841,7 @@
     if (mode === 'analysis') {
       $('#b-clear-ev').onclick = () => { S.evidence.clear(); S.netSig = ''; S.logSig = ''; updateNet(true); updateLogs(true); updateEvidenceStatus(); };
     }
-    if (mode !== 'analysis' && langOf(l) !== 'python' && window.IoTReal) {
+    if (mode !== 'analysis' && langOf(l) === 'cpp' && window.IoTReal) {
       window.IoTReal.mount($('#real-slot'), { mode, getCode: () => $('#code').value, consts: () => worldOf(l).consts || {} });
     }
     bindOutputs();
@@ -991,6 +1185,59 @@
     });
   }
 
+  function serialTitle(l) {
+    const lang = langOf(l);
+    const pi = boardOf(l) === 'pi';
+    if (lang === 'python') return pi ? 'Ό,τι τυπώνει το print() στο τερματικό του Pi' : 'Ό,τι τυπώνει το print() στο REPL του ESP32 (MicroPython)';
+    if (lang === 'rust') return pi ? 'Ό,τι τυπώνει το println! στο τερματικό του Pi (cargo run)' : 'Ό,τι τυπώνει το println! στο Serial Monitor του ESP32 (espflash monitor)';
+    return 'Ό,τι τυπώνει η πλακέτα';
+  }
+  // Πώς «γεννιέται» το LED σε κάθε γλώσσα (για την κάρτα εισόδων)
+  function ledCode() {
+    if (!S.task) return '';
+    const lang = langOf(S.task);
+    const pi = boardOf(S.task) === 'pi';
+    if (lang === 'python') return pi ? `LED(${PY.PI_PINS.LED})` : 'Pin(2, Pin.OUT)';
+    if (lang === 'rust') return pi ? 'gpio.get(17)?.into_output()' : 'PinDriver::output(gpio2)';
+    return '';
+  }
+
+  const RS_KW = new Set(['as', 'break', 'const', 'continue', 'else', 'enum', 'false', 'fn', 'for', 'if', 'impl', 'in', 'let', 'loop', 'match', 'mut', 'pub', 'return', 'self', 'Self', 'static', 'struct', 'true', 'use', 'where', 'while', 'dyn', 'move', 'ref', 'mod', 'crate', 'super', 'unsafe', 'type', 'trait']);
+  const RS_TY = new Set(['i8', 'i16', 'i32', 'i64', 'i128', 'isize', 'u8', 'u16', 'u32', 'u64', 'u128', 'usize', 'f32', 'f64', 'bool', 'char', 'str', 'String', 'Vec', 'Option', 'Result', 'Some', 'None', 'Ok', 'Err', 'Box']);
+  function highlightRust(lines) {
+    let inBlock = false;
+    return lines.map(line => {
+      let out = '';
+      let i = 0;
+      while (i < line.length) {
+        if (inBlock) {
+          const end = line.indexOf('*/', i);
+          if (end === -1) { out += span('com', line.slice(i)); i = line.length; } else { out += span('com', line.slice(i, end + 2)); i = end + 2; inBlock = false; }
+          continue;
+        }
+        const rest = line.slice(i);
+        let m;
+        if (rest.startsWith('//')) { out += span('com', rest); break; }
+        if (rest.startsWith('/*')) { out += span('com', '/*'); i += 2; inBlock = true; continue; }
+        if ((m = /^"(?:[^"\\]|\\.)*"?/.exec(rest))) { out += span('str', m[0]); i += m[0].length; continue; }
+        if ((m = /^'(?:\\.|[^\\'])'/.exec(rest))) { out += span('str', m[0]); i += m[0].length; continue; }
+        if ((m = /^#!?\[[^\]]*\]/.exec(rest))) { out += span('com', m[0]); i += m[0].length; continue; }
+        if ((m = /^_{2,}/.exec(rest))) { out += span('blank', m[0]); i += m[0].length; continue; }
+        if ((m = /^[A-Za-z_]\w*!?/.exec(rest))) {
+          const w = m[0];
+          const cls = w.endsWith('!') ? 'fn' : RS_KW.has(w) ? 'kw' : RS_TY.has(w) || /^[A-Z][A-Z0-9_]+$/.test(w) ? 'const' : /^[A-Z]/.test(w) ? 'fn' : null;
+          out += cls ? span(cls, w) : esc(w);
+          i += w.length;
+          continue;
+        }
+        if ((m = /^\d[\d_]*(\.\d+)?(?:[iuf](?:8|16|32|64|128|size))?/.exec(rest))) { out += span('num', m[0]); i += m[0].length; continue; }
+        out += esc(rest[0]);
+        i++;
+      }
+      return out;
+    });
+  }
+
   function highlightLines(lines) {
     let inBlock = false;
     return lines.map(line => {
@@ -1057,7 +1304,7 @@
     const ta = $('#code');
     if (!ta) return;
     const lines = ta.value.split('\n');
-    const html = modeOf(S.task) === 'config' ? highlightConfig(lines) : isPy() ? highlightPython(lines) : highlightLines(lines);
+    const html = modeOf(S.task) === 'config' ? highlightConfig(lines) : isPy() ? highlightPython(lines) : isRust() ? highlightRust(lines) : highlightLines(lines);
     const paused = S.runState === 'paused' && S.machine;
     const exec = paused ? S.machine.currentLine : null;
     const errLine = S.error ? S.error.line : null;
@@ -1107,7 +1354,7 @@
     if (e.key === 'Escape') { S.escTab = true; return; }
     if (e.key === 'Tab' && !S.escTab && !e.shiftKey) {
       e.preventDefault();
-      insertText(ta, isPy() ? '    ' : '  ');
+      insertText(ta, isPy() || isRust() ? '    ' : '  ');
       return;
     }
     if (e.key === 'Enter' && !e.shiftKey && !e.altKey) {
@@ -1115,7 +1362,7 @@
       const cur = before.slice(before.lastIndexOf('\n') + 1);
       // Python: μετά από γραμμή που τελειώνει σε «:» η εσοχή μεγαλώνει κατά 4 κενά.
       const opens = isPy() ? /:\s*(#.*)?$/.test(cur) : /\{\s*$/.test(cur);
-      const indent = (/^\s*/.exec(cur) || [''])[0] + (opens ? (isPy() ? '    ' : '  ') : '');
+      const indent = (/^\s*/.exec(cur) || [''])[0] + (opens ? (isPy() || isRust() ? '    ' : '  ') : '');
       e.preventDefault();
       insertText(ta, '\n' + indent);
       return;
@@ -1237,10 +1484,11 @@
     const w = worldOf(S.task);
     try {
       const E = VAL.engine(langOf(S.task));
-      const c = E.compile(ta.value, { consts: w.consts || {} });
+      const opts = { consts: w.consts || {}, board: boardOf(S.task) };
+      const c = E.compile(ta.value, opts);
       S.warnings = c.warnings;
       S.board = VAL.createWorld(w, S.inputs);
-      S.machine = new E.Machine(c.program, S.board, { consts: w.consts || {} });
+      S.machine = new E.Machine(c.program, S.board, opts);
       S.gen = S.machine.main();
       S.error = null;
       S.info = null;
@@ -1410,7 +1658,7 @@
       const code = $('#code').value;
       if (mode === 'code') {
         try {
-          VAL.engine(langOf(l)).compile(code, { consts: worldOf(l).consts || {} });
+          VAL.engine(langOf(l)).compile(code, { consts: worldOf(l).consts || {}, board: boardOf(l) });
         } catch (e) {
           if (!(e instanceof CodeError) && e.name !== 'CodeError') throw e;
           showError(e);
@@ -1447,6 +1695,12 @@
     const quizOk = !l.quiz || P.quizzes[l.id];
     if (S.results && S.results.allPass && quizOk && !P.completed[l.id]) {
       P.completed[l.id] = true;
+      // Τέλος κεφαλαίου: νέα κάρτα ιστορίας και σήμα (μία φορά)
+      const n = l.chapter;
+      if (chapterDone(n) && window.IoTStories && window.IoTStories[n] && !P.stories[n]) {
+        P.stories[n] = true;
+        setTimeout(() => showStory(n, true), 450);
+      }
       save();
     }
   }
@@ -1472,16 +1726,20 @@
       return;
     }
     const ls = chapterLessons(l.chapter);
-    const next = lessons[lessons.indexOf(l) + 1];
-    const chapterDone = ls.every(x => P.completed[x.id]);
-    const unlockMsg = chapterDone && next && next.chapter !== l.chapter ? `<p><strong>Ξεκλείδωσε το Κεφάλαιο ${next.chapter}.</strong></p>` : '';
-    const allDone = lessons.every(x => P.completed[x.id]);
+    const mine = trackLessons(trackOf(l));
+    const next = mine[mine.indexOf(l) + 1];
+    const chDone = ls.every(x => P.completed[x.id]);
+    const story = chDone && window.IoTStories && window.IoTStories[l.chapter];
+    const unlockMsg = (chDone && next && next.chapter !== l.chapter ? `<p><strong>Ξεκλείδωσε το Κεφάλαιο ${chNum(next.chapter)}.</strong></p>` : '')
+      + (story ? `<p class="story-won">${medal(story, false, 28)} <span>Κέρδισες το σήμα <strong>${esc(story.badge.name)}</strong> και μια κάρτα ιστορίας.</span> <button class="btn sm" id="see-story">Διάβασέ τη</button></p>` : '');
+    const allDone = mine.every(x => P.completed[x.id]);
     const nextBtn = next && taskUnlocked(next)
       ? `<button class="btn primary" id="go-next">Επόμενη άσκηση: ${esc(next.title)}</button>`
       : `<button class="btn primary" id="go-map">${allDone ? 'Δες τη βεβαίωση ολοκλήρωσης' : 'Πίσω στον χάρτη'}</button>`;
     slot.innerHTML = `<div class="card success" tabindex="-1" style="margin-top:0.75rem"><h3>Η άσκηση ολοκληρώθηκε</h3>${list}
       <p>${esc(l.explanationOnSuccess)}</p>${unlockMsg}<div class="btn-row">${nextBtn}</div></div>`;
     if ($('#go-next')) $('#go-next').onclick = () => openTask(next.id);
+    if ($('#see-story')) $('#see-story').onclick = () => showStory(l.chapter);
     if ($('#go-map')) $('#go-map').onclick = renderHome;
   }
 
@@ -1632,7 +1890,7 @@
     const parts = [`<span>Κατάσταση: <b>${labels[S.runState]}</b></span>`];
     if (m && S.board && S.runState !== 'idle') {
       const sleeping = S.board.sleep ? ` · ${S.board.sleep.mode} sleep` : '';
-      const phase = m.lang === 'python'
+      const phase = m.lang !== 'cpp' && m.lang
         ? (m.finished ? 'τέλος προγράμματος' : m.phase === 'loop' ? `κύριος βρόχος · γύρος ${m.loopIndex}` : 'κύριο πρόγραμμα')
         : (m.phase === 'loop' ? `loop() · επανάληψη ${m.loopIndex}` : m.phase === 'setup' ? 'setup()' : m.phase === 'deep sleep' ? 'κοιμάται' : 'αρχικές τιμές') + sleeping;
       parts.push(`<span>Φάση: <b>${phase}</b></span>`);
@@ -1676,7 +1934,7 @@
     const dot = $('#led-dot');
     if (dot) dot.classList.toggle('on', ledOn);
     if ($('#led-text')) $('#led-text').textContent = ledOn ? 'LED αναμμένο' : 'LED σβηστό';
-    if ($('#led-mode')) $('#led-mode').textContent = isPy() ? `LED(${PY.PI_PINS.LED}) · ${b && b.modes[2] === 3 ? 'έτοιμο' : 'δεν δημιουργήθηκε'}` : 'pinMode: ' + ((b && b.modeName(2)) || 'δεν ορίστηκε');
+    if ($('#led-mode')) $('#led-mode').textContent = ledCode() ? `${ledCode()} · ${b && b.modes[2] === 3 ? 'έτοιμο' : 'δεν δημιουργήθηκε'}` : 'pinMode: ' + ((b && b.modeName(2)) || 'δεν ορίστηκε');
     const setSw = (id, val, onT, offT) => {
       const btn = $('#' + id);
       if (!btn) return;
@@ -1693,7 +1951,7 @@
         $('#mqtt-text').textContent = 'MQTT: —';
       } else {
         const st = b.wifiStatus();
-        $('#wifi-text').textContent = isPy() ? 'Δίκτυο: ενσύρματο (Ethernet) · 192.168.1.10' : 'WiFi: ' + (WIFI_TEXT[st] || st) + (b.wifi.pending ? ' (συνδέεται…)' : '');
+        $('#wifi-text').textContent = isPi() ? 'Δίκτυο: ενσύρματο (Ethernet) · 192.168.1.10' : 'WiFi: ' + (WIFI_TEXT[st] || st) + (b.wifi.pending ? ' (συνδέεται…)' : '');
         const conn = b.net && b.net.connected('device');
         const sess = conn ? b.net.session('device') : null;
         $('#mqtt-text').textContent = 'MQTT: ' + (!b.net ? 'δεν υπάρχει broker' : conn ? `συνδεδεμένο ως ${sess.clientId} · θύρα ${sess.port}${sess.tls ? (sess.insecure ? ' · TLS χωρίς έλεγχο' : ' · TLS') : ' · χωρίς TLS'}` : 'αποσυνδεδεμένο' + (b.mqtt.lastError ? ' · ' + b.mqtt.lastError : ''));
@@ -1714,12 +1972,12 @@
       cls('#sc-router', 'on', S.inputs.router);
       const sleeping = !!(b && b.sleep);
       cls('#sc-esp', 'asleep', sleeping);
-      const wifiOn = isPy() ? !!b : !!(b && !sleeping && b.wifiStatus() === 3);
+      const wifiOn = isPi() ? !!b : !!(b && !sleeping && b.wifiStatus() === 3);
       cls('#sc-wifi', 'on', wifiOn);
       cls('#sc-link-wifi', 'on', wifiOn);
       const net = b && b.net;
       const sensorNode = net && [...net.sessions.keys()].some(c => c !== 'device' && c !== 'dashboard');
-      cls('#sc-link-esp-pi', 'on', isPy() ? !!sensorNode : !!(net && net.connected('device')));
+      cls('#sc-link-esp-pi', 'on', isPi() ? !!sensorNode : !!(net && net.connected('device')));
       cls('#sc-link-pi-dash', 'on', !!(net && net.connected('dashboard')));
       for (const [k, pin] of [['r', 25], ['y', 26], ['g', 27]]) {
         const on = !!(b && b.light(pin));
@@ -1765,7 +2023,7 @@
         S.msgSeen = net.messages.length;
         if (!P.settings.reducedMotion && !matchMedia('(prefers-reduced-motion: reduce)').matches) {
           fresh.forEach((m, i) => {
-            if (isPy()) {
+            if (isPi()) {
               // Pi: ο broker και το πρόγραμμα Python είναι στο ίδιο Pi. Οι αισθητήρες στέλνουν προς το Pi,
               // το Pi προωθεί στο dashboard.
               if (m.client !== 'device' && m.client !== 'dashboard') window.IoTScene.animatePacket(sc, 'sc-link-esp-pi', 'in', i * 120);
@@ -1783,7 +2041,7 @@
       }
     }
     // Αιτήματα HTTP από το tablet προς το Flask του Pi
-    if (sc && b && isPy() && b.http.log.length !== (S.httpSeen || 0)) {
+    if (sc && b && isPi() && b.http.log.length !== (S.httpSeen || 0)) {
       const fresh = b.http.log.slice(S.httpSeen || 0);
       S.httpSeen = b.http.log.length;
       if (!P.settings.reducedMotion && !matchMedia('(prefers-reduced-motion: reduce)').matches) {
@@ -1798,7 +2056,7 @@
       const l2 = sc.querySelector('#sc-dash-2');
       if (last && l1 && !(b.net && b.net.dashboard)) { l1.textContent = `${last.req.method} ${last.req.path}`.slice(0, 24); if (l2) l2.textContent = last.resp.status ? `→ ${last.resp.status}` : '→ απέτυχε'; }
     }
-    if (sc && b && isPy() && b.http.server) cls('#sc-link-pi-dash', 'on', true);
+    if (sc && b && isPi() && b.http.server) cls('#sc-link-pi-dash', 'on', true);
     if (sc && modeOf(S.task) === 'config') updateNetScene();
     if (S.board && S.board.warnings.length !== S.lastWarnCount) { S.lastWarnCount = S.board.warnings.length; renderErrorSlot(); }
   }
@@ -1879,7 +2137,7 @@
     const recs = m.visibleVars();
     if (!recs.length) { el.innerHTML = '<p class="muted">Αυτό το πρόγραμμα δεν έχει μεταβλητές ακόμα.</p>'; return; }
     const showChange = S.runState === 'paused';
-    const displayValue = m.lang === 'python' ? PY.display : IOT_DISPLAY;
+    const displayValue = m.display || (m.lang === 'python' ? PY.display : IOT_DISPLAY);
     el.innerHTML = `<table><thead><tr><th scope="col">Όνομα</th><th scope="col">Τύπος</th><th scope="col">Τιμή</th><th scope="col">Προηγούμενη</th><th scope="col">Γραμμή</th></tr></thead><tbody>
       ${recs.map(r => {
         const changed = showChange && r.stamp > S.stampBefore;
@@ -1903,7 +2161,7 @@
           : b.lang === 'python' ? '. Καμία συνθήκη δεν ισχύει και δεν υπάρχει else, οπότε το πρόγραμμα συνεχίζει μετά το if.' : '. Δεν υπάρχει else, οπότε το πρόγραμμα προσπερνά το if και συνεχίζει.';
     el.innerHTML = `<div class="branch">
       <div>Γραμμή ${b.line}</div>
-      <div class="cond">${b.lang === 'python' ? `${b.kw} ${esc(b.cond)}:` : `if (${esc(b.cond)})`}</div>
+      <div class="cond">${b.lang === 'python' ? `${b.kw} ${esc(b.cond)}:` : b.lang === 'rust' ? `${b.kw} ${esc(b.cond)} {` : `if (${esc(b.cond)})`}</div>
       ${b.vars.length ? `<div>Τιμές εκείνη τη στιγμή: ${b.vars.map(v => `<code>${esc(v.name)} = ${esc(v.value)}</code>`).join(', ')}</div>` : ''}
       <div>Η συνθήκη είναι <span class="verdict ${b.result}">${b.result ? 'ΑΛΗΘΗΣ (true)' : 'ΨΕΥΔΗΣ (false)'}</span>${what}</div>
     </div>`;
@@ -1914,12 +2172,14 @@
     if (!el) return;
     const m = S.machine;
     if (!m || !m.loopLog.length) {
-      el.innerHTML = isPy()
+      el.innerHTML = isRust()
+        ? '<p class="muted">Μετά από κάθε γύρο του κύριου βρόχου (το loop { … } της main) εδώ γράφεται μία γραμμή: τι είσοδο είχε, τι τιμές είχαν οι μεταβλητές και τι τυπώθηκε.</p>'
+        : isPy()
         ? '<p class="muted">Μετά από κάθε γύρο του κύριου βρόχου (while True: ή loop_forever) εδώ γράφεται μία γραμμή: τι είσοδο είχε, τι τιμές είχαν οι μεταβλητές και τι τυπώθηκε.</p>'
         : '<p class="muted">Μετά από κάθε επανάληψη του loop() εδώ γράφεται μία γραμμή: τι είσοδο είχε, τι τιμές είχαν οι μεταβλητές και τι τυπώθηκε.</p>';
       return;
     }
-    const names = (m.lang === 'python' ? m.visibleVars().filter(r => r.kind === 'global' && r.value.t !== 'object') : [...m.globals.values()].filter(r => !r.isConst)).map(r => r.name);
+    const names = (m.loopVarNames ? m.loopVarNames().map(n => ({ name: n })) : m.lang === 'python' ? m.visibleVars().filter(r => r.kind === 'global' && r.value.t !== 'object') : [...m.globals.values()].filter(r => !r.isConst)).map(r => r.name);
     const hw = hardwareOf(S.task);
     const cols = [];
     if (hw.includes('button')) cols.push(['Κουμπί', r => (r.inputs.button ? '1 · HIGH' : '0 · LOW')]);
@@ -2117,6 +2377,14 @@
           <div id="imp-result" aria-live="polite"></div></div>
       </div>
     </dialog>
+    <dialog id="dlg-story" class="dlg-story" aria-labelledby="dlg-story-title">
+      <div class="dlg-head"><h2 id="dlg-story-title">Κάρτα ιστορίας</h2><button class="btn quiet" data-close>Κλείσιμο</button></div>
+      <div class="dlg-body" id="dlg-story-body"></div>
+    </dialog>
+    <dialog id="dlg-collection" class="dlg-wide" aria-labelledby="dlg-collection-title">
+      <div class="dlg-head"><h2 id="dlg-collection-title">Η συλλογή σου</h2><button class="btn quiet" data-close>Κλείσιμο</button></div>
+      <div class="dlg-body" id="dlg-collection-body"></div>
+    </dialog>
     <div id="live" class="sr-only" aria-live="polite"></div>`;
     document.body.appendChild(host);
 
@@ -2172,6 +2440,7 @@
       const b = e.target.closest('[data-open]');
       if (!b) return;
       const which = b.dataset.open;
+      if (which === 'collection') { openCollection(); return; }
       if (which === 'settings') {
         $('#set-theme').value = P.settings.theme;
         $('#set-font').value = String(P.settings.fontScale);

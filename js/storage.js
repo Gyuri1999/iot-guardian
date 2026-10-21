@@ -22,6 +22,8 @@
       drafts: {},
       hints: {},
       current: null,
+      track: null,
+      stories: {},
       settings: { theme: 'system', fontScale: 1, lineSpacing: 'normal', reducedMotion: false }
     };
   }
@@ -45,6 +47,8 @@
       for (const [k, v] of Object.entries(obj.hints)) if (ids.has(k) && Number.isInteger(v) && v >= 0 && v <= 3) out.hints[k] = v;
     }
     if (typeof obj.current === 'string' && ids.has(obj.current)) out.current = obj.current;
+    if (typeof obj.track === 'string' && /^(cpp|py|rs)-(esp32|pi)$/.test(obj.track)) out.track = obj.track;
+    if (obj.stories && typeof obj.stories === 'object') for (const [k, v] of Object.entries(obj.stories)) if (/^\d{1,3}$/.test(k) && v === true) out.stories[k] = true;
     const s = obj.settings || {};
     if (['system', 'light', 'dark'].includes(s.theme)) out.settings.theme = s.theme;
     if (typeof s.fontScale === 'number' && s.fontScale >= 0.85 && s.fontScale <= 1.6) out.settings.fontScale = s.fontScale;

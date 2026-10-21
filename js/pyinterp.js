@@ -1217,6 +1217,7 @@
     constructor(program, board, opts) {
       opts = opts || {};
       this.lang = 'python';
+      this.target = opts.board || 'pi'; // 'pi' (Python στο Raspberry Pi) ή 'esp32' (MicroPython)
       this.prog = program;
       this.board = board;
       this.globals = new Map();
@@ -1774,6 +1775,7 @@
         if (v !== undefined) return v;
         return raise('AttributeError', `'${obj.cls}' object has no attribute '${name}'`, obj.cls === 'MQTTMessage' && name === 'payload_str' ? 'Το κείμενο του μηνύματος παίρνεται με msg.payload.decode().' : '', line);
       }
+      if (obj.t === 'builtin' && obj.attr) { const v = obj.attr(name, line); if (v !== undefined) return v; }  // π.χ. Pin.OUT (MicroPython)
       if (obj.t === 'exception' && name === 'args') return T([S(obj.msg)]);
       const table = METHODS[obj.t];
       if (table && table[name]) return { t: 'method', name: `${obj.t}.${name}`, self: obj, fn: table[name] };
