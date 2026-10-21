@@ -151,6 +151,7 @@
     plus: '<path d="M12 5v14M5 12h14"/>',
     minus: '<path d="M5 12h14"/>',
     fit: '<path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/>',
+    orbit: '<ellipse cx="12" cy="12" rx="9" ry="4"/><path d="M12 3v18"/><path d="M18.5 6.5l2.2 1.2-.6 2.4"/>',
     star: '<path d="M12 3l2.7 5.6 6.1.9-4.4 4.3 1 6.1L12 17l-5.4 2.9 1-6.1-4.4-4.3 6.1-.9z"/>',
     lang: '<path d="M8 8l-4 4 4 4M16 8l4 4-4 4M13.5 5l-3 14"/>'
   };
@@ -226,6 +227,7 @@
       <button class="sc-b" id="sc-zoom-out" aria-label="Σμίκρυνση">${icon('minus')}</button>
       <button class="sc-b" id="sc-fit" aria-label="Επαναφορά προβολής">${icon('fit')}</button>
       <button class="sc-b" id="sc-zoom-in" aria-label="Μεγέθυνση">${icon('plus')}</button>
+      <button class="sc-b sc-3d" id="sc-orbit" aria-pressed="false" aria-label="3D: περιστροφή γύρω γύρω" title="3D: γύρνα τη σκηνή γύρω γύρω" hidden>${icon('orbit')}<span>3D</span></button>
     </div>
     <p class="scene-hint">Σύρε για μετακίνηση · ροδέλα ή + / − για ζουμ</p>`;
   }
@@ -243,9 +245,45 @@
     bindParts(wrap, svg);
     const motion = !P.settings.reducedMotion && !matchMedia('(prefers-reduced-motion: reduce)').matches;
     // 3D εξαρτήματα (Three.js) κάτω από την SVG· χωρίς WebGL μένει η επίπεδη σκηνή.
-    if (window.IoTScene3D) window.IoTScene3D.mount(wrap, svg, window.IoTScene.manifest, { animate: motion });
+    const has3d = !!(window.IoTScene3D && window.IoTScene3D.mount(wrap, svg, window.IoTScene.manifest, { animate: motion }));
     if (motion) window.IoTScene.buildIn(svg);
+    bindOrbit(wrap, svg, has3d, pz);
     return svg;
+  }
+
+  // ---------- 3D περιστροφή: η σκηνή γυρίζει γύρω γύρω (σύρσιμο, ροδέλα, Esc για επιστροφή).
+  function bindOrbit(wrap, svg, has3d, pz) {
+    const btn = $('#sc-orbit');
+    const hint = wrap.querySelector('.scene-hint');
+    const D3 = window.IoTScene3D;
+    if (!btn || !has3d || !D3.orbit) return;
+    btn.hidden = false;
+    const normalHint = hint ? hint.textContent : '';
+    const show = () => {
+      const on = D3.orbiting();
+      btn.setAttribute('aria-pressed', String(on));
+      btn.classList.toggle('on', on);
+      btn.title = on ? 'Επιστροφή στην κανονική όψη (Esc)' : '3D: γύρνα τη σκηνή γύρω γύρω';
+      if (hint) hint.textContent = on ? (D3.spinning() ? 'Γυρίζει μόνη της · σύρε για να τη γυρίσεις εσύ · ροδέλα για ζουμ · Esc για επιστροφή' : 'Σύρε για περιστροφή · ροδέλα για ζουμ · Esc για επιστροφή') : normalHint;
+    };
+    D3.onState(show);
+    const toggle = () => {
+      if (D3.orbiting()) D3.orbit(false); else D3.orbit(true, { auto: !P.settings.reducedMotion && !matchMedia('(prefers-reduced-motion: reduce)').matches });
+      show();
+      announce(D3.orbiting() ? '3D περιστροφή: η σκηνή γυρίζει. Οι ετικέτες κρύβονται μέχρι να επιστρέψεις.' : 'Κανονική όψη.');
+    };
+    btn.onclick = toggle;
+    // Το «Επαναφορά προβολής» βγάζει και από την περιστροφή.
+    const fit = $('#sc-fit');
+    if (fit) fit.onclick = () => { if (D3.orbiting()) { D3.orbit(false); show(); } else pz.reset(); };
+    // Esc: επιστροφή (το κουμπί και το κείμενο ενημερώνονται όταν τελειώσει η κίνηση, μέσω του onState)
+    if (!S.orbitEsc) {
+      S.orbitEsc = true;
+      document.addEventListener('keydown', e => {
+        const d = window.IoTScene3D;
+        if (e.key === 'Escape' && d && d.orbiting && d.orbiting()) d.orbit(false);
+      });
+    }
   }
 
   // ---------- «Τι είναι;»: κάθε κομμάτι της σκηνής εξηγείται με κλικ ή Enter.

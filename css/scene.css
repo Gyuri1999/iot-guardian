@@ -274,3 +274,11 @@
 .scene-3d { position: absolute; pointer-events: none; display: block; }
 .scene.has3d .floor { opacity: 0; }
 .scene.has3d :is(.sc-back, .sc-mid, .sc-wires, .sc-front) :is(polygon, path, rect, ellipse, circle, text):not(.callout *, .halo, .smd, .zzz, .readout, .readout-t, .tl-halo, .tab-h, .tab-t, .rled, .waves *, .pwaves *, .us-waves *, .dist-line *) { opacity: 0; }
+
+/* ---------- 3D περιστροφή: ο καμβάς παίρνει το ποντίκι, η επίπεδη σκηνή (ετικέτες, κλικ) κρύβεται */
+.scene-3d.orbiting { pointer-events: auto; cursor: grab; touch-action: none; z-index: 1; }
+.scene-3d.orbiting:active { cursor: grabbing; }
+.scene.orbiting { opacity: 0; pointer-events: none; }
+.sc-b.sc-3d { width: auto; padding: 0 0.5rem; gap: 0.25rem; display: inline-flex; align-items: center; font-family: var(--font-label); font-weight: 700; font-size: 0.78rem; letter-spacing: 0.06em; }
+.sc-b.sc-3d.on { background: var(--teal); color: #fff; }
+.sc-b.sc-3d .ic { width: 1.05rem; height: 1.05rem; }

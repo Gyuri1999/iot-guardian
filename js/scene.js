@@ -662,7 +662,7 @@
     if (hw.includes('led') || !(hw.includes('ultrasonic') || hw.includes('traffic'))) {
       front += led(LED_AT[0], LED_AT[1]);
       wires.push(wire(espPinUV('D2'), { u: LED_AT[0] - 2.54, v: LED_AT[1] + 2.54, h: 2.4 }, 'w-led', 46, 'sc-w-led'));
-      wires.push(wire(espPinUV('GND'), { u: LED_AT[0] + 2.54, v: BB.v + BB.dv - 2, h: 2.4 }, 'w-gnd', 30));
+      wires.push(wire(espPinUV('GND2'), { u: LED_AT[0] + 2.54, v: BB.v + BB.dv - 2, h: 2.4 }, 'w-gnd', 30));
       labels.push(callout(P(LED_AT[0], LED_AT[1], 14), 26, -92, 'LED · GPIO 2', null, 'led'));
     }
     if (hw.includes('button')) {
@@ -683,7 +683,7 @@
       front += ultrasonic();
       wires.push(wire(espPinUV('D5'), usPinUV(1), 'w-trig', 70, 'sc-w-trig'));
       wires.push(wire(espPinUV('D18'), usPinUV(2), 'w-echo', 64, 'sc-w-echo'));
-      wires.push(wire(espPinUV('GND'), usPinUV(3), 'w-gnd', 40));
+      wires.push(wire(espPinUV('GND2'), usPinUV(3), 'w-gnd', 40));
       labels.push(callout(P(US.u + US.w - 3, US.v, 14), 40, -50, 'HC-SR04 · TRIG 5 · ECHO 18', null, 'ultrasonic'));
       front += `<g id="sc-car-move" transform="${carOffset(50)}">${car()}</g>`;
       front += `<g id="sc-dist" class="dist-line"><path id="sc-dist-path" d=""/><g id="sc-dist-tag"><rect x="-26" y="-9" width="52" height="18" rx="9" class="dist-pill"/><text x="0" y="3.6" text-anchor="middle" class="dist-t" id="sc-dist-t">50 cm</text></g></g>`;
@@ -786,11 +786,13 @@
   function attachPanZoom(svg) {
     let base = svg.getAttribute('data-vb').split(' ').map(Number);
     // Προσαρμογή στο περιεχόμενο: το viewBox ξεκινά από το πραγματικό πλαίσιο των αντικειμένων.
-    try {
-      const bb = svg.querySelector('.sc-content').getBBox();
-      if (bb.width > 0) {
-        const pad = Math.max(bb.width, bb.height) * 0.03;
-        base = [bb.x - pad, bb.y - pad, bb.width + 2 * pad, bb.height + 2 * pad];
+    // Υπολογίζεται ξανά όταν αλλάζει το μέγεθος της σκηνής, ώστε οι ετικέτες στις άκρες να μην κόβονται.
+    const fitBase = () => {
+      try {
+        const bb = svg.querySelector('.sc-content').getBBox();
+        if (!(bb.width > 0)) return null;
+        const pad = Math.max(bb.width, bb.height) * 0.06;
+        let b = [bb.x - pad, bb.y - pad, bb.width + 2 * pad, bb.height + 2 * pad];
         // Αν μια κάρτα επιπλέει πάνω αριστερά, το περιεχόμενο χωράει δίπλα ή κάτω από αυτήν (όπου μεγαλώνει περισσότερο).
         const r = svg.getBoundingClientRect();
         const card = svg.parentElement && svg.parentElement.querySelector('.inputs-card');
@@ -798,18 +800,21 @@
           const ix = card.offsetLeft + card.offsetWidth, iy = card.offsetTop + card.offsetHeight;
           const ctl = svg.parentElement.querySelector('.scene-ctl');
           const bottom = ctl && getComputedStyle(ctl).position === 'absolute' ? r.height - ctl.offsetTop : 0;
-          const kSide = Math.min((r.width - ix) / base[2], (r.height - bottom) / base[3]);
-          const kBelow = Math.min(r.width / base[2], (r.height - iy - bottom) / base[3]);
+          const kSide = Math.min((r.width - ix) / b[2], (r.height - bottom) / b[3]);
+          const kBelow = Math.min(r.width / b[2], (r.height - iy - bottom) / b[3]);
           const k = Math.max(kSide, kBelow);
           if (k > 0) {
             const left = kSide >= kBelow ? ix : 0, top = kSide >= kBelow ? 0 : iy;
             const w = r.width / k, h = r.height / k;
-            base = [base[0] - left / k - ((r.width - left) / k - base[2]) / 2, base[1] - top / k - ((r.height - top - bottom) / k - base[3]) / 2, w, h];
+            b = [b[0] - left / k - ((r.width - left) / k - b[2]) / 2, b[1] - top / k - ((r.height - top - bottom) / k - b[3]) / 2, w, h];
           }
         }
-        svg.setAttribute('viewBox', base.map(n => n.toFixed(1)).join(' '));
-      }
-    } catch (e) { /* χωρίς διάταξη (π.χ. κρυφό): μένει το αρχικό viewBox */ }
+        return b;
+      } catch (e) { return null; /* χωρίς διάταξη (π.χ. κρυφό): μένει το αρχικό viewBox */ }
+    };
+    base = fitBase() || base;
+    svg.setAttribute('viewBox', base.map(n => n.toFixed(1)).join(' '));
+    let userView = false; // γίνεται true όταν ο μαθητής ζουμάρει ή μετακινεί τη σκηνή
     let vb = base.slice();
     const apply = () => svg.setAttribute('viewBox', vb.map(n => n.toFixed(1)).join(' '));
     let drag = null;
@@ -828,6 +833,7 @@
         svg.setPointerCapture(drag.id);
         svg.classList.add('dragging');
       }
+      userView = true;
       const r = svg.getBoundingClientRect();
       const kx = vb[2] / r.width;
       vb[0] = drag.vb[0] - (e.clientX - drag.x) * kx;
@@ -838,6 +844,7 @@
     svg.addEventListener('pointerup', end);
     svg.addEventListener('pointercancel', end);
     const zoom = (f, cx, cy) => {
+      userView = true;
       const nw = Math.min(base[2] * 2.2, Math.max(base[2] * 0.35, vb[2] * f));
       const k = nw / vb[2];
       const ox = cx === undefined ? vb[0] + vb[2] / 2 : cx;
@@ -852,10 +859,22 @@
       const cy = vb[1] + ((e.clientY - r.top) / r.height) * vb[3];
       zoom(e.deltaY > 0 ? 1.12 : 1 / 1.12, cx, cy);
     }, { passive: false });
+    if (window.ResizeObserver && svg.parentElement) {
+      let last = '';
+      new ResizeObserver(() => {
+        const r = svg.getBoundingClientRect();
+        const key = Math.round(r.width) + 'x' + Math.round(r.height);
+        if (key === last || !r.width || !r.height) return;
+        last = key;
+        if (userView) return;
+        const b = fitBase();
+        if (b) { base = b; vb = b.slice(); apply(); }
+      }).observe(svg.parentElement);
+    }
     return {
       zoomIn: () => zoom(1 / 1.25),
       zoomOut: () => zoom(1.25),
-      reset: () => { vb = base.slice(); apply(); },
+      reset: () => { base = fitBase() || base; vb = base.slice(); userView = false; apply(); },
       pan: (dx, dy) => { vb[0] += dx * vb[2] * 0.08; vb[1] += dy * vb[3] * 0.08; apply(); }
     };
   }

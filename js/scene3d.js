@@ -713,6 +713,134 @@
     cam.updateProjectionMatrix();
   }
 
+  // ------------------------------------------------------------ 3D περιστροφή («γύρω γύρω»)
+  // Η ισομετρική κάμερα κοιτά από την κατεύθυνση (1,1,1): γωνία 45° γύρω από τον κατακόρυφο άξονα και 35,26° από πάνω.
+  // Η περιστροφή ξεκινά από εκεί και επιστρέφει εκεί με ομαλή κίνηση, οπότε δεν υπάρχει «πήδημα» στην εικόνα.
+  const ISO_YAW = Math.PI / 4;
+  const ISO_PITCH = Math.asin(1 / Math.sqrt(3));
+  const UP = new THREE.Vector3(0, 1, 0);
+  const ease = x => (x < 0.5 ? 2 * x * x : 1 - Math.pow(-2 * x + 2, 2) / 2);
+
+  function orbitBasis(yaw, pitch) {
+    const z = new THREE.Vector3(Math.cos(pitch) * Math.sin(yaw), Math.sin(pitch), Math.cos(pitch) * Math.cos(yaw));
+    const x = new THREE.Vector3().crossVectors(UP, z).normalize();
+    const y = new THREE.Vector3().crossVectors(z, x);
+    return { x, y, z };
+  }
+
+  function placeOrbit(now) {
+    const o = cur.orbit;
+    const { cam } = cur;
+    // μετάβαση (μπαίνω / βγαίνω): γωνίες και κέντρο πλαισίου κινούνται ομαλά
+    let busy = false;
+    if (o.tr) {
+      const x = Math.min(1, (now - o.tr.t0) / o.tr.dur);
+      const e = ease(x);
+      o.yaw = o.tr.y0 + (o.tr.y1 - o.tr.y0) * e;
+      o.pitch = o.tr.p0 + (o.tr.p1 - o.tr.p0) * e;
+      o.off = [o.tr.o0[0] + (o.tr.o1[0] - o.tr.o0[0]) * e, o.tr.o0[1] + (o.tr.o1[1] - o.tr.o0[1]) * e];
+      o.zoom = o.tr.z0 + (o.tr.z1 - o.tr.z0) * e;
+      busy = x < 1;
+      if (!busy) {
+        const done = o.tr.done;
+        o.tr = null;
+        if (done) done();
+        else busy = !!o.auto; // μετά την είσοδο συνεχίζει η αυτόματη περιστροφή
+      }
+    } else if (o.auto && !o.drag) {
+      const dt = o.last ? Math.min(64, now - o.last) : 16;
+      o.yaw += dt * 0.00045;
+      busy = true;
+    }
+    o.last = now;
+    if (!cur.orbit) return busy;
+    const b = orbitBasis(o.yaw, o.pitch);
+    cam.matrix.makeBasis(b.x, b.y, b.z).setPosition(o.center.clone().addScaledVector(b.z, 600));
+    cam.updateMatrixWorld(true);
+    const aspect = cur.W / cur.H;
+    const hh = o.half / o.zoom;
+    cam.left = o.off[0] - hh * aspect; cam.right = o.off[0] + hh * aspect;
+    cam.top = o.off[1] + hh; cam.bottom = o.off[1] - hh;
+    cam.updateProjectionMatrix();
+    return busy;
+  }
+
+  function onOrbitPointer(e) {
+    const o = cur && cur.orbit;
+    if (!o) return;
+    if (e.type === 'pointerdown') {
+      o.drag = { x: e.clientX, y: e.clientY, yaw: o.yaw, pitch: o.pitch };
+      o.auto = false;
+      cur.canvas.setPointerCapture(e.pointerId);
+      if (cur.onState) cur.onState();
+    } else if (e.type === 'pointermove' && o.drag && !o.tr) {
+      o.yaw = o.drag.yaw - (e.clientX - o.drag.x) * 0.009;
+      o.pitch = Math.max(0.08, Math.min(1.45, o.drag.pitch + (e.clientY - o.drag.y) * 0.006));
+      requestRender();
+    } else if (e.type === 'pointerup' || e.type === 'pointercancel') {
+      o.drag = null;
+    }
+  }
+  function onOrbitWheel(e) {
+    const o = cur && cur.orbit;
+    if (!o) return;
+    e.preventDefault();
+    o.zoom = Math.max(0.5, Math.min(4, o.zoom * (e.deltaY > 0 ? 1 / 1.12 : 1.12)));
+    requestRender();
+  }
+
+  // on = true: ξεκίνα την περιστροφή (με αυτόματο «γύρω γύρω») · false: επιστροφή στην ισομετρική όψη.
+  function orbit(on, opts) {
+    if (!cur) return false;
+    opts = opts || {};
+    const { cam, svg } = cur;
+    if (on) {
+      if (cur.orbit) { if (opts.auto !== undefined) { cur.orbit.auto = opts.auto; requestRender(); } return true; }
+      placeCamera(cam, svg, cur.W, cur.H, root.IoTScene.K);
+      const box = new THREE.Box3();
+      cur.scene.children.forEach(c => { if (c.userData.top) box.expandByObject(c); });
+      if (box.isEmpty()) box.setFromObject(cur.scene);
+      const center = box.getCenter(new THREE.Vector3());
+      // το τρέχον πλαίσιο της ισομετρικής κάμερας, εκφρασμένο γύρω από το κέντρο της σκηνής
+      const cx = center.dot(RX);
+      const cy = center.dot(RY);
+      const half = (cam.top - cam.bottom) / 2;
+      const off0 = [(cam.left + cam.right) / 2 - cx, (cam.top + cam.bottom) / 2 - cy];
+      cur.orbit = { yaw: ISO_YAW, pitch: ISO_PITCH, center, half, zoom: 1, off: off0, auto: opts.auto !== false, drag: null, last: 0 };
+      cur.orbit.tr = { t0: performance.now(), dur: 700, y0: ISO_YAW, y1: ISO_YAW, p0: ISO_PITCH, p1: 0.5, o0: off0, o1: [0, 0], z0: 1, z1: 1.35 };
+      cur.canvas.classList.add('orbiting');
+      svg.classList.add('orbiting');
+      cur.canvas.addEventListener('pointerdown', onOrbitPointer);
+      cur.canvas.addEventListener('pointermove', onOrbitPointer);
+      cur.canvas.addEventListener('pointerup', onOrbitPointer);
+      cur.canvas.addEventListener('pointercancel', onOrbitPointer);
+      cur.canvas.addEventListener('wheel', onOrbitWheel, { passive: false });
+      requestRender();
+      return true;
+    }
+    const o = cur.orbit;
+    if (!o) return false;
+    // γύρνα στη γωνία της ισομετρικής όψης από τον πιο κοντινό δρόμο
+    const full = Math.PI * 2;
+    const target = ISO_YAW + Math.round((o.yaw - ISO_YAW) / full) * full;
+    placeCamera(cam, svg, cur.W, cur.H, root.IoTScene.K);
+    const offIso = [(cam.left + cam.right) / 2 - o.center.dot(RX), (cam.top + cam.bottom) / 2 - o.center.dot(RY)];
+    o.auto = false;
+    o.tr = { t0: performance.now(), dur: 650, y0: o.yaw, y1: target, p0: o.pitch, p1: ISO_PITCH, o0: o.off, o1: offIso, z0: o.zoom, z1: 1, done: () => {
+      cur.orbit = null;
+      cam.matrix.makeBasis(RX, RY, RZ).setPosition(RZ.clone().multiplyScalar(600));
+      cam.updateMatrixWorld(true);
+      cur.canvas.classList.remove('orbiting');
+      svg.classList.remove('orbiting');
+      ['pointerdown', 'pointermove', 'pointerup', 'pointercancel'].forEach(t => cur.canvas.removeEventListener(t, onOrbitPointer));
+      cur.canvas.removeEventListener('wheel', onOrbitWheel);
+      if (cur.onState) cur.onState();
+      requestRender();
+    } };
+    requestRender();
+    return true;
+  }
+
   // ------------------------------------------------------------ κατάσταση από την SVG
 
   function sync() {
@@ -786,10 +914,15 @@
     canvas.style.height = H + 'px';
     const pr = Math.min(2, root.devicePixelRatio || 1);
     if (cur.W !== W || cur.H !== H || cur.pr !== pr) { renderer.setPixelRatio(pr); renderer.setSize(W, H, false); cur.W = W; cur.H = H; cur.pr = pr; }
-    placeCamera(cam, svg, W, H, root.IoTScene.K);
-    const busy = animate(now || performance.now());
+    const t = now || performance.now();
+    let spin = false;
+    if (cur.orbit) spin = placeOrbit(t);
+    else placeCamera(cam, svg, W, H, root.IoTScene.K);
+    if (!cur) return;
+    const busy = animate(t);
+    cur.renders = (cur.renders || 0) + 1;
     renderer.render(cur.scene, cam);
-    if (busy) requestRender();
+    if (busy || spin) requestRender();
   }
 
   // «Στήσιμο»: τα αντικείμενα πέφτουν ένα-ένα, μετά τα καλώδια «τραβιούνται» από άκρη σε άκρη (όπως το buildIn της SVG).
@@ -818,6 +951,12 @@
 
   function unmount() {
     if (!cur) return;
+    if (cur.orbit) {
+      ['pointerdown', 'pointermove', 'pointerup', 'pointercancel'].forEach(t => cur.canvas.removeEventListener(t, onOrbitPointer));
+      cur.canvas.removeEventListener('wheel', onOrbitWheel);
+      cur.canvas.classList.remove('orbiting');
+      cur.orbit = null;
+    }
     cur.mo && cur.mo.disconnect();
     cur.ro && cur.ro.disconnect();
     for (const d of cur.k.disp) d.dispose && d.dispose();
@@ -894,5 +1033,9 @@
     return out;
   }
 
-  root.IoTScene3D = { mount, unmount, requestRender, capture, info: () => cur && { W: cur.W, H: cur.H, live: cur.svg.isConnected, anim: !!cur.anim } };
+  root.IoTScene3D = {
+    mount, unmount, requestRender, capture, orbit,
+    orbiting: () => !!(cur && cur.orbit && !(cur.orbit.tr && cur.orbit.tr.done)),
+    spinning: () => !!(cur && cur.orbit && cur.orbit.auto),
+    onState: f => { if (cur) cur.onState = f; }, info: () => cur && { W: cur.W, H: cur.H, live: cur.svg.isConnected, anim: !!cur.anim, orbit: cur.orbit && { yaw: +cur.orbit.yaw.toFixed(3), pitch: +cur.orbit.pitch.toFixed(3), tr: !!cur.orbit.tr, renders: cur.renders || 0 } } };
 })(typeof window !== 'undefined' ? window : globalThis);
