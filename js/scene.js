@@ -50,7 +50,7 @@
     question: '<circle cx="6" cy="6" r="5"/><path d="M4.4 4.6a1.7 1.7 0 1 1 2.4 1.6c-.6.3-.8.6-.8 1.2M6 9h0.1"/>'
   };
   const PART_ICON = {
-    esp32: 'chip', 'esp-module': 'chip', 'esp-uart': 'chip', 'esp-reg': 'chip', pi: 'chip', 'pi-cpu': 'chip', 'pi-ram': 'chip', 'mini-esp': 'chip',
+    esp32: 'chip', 'esp-module': 'chip', 'esp-uart': 'chip', 'esp-reg': 'chip', pi: 'chip', 'pi-cpu': 'chip', 'pi-ram': 'chip', 'pi-rp1': 'chip', 'mini-esp': 'chip', 'pi-hdmi': 'screen', 'pi-fpc': 'pins',
     'esp-pins': 'pins', 'pi-gpio': 'pins', 'esp-usb': 'plug', 'pi-power': 'plug', 'pi-ports': 'plug', 'esp-antenna': 'wifi', router: 'wifi',
     'esp-buttons': 'button', button: 'button', led: 'bulb', 'esp-led': 'bulb', pir: 'eye', ultrasonic: 'eye', 'us-pins': 'pins', sensor: 'thermo',
     tablet: 'screen', laptop: 'screen', car: 'car', traffic: 'traffic', breadboard: 'grid', 'rpi-broker': 'server', 'unknown-device': 'question'
@@ -183,12 +183,15 @@
     s += `<circle cx="${d2[0].toFixed(1)}" cy="${d2[1].toFixed(1)}" r="1.7" class="smd d2" id="sc-d2"/></g>`;
     // pins που βγαίνουν και από πάνω: κόλληση στο PCB, κοντή ακίδα και στρογγυλεμένη κορυφή
     s += '<g data-part="esp-pins">';
+    // λευκό περίγραμμα silkscreen γύρω από κάθε σειρά pins, όπως στην πλακέτα
+    s += `<g transform="${planeMatrix(T)}" class="silk-box rows">`
+      + [1.4, 26.6].map(vv => `<rect x="${(u + PIN_U(0) - 1.3).toFixed(2)}" y="${(v + vv - 1.3).toFixed(2)}" width="${(PIN_U(18) - PIN_U(0) + 2.6).toFixed(2)}" height="2.6" rx="0.4"/>`).join('') + '</g>';
     for (const vv of [1.4, 26.6]) {
       for (let i = 0; i < 19; i++) {
         const p = P(u + PIN_U(i), v + vv, T);
-        const q = P(u + PIN_U(i), v + vv, T + 1.9);
+        const q = P(u + PIN_U(i), v + vv, T + 2.2);
         s += `<ellipse cx="${p[0].toFixed(1)}" cy="${p[1].toFixed(1)}" rx="1.7" ry="1" class="solder"/>`
-          + `<path d="M${pt(p)} L${pt(q)}" class="pin-stub"/><ellipse cx="${q[0].toFixed(1)}" cy="${q[1].toFixed(1)}" rx="0.95" ry="0.6" class="pin-tip"/>`;
+          + `<path d="M${pt(p)} L${pt(q)}" class="pin-stub"/><ellipse cx="${q[0].toFixed(1)}" cy="${q[1].toFixed(1)}" rx="1.25" ry="0.75" class="pin-tip"/>`;
       }
     }
     s += '</g>';
@@ -297,44 +300,92 @@
   // Raspberry Pi ως κύρια πλακέτα (μαθήματα Python): PCB 56×34, header 40 pins στη μπροστινή πλευρά.
   // Η σειρά με τα μονά pins ακολουθεί το πραγματικό Pi: pin 7 = GPIO 4, 9 = GND, 11 = GPIO 17, 13 = GPIO 27.
   const PI_ODD = ['3V3', 'GPIO2', 'GPIO3', 'GPIO4', 'GND', 'GPIO17', 'GPIO27', 'GPIO22', '3V3b', 'GPIO10', 'GPIO9', 'GPIO11', 'GNDb', 'ID_SD', 'GPIO5', 'GPIO6', 'GPIO13', 'GPIO19', 'GPIO26', 'GNDc'];
-  const PI_PIN_U = i => 6 + i * 2.4;
+  // Raspberry Pi 5 (όπως το πραγματικό). Η μακριά πλευρά (L, 58) πάει προς τον θεατή (+v), η στενή (W, 36) κατά +u:
+  // έτσι φαίνονται τα ανοίγματα των USB/Ethernet (μπροστά) και των HDMI/USB-C (δεξιά). Header 2×20 στην πίσω μακριά πλευρά.
+  // Η σειρά με τα μονά pins (pin 1, 3, 5…) είναι η εσωτερική: pin 7 = GPIO 4, 9 = GND, 11 = GPIO 17, 13 = GPIO 27.
+  const PI_T = 1.6;            // πάνω επιφάνεια του PCB
+  const PI_PIN_L = i => 4 + i * 2.32;
+  const PI_PIN_TOP = PI_T + 2.4 + 5.2;
   function piPinUV(name) {
     const i = PI_ODD.indexOf(name);
-    return { u: ESP.u + PI_PIN_U(i), v: ESP.v + 30.6, h: 4.2 };
+    return { u: ESP.u + 4.4, v: ESP.v + PI_PIN_L(i), h: PI_PIN_TOP };
   }
   function piPin(name) {
-    const i = PI_ODD.indexOf(name);
-    return P(ESP.u + PI_PIN_U(i), ESP.v + 31.6, 4.6);
+    const q = piPinUV(name);
+    return P(q.u, q.v, q.h);
+  }
+  // Ψηλή ακίδα header: σκούρο περίγραμμα, ασημένιο σώμα, μικρή κορυφή.
+  function tallPin(u, v, h0, h1) {
+    const a = P(u, v, h0);
+    const b = P(u, v, h1);
+    return `<path d="M${pt(a)} L${pt(b)}" class="pin-ol"/><path d="M${pt(a)} L${pt(b)}" class="pin-body"/><ellipse cx="${b[0].toFixed(1)}" cy="${b[1].toFixed(1)}" rx="0.75" ry="0.45" class="pin-tip"/>`;
+  }
+  function raspberryLogo(cx, cy) {
+    const berries = [[0, 0], [1.6, 0.4], [-1.6, 0.4], [0.8, 1.7], [-0.8, 1.7], [0, 3.1], [1.9, 2.1], [-1.9, 2.1]];
+    return berries.map(([x, y]) => `<circle cx="${cx + x}" cy="${cy + y}" r="0.85" class="pi-logo"/>`).join('')
+      + `<path d="M${cx - 1.6},${cy - 1.6} q1.6,-1.2 1.6,0.6 q0,-1.8 1.6,-0.6" class="pi-logo-leaf"/>`;
   }
   function piHost() {
     const { u, v } = ESP;
+    const T = PI_T;
+    // τοπικές συντεταγμένες: L κατά μήκος (→ v), W κατά πλάτος (→ u)
+    const B = (L, W, h, dL, dW, dh, cls, id) => box(u + W, v + L, h, dW, dL, dh, cls, id);
+    const Q = (L, W, h) => P(u + W, v + L, h);
+    // κείμενο/σχέδια πάνω στο PCB: διαβάζεται από μπροστά προς τα πίσω (x αυξάνει προς −L), όπως στο πραγματικό
+    const onTop = h => `${planeMatrix(h)} matrix(0,-1,1,0,0,0)`;
+    const tx = L => -(v + L);
+    const ty = W => u + W;
     let s = '<g id="sc-esp" class="sc-esp sc-pihost" data-part="pi">';
-    s += box(u, v, 0, 56, 34, 1.6, 'pi-pcb');
-    s += `<g transform="${planeMatrix(1.6)}"><text x="${u + 20}" y="${v + 25}" class="silk2">Raspberry Pi 5</text></g>`;
-    // θύρες USB / Ethernet στην αριστερή στενή πλευρά
-    for (const [hu, hv] of [[3.5, 3.5], [3.5, 30.5], [52.5, 3.5], [52.5, 30.5]]) {
-      const c = P(u + hu, v + hv, 1.6);
-      s += `<ellipse cx="${c[0].toFixed(1)}" cy="${c[1].toFixed(1)}" rx="2" ry="1.2" class="hole"/>`;
+    s += B(0, 0, 0, 58, 36, 1.6, 'pi-pcb');
+    // χρυσές τρύπες στερέωσης, λογότυπο και silkscreen
+    for (const [hl, hw] of [[2.8, 2.8], [2.8, 33.2], [42.8, 2.8], [42.8, 33.2]]) {
+      const c = Q(hl, hw, T);
+      s += `<ellipse cx="${c[0].toFixed(1)}" cy="${c[1].toFixed(1)}" rx="2.4" ry="1.4" class="pi-hole"/><ellipse cx="${c[0].toFixed(1)}" cy="${c[1].toFixed(1)}" rx="1.2" ry="0.7" class="pi-hole-in"/>`;
     }
-    s += `<g data-part="pi-ports">${box(u - 2, v + 2, 1.6, 9, 9, 6, 'port')}${box(u - 2, v + 12.5, 1.6, 9, 8, 6, 'port')}${box(u - 2, v + 22, 1.6, 9, 9, 7, 'eth')}</g>`;
-    s += `<g data-part="pi-cpu">${box(u + 22, v + 6, 1.6, 12, 12, 1.4, 'chip')}<g transform="${planeMatrix(3)}"><text x="${u + 23.5}" y="${v + 12.6}" class="chip-t">BCM2712</text></g></g>`;
-    s += `<g data-part="pi-ram">${box(u + 37, v + 7, 1.6, 8, 10, 1, 'chip')}</g>`;
-    s += `<g data-part="pi-power">${box(u + 50, v + 12, 1.6, 6, 5, 2, 'usb')}</g>`;
-    for (const [cu, cv] of [[14, 8], [14, 11], [17, 20], [47, 22], [34, 22]]) s += box(u + cu, v + cv, 1.6, 1.6, 0.9, 0.5, 'smd-c');
-    // header 2×20
+    s += `<g transform="${onTop(T)}">${raspberryLogo(tx(11), ty(26))}`
+      + `<text x="${tx(33)}" y="${ty(9.6)}" class="pi-silk">Raspberry Pi</text><rect x="${tx(19.4)}" y="${ty(9.6) - 2}" width="2.2" height="2.6" rx="0.3" class="pi-silk-box"/><text x="${tx(19.4) + 0.55}" y="${ty(9.6)}" class="pi-silk">5</text>`
+      + `<text x="${tx(34.5)}" y="${ty(30.6)}" class="pi-silk big">HDMI</text></g>`;
+    // header 2×20 με ψηλές ακίδες (πίσω μακριά πλευρά)
     s += '<g data-part="pi-gpio">';
-    s += box(u + 4.6, v + 29.6, 1.6, 48.4, 4, 2.6, 'pinhdr');
-    for (let i = 0; i < 20; i++) {
-      for (const vv of [30.6, 32.6]) {
-        const p = P(u + PI_PIN_U(i), v + vv, 4.4);
-        s += `<ellipse cx="${p[0].toFixed(1)}" cy="${p[1].toFixed(1)}" rx="1.4" ry="0.8" class="pin-pad"/>`;
-      }
+    s += B(2.8, 1.2, T, 46.4, 4.4, 2.4, 'pinhdr');
+    for (const ww of [2.4, 4.4]) for (let i = 0; i < 20; i++) s += tallPin(u + ww, v + PI_PIN_L(i), T + 2.4, PI_PIN_TOP);
+    s += '</g>';
+    // ανεμιστήρας (λευκό βύσμα) και PoE (2×2)
+    s += B(5, 7.6, T, 3.6, 2.4, 2.4, 'conn-white');
+    s += B(46, 8, T, 3.6, 3.6, 1.4, 'pinhdr');
+    for (const [pl, pw] of [[46.9, 8.9], [48.7, 8.9], [46.9, 10.7], [48.7, 10.7]]) s += tallPin(u + pw, v + pl, T + 1.4, T + 5);
+    // επεξεργαστής BCM2712 (μεταλλικό κάλυμμα), RAM, RP1
+    s += `<g data-part="pi-ram">${B(10.5, 13, T, 9.6, 6.6, 1.2, 'chip')}</g>`;
+    s += `<g data-part="pi-cpu">${B(21, 13, T, 11, 11, 1.8, 'cpu-lid')}<g transform="${onTop(T + 1.8)}"><text x="${tx(30.6)}" y="${ty(16.4)}" class="chip-t dark">BCM2712</text><text x="${tx(30.6)}" y="${ty(18.8)}" class="chip-t dark">ARM · 2.4 GHz</text></g></g>`;
+    s += `<g data-part="pi-rp1">${B(34, 9, T, 8, 8, 1.2, 'chip')}<g transform="${onTop(T + 1.2)}">${raspberryLogo(tx(38), ty(12.6))}</g></g>`;
+    s += B(43.5, 15, T, 4, 4, 0.8, 'chip');
+    // συνδέσεις FPC (κάμερα / οθόνη)
+    s += `<g data-part="pi-fpc">${B(35, 20.5, T, 10, 2.6, 1.6, 'fpc')}${B(35, 25, T, 10, 2.6, 1.6, 'fpc')}`;
+    s += `<g transform="${onTop(T + 1.6)}"><rect x="${tx(44.4)}" y="${ty(21.2)}" width="8.8" height="1.2" class="fpc-gold"/><rect x="${tx(44.4)}" y="${ty(25.7)}" width="8.8" height="1.2" class="fpc-gold"/></g></g>`;
+    // δεξιά μακριά πλευρά: 2 micro-HDMI και USB-C τροφοδοσίας (τα ανοίγματα βλέπουν δεξιά)
+    s += '<g data-part="pi-hdmi">';
+    for (const hl of [21, 28.5]) {
+      s += B(hl, 31.4, T, 5.4, 5.2, 2.6, 'usb');
+      s += `<g transform="${planeVH(u + 36.6)}"><rect x="${v + hl + 0.8}" y="${-(T + 2.1)}" width="3.8" height="1.5" rx="0.4" class="usbc-slot"/></g>`;
     }
     s += '</g>';
-    const pwr = P(u + 50, v + 4, 2.2);
-    const act = P(u + 50, v + 8, 2.2);
-    s += `<circle cx="${pwr[0].toFixed(1)}" cy="${pwr[1].toFixed(1)}" r="2.2" class="smd pwr" id="sc-pwr"/>`;
-    s += `<circle cx="${act[0].toFixed(1)}" cy="${act[1].toFixed(1)}" r="2.2" class="smd act" id="sc-d2"/>`;
+    s += `<g data-part="pi-power">${B(6.5, 31, T, 7, 5.8, 2.8, 'usb')}<g transform="${planeVH(u + 36.8)}"><rect x="${v + 7.4}" y="${-(T + 2.3)}" width="5.2" height="1.8" rx="0.9" class="usbc-slot"/></g></g>`;
+    // μπροστινή στενή πλευρά: δύο διπλά USB-A (τα μπλε είναι USB 3) και Ethernet (τα ανοίγματα βλέπουν μπροστά)
+    s += '<g data-part="pi-ports">';
+    s += B(49.6, 1.4, T, 10.4, 8.4, 8.4, 'usb-a') + B(49.6, 11, T, 10.4, 8.4, 8.4, 'usb-a usb3');
+    s += B(49, 20.6, T, 11.2, 14, 7.6, 'eth');
+    for (const [pw, h] of [[1.4, 2.6], [1.4, 6.4], [11, 2.6], [11, 6.4]]) {
+      s += `<g transform="${planeUH(v + 60)}"><rect x="${u + pw + 1.4}" y="${-(T + h + 1.6)}" width="5.6" height="1.5" rx="0.2" class="${pw > 5 ? 'usb3-tongue' : 'usb-tongue'}"/></g>`;
+    }
+    s += `<g transform="${planeUH(v + 60.2)}"><rect x="${u + 22.6}" y="${-(T + 6.4)}" width="10" height="5.4" rx="0.4" class="eth-mouth"/></g>`;
+    s += '</g>';
+    // μικρά SMD
+    for (const [cl, cw] of [[6.4, 14], [7.2, 17], [20, 26.5], [23, 26.5], [18.6, 10], [21, 10], [22, 46.5], [44, 27.5], [28, 9]]) if (cw < 30) s += B(cl, cw, T, 0.9, 1.6, 0.5, 'smd-c');
+    // LED τροφοδοσίας και δραστηριότητας
+    const pwr = Q(4, 32, T + 0.3);
+    const act = Q(4, 29.6, T + 0.3);
+    s += `<circle cx="${pwr[0].toFixed(1)}" cy="${pwr[1].toFixed(1)}" r="1.5" class="smd pwr" id="sc-pwr"/>`;
+    s += `<circle cx="${act[0].toFixed(1)}" cy="${act[1].toFixed(1)}" r="1.5" class="smd act" id="sc-d2"/>`;
     s += '</g>';
     return s;
   }
@@ -494,7 +545,7 @@
     let back = '';
     let mid = piHost();
     let front = '';
-    const labels = [callout(P(28, 16, 4), -96, -58, net ? 'RASPBERRY PI · BROKER + PYTHON' : 'RASPBERRY PI', null, 'pi'), callout(piPin('GPIO22'), -40, 40, 'GPIO HEADER · 40 PINS', null, 'pi-gpio')];
+    const labels = [callout(P(28, 16, 4), -20, 104, net ? 'RASPBERRY PI · BROKER + PYTHON' : 'RASPBERRY PI', null, 'pi'), callout(piPin('GPIO26'), -10, -96, 'GPIO HEADER · 40 PINS', null, 'pi-gpio')];
     const wires = [];
     mid += breadboard();
     const LED_AT = [72, 15];
@@ -504,7 +555,7 @@
       front += led(LED_AT[0], LED_AT[1]);
       wires.push(wire(piPinUV('GPIO17'), { u: LED_AT[0] - 2.54, v: LED_AT[1] + 2.54, h: 2.4 }, 'w-led', 46, 'sc-w-led'));
       wires.push(wire(piPinUV('GND'), { u: LED_AT[0] + 2.54, v: BB.v + BB.dv - 2, h: 2.4 }, 'w-gnd', 30));
-      labels.push(callout(P(LED_AT[0], LED_AT[1], 14), -40, -60, 'LED · GPIO 17', null, 'led'));
+      labels.push(callout(P(LED_AT[0], LED_AT[1], 14), -30, -96, 'LED · GPIO 17', null, 'led'));
     }
     if (hw.includes('button')) {
       front += button(BTN_AT[0], BTN_AT[1]);

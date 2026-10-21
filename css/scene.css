@@ -231,7 +231,8 @@
 
 /* ---------- ESP32 όπως στην εικόνα αναφοράς */
 .esp-black .f-l { fill: #7b6c4f; } .esp-black .f-r { fill: #6a5c42; }
-.pin-stub { stroke: #c9ced4; stroke-width: 1.3; stroke-linecap: round; }
+.pin-stub { stroke: #c9ced4; stroke-width: 1.8; stroke-linecap: round; }
+.silk-box.rows rect { stroke-width: 0.3; opacity: 0.95; }
 .pin-tip { fill: #eef1f4; stroke: #7f868d; stroke-width: 0.45; }
 .solder { fill: #b9bec4; stroke: #6f767d; stroke-width: 0.45; }
 .silk-box rect { fill: none; stroke: #e9edf2; stroke-width: 0.22; opacity: 0.85; }
@@ -246,3 +247,24 @@
 .usbc-tongue { fill: #6d747c; }
 .shield-t.sm { font-size: 1.45px; }
 .shield-s.sm { font-size: 0.82px; }
+
+/* ---------- Raspberry Pi 5 όπως στην εικόνα αναφοράς */
+.pi-pcb .f-t { fill: #2f9a55; } .pi-pcb .f-l { fill: #1f6e3b; } .pi-pcb .f-r { fill: #268448; }
+.pi-hole { fill: #d9b24c; stroke: #8a6d22; stroke-width: 0.5; }
+.pi-hole-in { fill: var(--paper, #f7f0e1); stroke: #8a6d22; stroke-width: 0.4; }
+.pi-silk { font: 700 1.9px var(--font-label); fill: #eaf7ee; letter-spacing: 0.05em; }
+.pi-silk.big { font-size: 2.6px; letter-spacing: 0.12em; }
+.pi-silk-box { fill: none; stroke: #eaf7ee; stroke-width: 0.25; }
+.pi-logo { fill: none; stroke: #eaf7ee; stroke-width: 0.35; }
+.pi-logo-leaf { fill: none; stroke: #eaf7ee; stroke-width: 0.35; stroke-linecap: round; }
+.pin-ol { stroke: var(--ink-line); stroke-width: 1.5; stroke-linecap: round; }
+.pin-body { stroke: #cfd4d9; stroke-width: 0.85; stroke-linecap: round; }
+.conn-white .f-t { fill: #f4f2ea; } .conn-white .f-l { fill: #cfcabd; } .conn-white .f-r { fill: #e2ded2; }
+.cpu-lid .f-t { fill: #d7dbdf; } .cpu-lid .f-l { fill: #9aa1a8; } .cpu-lid .f-r { fill: #b8bec4; }
+.chip-t.dark { fill: #5f666e; font-size: 1.3px; }
+.fpc .f-t { fill: #23262b; } .fpc .f-l { fill: #131518; } .fpc .f-r { fill: #1a1d21; }
+.fpc-gold { fill: #d6aa48; }
+.usb-a .f-t { fill: #d9dde1; } .usb-a .f-l { fill: #b4bac0; } .usb-a .f-r { fill: #c7ccd1; }
+.usb-tongue { fill: #2b2f36; } .usb3-tongue { fill: #2f6fd6; }
+.eth .f-t { fill: #dfe2e6; } .eth .f-l { fill: #b3b9bf; } .eth .f-r { fill: #c8cdd2; }
+.eth-mouth { fill: #2f343b; stroke: var(--ink-line); stroke-width: 0.3; }
