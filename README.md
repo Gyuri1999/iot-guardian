@@ -1,3 +1,5 @@
+<img src="docs/logo.svg" alt="" width="96" align="right">
+
 # IoT Guardian
 
 **Παίξε τώρα, χωρίς εγκατάσταση:** https://gyuri1999.github.io/iot-guardian/

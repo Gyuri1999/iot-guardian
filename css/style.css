@@ -92,7 +92,7 @@ a { color: var(--accent); }
   padding: 0.7rem 0.4rem; background: var(--surface); border-right: 1px solid var(--line); z-index: 6;
 }
 .rail-logo { width: 2.3rem; height: 2.3rem; border-radius: 8px; background: #1d2534; display: grid; place-items: center; margin-bottom: 0.6rem; }
-.rail-logo span { width: 0.7rem; height: 0.7rem; border-radius: 50%; background: #ff5a3c; box-shadow: 0 0 0 3px rgba(255, 90, 60, 0.25); }
+.rail-logo .logo { width: 1.75rem; height: 1.75rem; --lg-ink: #e8edf7; --lg-paper: #1d2534; }
 .rail-btn { width: 2.6rem; height: 2.6rem; display: grid; place-items: center; border-radius: 8px; border: 1px solid transparent; background: transparent; color: var(--ink); cursor: pointer; }
 .rail-btn .ic { width: 1.3rem; height: 1.3rem; }
 .rail-btn:hover { background: var(--surface-2); }
@@ -102,9 +102,16 @@ a { color: var(--accent); }
 
 .hdr { display: flex; align-items: center; gap: 0.8rem; flex-wrap: wrap; padding: 0.7rem 16px 0.35rem; }
 .hdr-brand { display: flex; align-items: center; gap: 0.75rem; }
-.hdr-mark { width: 2.6rem; height: 1.6rem; border-radius: 0.8rem; border: 3px solid var(--ink); position: relative; }
-.hdr-mark::before, .hdr-mark::after { content: ""; position: absolute; top: 50%; width: 0.55rem; height: 3px; background: var(--ink); transform: translateY(-50%); }
-.hdr-mark::before { left: 0.35rem; } .hdr-mark::after { right: 0.35rem; box-shadow: 0 0 0 0 var(--ink); }
+.hdr-mark { width: 2.9rem; height: 2.9rem; flex: none; }
+.hdr-mark .logo { width: 100%; height: 100%; display: block; }
+/* λογότυπο: ασπίδα με τσιπ */
+.logo { --lg-ink: var(--ink); --lg-paper: var(--surface); }
+.logo .lg-shield { fill: var(--lg-paper); stroke: var(--lg-ink); stroke-width: 4; stroke-linejoin: round; }
+.logo .lg-chip { fill: var(--lg-ink); }
+.logo .lg-pins { stroke: var(--lg-ink); stroke-width: 2.6; stroke-linecap: round; fill: none; }
+.logo .lg-led { fill: #ff5a3c; }
+.logo .lg-halo { fill: none; stroke: #ff5a3c; stroke-opacity: 0.35; stroke-width: 2.4; }
+.logo .lg-wifi { fill: none; stroke: var(--teal); stroke-width: 2.8; stroke-linecap: round; }
 .hdr-title { font-family: var(--font-label); font-weight: 700; font-size: 1.55rem; letter-spacing: 0.12em; text-transform: uppercase; line-height: 1; }
 .hdr-sub { font-family: var(--font-label); font-size: 0.78rem; letter-spacing: 0.22em; text-transform: uppercase; color: var(--muted); margin-top: 0.25rem; }
 .pill { display: flex; align-items: center; gap: 0.6rem; padding: 0.45rem 0.8rem; border: 1px solid var(--line-strong); border-radius: 10px; background: var(--surface); }

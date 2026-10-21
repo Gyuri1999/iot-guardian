@@ -191,10 +191,19 @@
     return 'led';
   }
 
+  // Λογότυπο: ασπίδα με τσιπ και κόκκινο LED (ίδιο με docs/logo.svg, με χρώματα από το θέμα).
+  const LOGO = `<svg class="logo" viewBox="0 0 64 64" aria-hidden="true" focusable="false">
+    <path class="lg-shield" d="M32 4 L54 12 V30 C54 45 44 55 32 60 C20 55 10 45 10 30 V12 Z"/>
+    <rect class="lg-chip" x="21" y="22" width="22" height="22" rx="3"/>
+    <path class="lg-pins" d="M17 27h4M17 33h4M17 39h4M43 27h4M43 33h4M43 39h4"/>
+    <circle class="lg-led" cx="32" cy="33" r="4.6"/><circle class="lg-halo" cx="32" cy="33" r="7.5"/>
+    <path class="lg-wifi" d="M26 15.5a9 9 0 0 1 12 0"/>
+  </svg>`;
+
   function rail(active) {
     const b = (id, ic, label, on) => `<button class="rail-btn${on ? ' on' : ''}" id="${id}" title="${label}" aria-label="${label}">${icon(ic)}</button>`;
     return `<nav class="rail" aria-label="Πλοήγηση">
-      <div class="rail-logo" aria-hidden="true"><span></span></div>
+      <div class="rail-logo" aria-hidden="true">${LOGO}</div>
       ${b('nav-home', 'home', 'Αρχική και χάρτης κεφαλαίων', active === 'home')}
       ${b('nav-lab', 'chip', 'Εργαστήριο: συνέχεια από εκεί που έμεινες', active === 'lab')}
       ${b('nav-lang', 'lang', 'Γλώσσα και πλακέτα', active === 'lang')}
@@ -210,7 +219,7 @@
     const pct = total ? Math.round((done / total) * 100) : 0;
     return `<header class="hdr">
       <div class="hdr-brand">
-        <div class="hdr-mark" aria-hidden="true"></div>
+        <div class="hdr-mark" aria-hidden="true">${LOGO}</div>
         <div><div class="hdr-title">IoT Guardian</div><div class="hdr-sub">Κατάλαβε · Γράψε · Προστάτευσε</div></div>
       </div>
       <span class="spacer"></span>

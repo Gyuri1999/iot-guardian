@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="IoT Guardian">
+  <style>
+    .ink { stroke: #1f2a44; } .inkf { fill: #1f2a44; } .paper { fill: #fdf9f0; }
+    @media (prefers-color-scheme: dark) { .ink { stroke: #e8edf7; } .inkf { fill: #e8edf7; } .paper { fill: #16233a; } }
+  </style>
+  <path class="paper ink" d="M32 4 L54 12 V30 C54 45 44 55 32 60 C20 55 10 45 10 30 V12 Z" stroke-width="4" stroke-linejoin="round"/>
+  <rect class="inkf" x="21" y="22" width="22" height="22" rx="3"/>
+  <path class="ink" d="M17 27h4M17 33h4M17 39h4M43 27h4M43 33h4M43 39h4" stroke-width="2.6" stroke-linecap="round"/>
+  <circle cx="32" cy="33" r="4.6" fill="#ff5a3c"/>
+  <circle cx="32" cy="33" r="7.5" fill="none" stroke="#ff5a3c" stroke-opacity=".35" stroke-width="2.4"/>
+  <path d="M26 15.5a9 9 0 0 1 12 0" fill="none" stroke="#13857f" stroke-width="2.8" stroke-linecap="round"/>
+</svg>
