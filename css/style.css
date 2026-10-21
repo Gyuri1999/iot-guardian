@@ -483,3 +483,27 @@ dialog::backdrop { background: rgba(15, 24, 40, 0.55); }
 .ci-n { font: 700 0.7rem var(--font-label); letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); }
 .ci-t { font: 700 0.9rem var(--font-label); }
 .ci-s { font-size: 0.78rem; color: var(--muted); line-height: 1.35; }
+
+/* ---------- κώδικας που τρέχει: η τρέχουσα γραμμή, μικρό Serial Monitor, κουμπί διακοπής */
+.code-wrap pre .l.run { background: color-mix(in srgb, var(--teal) 16%, transparent); box-shadow: inset 3px 0 0 var(--teal); }
+.gutter .run { color: var(--teal); font-weight: 700; box-shadow: inset -2px 0 0 var(--teal); }
+.ib.run.stop { background: var(--err); border-color: var(--err); color: #fff; }
+.ib.run.stop .ic { fill: currentColor; stroke: none; }
+.mini-mon { margin-top: 0.45rem; border: 1px solid var(--line); border-radius: 8px; background: var(--code-bg); overflow: hidden; }
+.mm-head { width: 100%; display: flex; align-items: center; gap: 0.45rem; padding: 0.3rem 0.6rem; border: 0; border-bottom: 1px solid var(--line); background: var(--surface-2); color: var(--ink); cursor: pointer; font: inherit; text-align: left; }
+.mm-head b { font-family: var(--font-label); font-size: 0.74rem; letter-spacing: 0.1em; text-transform: uppercase; }
+.mm-state { font-family: var(--font-label); font-size: 0.7rem; letter-spacing: 0.1em; color: var(--muted); }
+.mm-caret { margin-left: auto; color: var(--muted); transition: transform 0.15s; }
+.mini-mon.collapsed .mm-caret { transform: rotate(-90deg); }
+.mini-mon.collapsed .mm-head { border-bottom: 0; }
+.mini-mon.collapsed .mm-body { display: none; }
+.mm-dot { width: 0.6rem; height: 0.6rem; border-radius: 50%; background: var(--muted); flex: none; }
+.mini-mon[data-state="running"] .mm-dot { background: var(--teal); box-shadow: 0 0 0 3px color-mix(in srgb, var(--teal) 25%, transparent); animation: mm-pulse 1.4s ease-in-out infinite; }
+.mini-mon[data-state="running"] .mm-state { color: var(--teal); }
+.mini-mon[data-state="paused"] .mm-dot { background: var(--warn); }
+.mini-mon[data-state="error"] .mm-dot { background: var(--err); }
+.mini-mon[data-state="error"] .mm-state { color: var(--err); }
+.mini-mon[data-state="ended"] .mm-dot { background: var(--ok); }
+.mm-body { margin: 0; padding: 0.35rem 0.6rem; min-height: 4.6em; max-height: 6.4em; overflow: hidden; font-family: var(--font-code); font-size: 0.8rem; line-height: 1.5; white-space: pre-wrap; word-break: break-word; color: var(--ink); }
+@keyframes mm-pulse { 50% { box-shadow: 0 0 0 6px color-mix(in srgb, var(--teal) 0%, transparent); } }
+@media (prefers-reduced-motion: reduce) { .mini-mon[data-state="running"] .mm-dot { animation: none; } }

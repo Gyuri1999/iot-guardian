@@ -142,6 +142,7 @@
     save: '<path d="M5 3h11l3 3v15H5z"/><path d="M8 3v6h8V3"/><rect x="8" y="13" width="8" height="5"/>',
     play: '<path d="M7 4l13 8-13 8z"/>',
     pause: '<path d="M7 4v16M17 4v16"/>',
+    stop: '<rect x="6" y="6" width="12" height="12" rx="1.5"/>',
     step: '<path d="M5 4l10 8-10 8z"/><path d="M19 4v16"/>',
     reset: '<path d="M4 12a8 8 0 1 0 3-6.2"/><path d="M4 3v5h5"/>',
     check: '<path d="M4 12l5 5L20 6"/>',
@@ -815,6 +816,10 @@
               aria-label="${isConfig ? (l.system ? 'Ρυθμίσεις του Pi' : 'Ρυθμίσεις broker') : 'Κώδικας άσκησης'}" aria-describedby="editor-help"></textarea>
           </div>
         </div>
+        ${isConfig ? '' : `<div class="mini-mon${S.miniCollapsed ? ' collapsed' : ''}" id="mini-mon" data-state="idle">
+          <button class="mm-head" id="mm-toggle" aria-expanded="${!S.miniCollapsed}" aria-controls="mm-body"><span class="mm-dot" aria-hidden="true"></span><b>${langOf(l) === 'python' ? 'Τερματικό' : 'Serial Monitor'}</b><span class="mm-state" id="mm-state">ΕΤΟΙΜΟ</span><span class="mm-caret" aria-hidden="true">▾</span></button>
+          <pre class="mm-body" id="mm-body" aria-live="off"></pre>
+        </div>`}
         <p class="editor-help" id="editor-help">${isConfig
           ? 'Σχόλιο είναι μόνο γραμμή που ξεκινά με #. Tab: εσοχή · Esc και μετά Tab: έξοδος.'
           : langOf(l) === 'python' ? 'Tab: εσοχή 4 κενών · Enter μετά από «:» μεγαλώνει την εσοχή · Esc και μετά Tab: έξοδος · Ctrl+Enter: εκτέλεση'
@@ -867,7 +872,12 @@
       $('#b-reset').onclick = doReset;
     }
     if (mode === 'code') {
-      $('#b-run').onclick = doRun;
+      $('#b-run').onclick = () => (S.runState === 'running' ? doStop() : doRun());
+      if ($('#mm-toggle')) $('#mm-toggle').onclick = () => {
+        S.miniCollapsed = !S.miniCollapsed;
+        $('#mini-mon').classList.toggle('collapsed', S.miniCollapsed);
+        $('#mm-toggle').setAttribute('aria-expanded', String(!S.miniCollapsed));
+      };
       $('#b-pause').onclick = doPause;
       $('#b-step').onclick = doStep;
       bindBoard();
@@ -1345,6 +1355,8 @@
     const html = modeOf(S.task) === 'config' ? highlightConfig(lines) : isPy() ? highlightPython(lines) : isRust() ? highlightRust(lines) : highlightLines(lines);
     const paused = S.runState === 'paused' && S.machine;
     const exec = paused ? S.machine.currentLine : null;
+    const runLine = S.runState === 'running' && S.machine ? S.machine.currentLine : null;
+    S.runLineShown = runLine;
     const errLine = S.error ? S.error.line : null;
     const taken = paused && S.machine.lastBranch && S.machine.lastBranch.range ? S.machine.lastBranch.range : null;
     $('#hl').innerHTML = html.map((h, i) => {
@@ -1352,6 +1364,7 @@
       let cls = '';
       if (taken && n >= taken.from && n <= taken.to) cls += ' taken';
       if (n === exec) cls += ' exec';
+      if (n === runLine) cls += ' run';
       if (n === errLine) cls += ' err';
       return `<span class="l${cls}">${h || ' '}</span>`;
     }).join('');
@@ -1359,9 +1372,50 @@
       const n = i + 1;
       if (n === errLine) return `<div class="err">✕ ${n}</div>`;
       if (n === exec) return `<div class="exec">▶ ${n}</div>`;
+      if (n === runLine) return `<div class="run">${n}</div>`;
       return `<div>${n}</div>`;
     }).join('') + '<div>&nbsp;</div>';
     syncScroll();
+  }
+
+  // Όσο τρέχει το πρόγραμμα: φωτίζεται η γραμμή που εκτελείται τώρα, και ο editor κυλά ώστε να φαίνεται.
+  function updateRunLine() {
+    const hl = $('#hl');
+    const gut = $('#gutter');
+    if (!hl || !gut) return;
+    const n = S.runState === 'running' && S.machine ? S.machine.currentLine : null;
+    if (n === S.runLineShown) return;
+    hl.querySelectorAll('.l.run').forEach(e => e.classList.remove('run'));
+    gut.querySelectorAll('.run').forEach(e => e.classList.remove('run'));
+    S.runLineShown = n;
+    if (!n) return;
+    if (hl.children[n - 1]) hl.children[n - 1].classList.add('run');
+    if (gut.children[n - 1]) gut.children[n - 1].classList.add('run');
+    const ta = $('#code');
+    const cs = getComputedStyle(ta);
+    const lh = parseFloat(cs.lineHeight) || 22;
+    const top = (n - 1) * lh + (parseFloat(cs.paddingTop) || 0);
+    if (top < ta.scrollTop || top + lh > ta.scrollTop + ta.clientHeight) {
+      ta.scrollTop = Math.max(0, top - ta.clientHeight / 3);
+      syncScroll();
+    }
+  }
+
+  // Μικρό Serial Monitor κάτω από τον κώδικα: οι τελευταίες γραμμές και η κατάσταση (τρέχει, παύση…).
+  const MM_STATE = { idle: 'ΕΤΟΙΜΟ', running: 'ΤΡΕΧΕΙ', paused: 'ΠΑΥΣΗ', error: 'ΣΦΑΛΜΑ', ended: 'ΤΕΛΕΙΩΣΕ' };
+  function updateMini() {
+    const box = $('#mini-mon');
+    if (!box) return;
+    box.dataset.state = S.runState;
+    const st = $('#mm-state');
+    if (st) st.textContent = MM_STATE[S.runState] || '';
+    const body = $('#mm-body');
+    const all = S.board ? S.board.serial.filter(l => l.id > S.serialClearedAt) : [];
+    const last = all[all.length - 1];
+    const sig = all.length + ':' + (last ? last.id + ':' + last.text.length : '0') + ':' + S.runState;
+    if (sig === S.miniSig) return;
+    S.miniSig = sig;
+    body.textContent = all.length ? all.slice(-4).map(l => l.text).join('\n') : (S.board ? '(δεν έχει τυπωθεί τίποτα ακόμα)' : 'Πάτα ▶ για να τρέξει ο κώδικας.');
   }
 
   function syncScroll() {
@@ -1837,6 +1891,8 @@
     renderErrorSlot();
     updateRunState();
     updateControls();
+    S.miniSig = '';
+    updateMini();
     updateBoard();
     updateSerial(true);
     updateVars();
@@ -1854,6 +1910,8 @@
 
   function updateLive() {
     updateRunState();
+    updateRunLine();
+    updateMini();
     updateBoard();
     updateSerial(false);
     updateVars();
@@ -1906,9 +1964,25 @@
 
   function updateControls() {
     const running = S.runState === 'running';
-    if (!$('#b-run')) return;
-    $('#b-run').disabled = running;
+    const b = $('#b-run');
+    if (!b) return;
+    // Όσο τρέχει, το ▶ γίνεται ■ (διακοπή).
+    if (b.classList.contains('stop') !== running) {
+      b.classList.toggle('stop', running);
+      b.innerHTML = icon(running ? 'stop' : 'play');
+      b.title = running ? 'Διακοπή' : 'Εκτέλεση (Ctrl+Enter)';
+      b.setAttribute('aria-label', running ? 'Διακοπή' : 'Εκτέλεση');
+    }
     $('#b-pause').disabled = !running;
+  }
+
+  function doStop() {
+    if (S.raf) clearTimeout(S.raf);
+    S.raf = null;
+    S.gen = null;
+    S.runState = 'idle';
+    updateAll();
+    announce('Η εκτέλεση σταμάτησε.');
   }
 
   function fmtTime(ms) {
