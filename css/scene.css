@@ -268,3 +268,9 @@
 .usb-tongue { fill: #2b2f36; } .usb3-tongue { fill: #2f6fd6; }
 .eth .f-t { fill: #dfe2e6; } .eth .f-l { fill: #b3b9bf; } .eth .f-r { fill: #c8cdd2; }
 .eth-mouth { fill: #2f343b; stroke: var(--ink-line); stroke-width: 0.3; }
+
+/* 3D εξαρτήματα (Three.js): ο καμβάς κάθεται κάτω από την SVG. Η SVG κρατά αόρατα τα σχήματα (για κλικ και hover)
+   και δείχνει μόνο ετικέτες, λάμψεις, κύματα και ενδείξεις. */
+.scene-3d { position: absolute; pointer-events: none; display: block; }
+.scene.has3d .floor { opacity: 0; }
+.scene.has3d :is(.sc-back, .sc-mid, .sc-wires, .sc-front) :is(polygon, path, rect, ellipse, circle, text):not(.callout *, .halo, .smd, .zzz, .readout, .readout-t, .tl-halo, .tab-h, .tab-t, .rled, .waves *, .pwaves *, .us-waves *, .dist-line *) { opacity: 0; }

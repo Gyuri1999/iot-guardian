@@ -10,7 +10,7 @@
 
 ## Εικόνες
 
-Ισομετρικός πάγκος εργαστηρίου, με κάθε κομμάτι διαδραστικό: πατάς ένα εξάρτημα ή την ετικέτα του και βλέπεις τι είναι, τι κάνει και πώς συνδέεται.
+Ισομετρικός πάγκος εργαστηρίου σε 3D (Three.js: στρογγυλεμένα εξαρτήματα, απαλές σκιές), με κάθε κομμάτι διαδραστικό: πατάς ένα εξάρτημα ή την ετικέτα του και βλέπεις τι είναι, τι κάνει και πώς συνδέεται.
 
 | | |
 |---|---|
@@ -102,6 +102,8 @@ node tests/run-tests.js --only c7
 | `js/storage.js` | πρόοδος στο localStorage, εξαγωγή/εισαγωγή |
 | `js/ui.js` | διεπαφή |
 | `js/scene.js` | ισομετρική σκηνή εργαστηρίου |
+| `js/scene3d.js` | 3D απόδοση των εξαρτημάτων με Three.js (χωρίς WebGL μένει η SVG σκηνή) |
+| `js/vendor/three.min.js` | Three.js r149 (MIT, © three.js authors) |
 | `js/real.js` | πάνελ αληθινού ESP32 και μικρός MQTT client πάνω από WebSocket |
 | `real-lab/` | τοπικός βοηθός (compile/upload, Serial, Mosquitto) και `IoTGuardian.h` |
 | `tools/real-compile.js` | compile όλων των λύσεων για αληθινό ESP32 |
@@ -124,6 +126,7 @@ node tests/run-tests.js --only c7
 ## Άδεια και συνεισφορά
 
 - Κώδικας: **MIT** (`LICENSE`).
+- Περιλαμβάνει το [Three.js](https://threejs.org) r149 (`js/vendor/three.min.js`), με άδεια MIT.
 - Μαθήματα και εκπαιδευτικό περιεχόμενο: **CC BY-SA 4.0** (`LICENSE-CONTENT.md`).
 
 Διορθώσεις, νέα μαθήματα και μεταφράσεις είναι ευπρόσδεκτα. Για νέο κεφάλαιο διάβασε πρώτα το `docs/AUTHORING.md` και τρέξε `node tests/run-tests.js` πριν από το pull request.

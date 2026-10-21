@@ -202,7 +202,10 @@
     on('sc-fit', pz.reset);
     S.scene = svg;
     bindParts(wrap, svg);
-    if (!P.settings.reducedMotion && !matchMedia('(prefers-reduced-motion: reduce)').matches) window.IoTScene.buildIn(svg);
+    const motion = !P.settings.reducedMotion && !matchMedia('(prefers-reduced-motion: reduce)').matches;
+    // 3D εξαρτήματα (Three.js) κάτω από την SVG· χωρίς WebGL μένει η επίπεδη σκηνή.
+    if (window.IoTScene3D) window.IoTScene3D.mount(wrap, svg, window.IoTScene.manifest, { animate: motion });
+    if (motion) window.IoTScene.buildIn(svg);
     return svg;
   }
 

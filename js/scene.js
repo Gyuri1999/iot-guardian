@@ -10,6 +10,9 @@
   'use strict';
 
   const K = 3.2;
+  // Κατάλογος αντικειμένων της τελευταίας σκηνής (για την 3D απόδοση στο scene3d.js).
+  let MAN = null;
+  const rec = o => { if (MAN) MAN.push(o); };
   const C = Math.cos(Math.PI / 6);
   const S = 0.5;
   const P = (u, v, h) => [(u - v) * C * K, (u + v) * S * K - (h || 0) * K];
@@ -78,6 +81,7 @@
   // (θηλυκό πάνω στο pin της πλακέτας, αρσενικό μέσα στην τρύπα του breadboard).
   function wire(a, b, cls, lift, id) {
     let plugs = '';
+    if (!Array.isArray(a)) rec({ t: 'wire', a, b, cls, lift: lift || 40, id });
     if (!Array.isArray(a)) {
       const A = a;
       const Bp = b;
@@ -117,6 +121,7 @@
   function esp32() {
     const { u, v } = ESP;
     const H = ESP.h;
+    rec({ t: 'esp32' });
     let s = '<g id="sc-esp" class="sc-esp" data-part="esp32">';
     s += shadow(u, v, 52, 28);
     // από κάτω: πλαστικό των headers και οι ακίδες προς το τραπέζι
@@ -209,6 +214,7 @@
   const BB = { u: 62, v: 2, du: 60, dv: 26 };
   function breadboard() {
     const { u, v, du, dv } = BB;
+    rec({ t: 'bb' });
     let s = '<g data-part="breadboard">' + box(u, v, 0, du, dv, 2.4, 'bb');
     let holes = '';
     for (let x = 3; x < du - 2; x += 2.54) {
@@ -226,6 +232,7 @@
   }
 
   function led(u, v) {
+    rec({ t: 'led', u, v });
     const base = P(u, v, 2.4);
     const top = P(u, v, 14);
     const sh = P(u + 4, v - 1, 2.4);
@@ -240,6 +247,7 @@
   }
 
   function button(u, v) {
+    rec({ t: 'button', u, v });
     let s = '<g id="sc-btn" class="sc-btn clickable" data-part="button" tabindex="0" role="button" aria-label="Κουμπί: πάτα για αλλαγή">';
     s += box(u - 4.5, v - 4.5, 2.4, 9, 9, 3, 'btn-body');
     const c = P(u, v, 6.6);
@@ -249,6 +257,7 @@
   }
 
   function pir(u, v) {
+    rec({ t: 'pir', u, v });
     let s = '<g id="sc-pir" class="sc-pir clickable" data-part="pir" tabindex="0" role="button" aria-label="Αισθητήρας PIR: πάτα για κίνηση">';
     s += box(u - 7, v - 7, 2.4, 14, 14, 1.4, 'pir-pcb');
     const c = P(u, v, 3.8);
@@ -261,6 +270,7 @@
   }
 
   function sensor(u, v) {
+    rec({ t: 'sensor', u, v });
     let s = '<g id="sc-sensor" class="sc-sensor" data-part="sensor">';
     s += box(u - 4.5, v - 6, 2.4, 9, 12, 7, 'dht');
     s += `<g transform="${planeMatrix(9.4)}">${[0, 1, 2, 3, 4].map(i => `<rect x="${u - 3.4 + i * 1.6}" y="${v - 4.6}" width="0.8" height="9.2" class="vent"/>`).join('')}</g>`;
@@ -271,6 +281,7 @@
   }
 
   function router(u, v) {
+    rec({ t: 'router', u, v });
     let s = '<g id="sc-router" class="sc-router clickable" data-part="router" tabindex="0" role="button" aria-label="Router WiFi: πάτα για να το σβήσεις ή να το ανάψεις">';
     s += box(u, v, 0, 18, 11, 3.2, 'router-body');
     const a1 = P(u + 4, v + 1, 3.2);
@@ -287,6 +298,7 @@
   }
 
   function rpi(u, v, id) {
+    rec({ t: 'rpi', u, v });
     let s = `<g id="${id || 'sc-pi'}" class="sc-pi" data-part="rpi-broker">`;
     s += box(u, v, 0, 30, 20, 1.4, 'pi-pcb');
     s += box(u + 26, v + 2, 1.4, 5, 7, 4, 'port') + box(u + 26, v + 11, 1.4, 5, 7, 4, 'port');
@@ -328,6 +340,7 @@
   function piHost() {
     const { u, v } = ESP;
     const T = PI_T;
+    rec({ t: 'pi5' });
     // τοπικές συντεταγμένες: L κατά μήκος (→ v), W κατά πλάτος (→ u)
     const B = (L, W, h, dL, dW, dh, cls, id) => box(u + W, v + L, h, dW, dL, dh, cls, id);
     const Q = (L, W, h) => P(u + W, v + L, h);
@@ -392,6 +405,7 @@
 
   // Μικρό ESP32 που στέλνει μετρήσεις στο Pi (εικονικός client του broker).
   function miniEsp(u, v) {
+    rec({ t: 'miniEsp', u, v });
     let s = '<g id="sc-node" class="sc-node" data-part="mini-esp">';
     s += box(u, v, 0, 22, 12, 1.2, 'pcb');
     s += box(u + 3, v + 2, 1.2, 9, 8, 1.2, 'shield');
@@ -425,6 +439,7 @@
   function ultrasonic() {
     const { u, v, w } = US;
     const H = 2.4;
+    rec({ t: 'ultrasonic' });
     let s = '<g id="sc-us" class="sc-us" data-part="ultrasonic">';
     // 4 pins στο breadboard
     for (let i = 0; i < 4; i++) s += box(u + 6.2 + i * 2.54, v + 0.2, H, 0.6, 0.6, 2.4, 'pinhdr');
@@ -447,6 +462,7 @@
   const TL = { u: 80, v: 16 };
   function trafficLight() {
     const { u, v } = TL;
+    rec({ t: 'traffic' });
     let s = '<g id="sc-tl" class="sc-tl" data-part="traffic">';
     s += box(u - 1, v - 1, 2.4, 2, 2, 4, 'tl-pole');
     s += box(u - 2.6, v - 1.6, 6.4, 5.2, 3.2, 16, 'tl-body');
@@ -468,6 +484,7 @@
   function car() {
     const u = CAR.u;
     const v = 0;
+    rec({ t: 'car' });
     let s = `<g id="sc-car" class="sc-car clickable draggable" data-part="car" tabindex="0" role="slider" aria-label="Εμπόδιο: σύρε το για να αλλάξει η απόσταση" aria-valuemin="2" aria-valuemax="200">`;
     s += shadow(u - 4, v, 8, 15);
     for (const [wu, wv] of [[3.6, 3], [3.6, 11.2]]) {
@@ -495,6 +512,7 @@
   }
 
   function tablet(u, v) {
+    rec({ t: 'tablet', u, v });
     let s = '<g id="sc-dash" class="sc-dash" data-part="tablet">';
     s += box(u, v, 0, 26, 18, 1.2, 'tab-body');
     s += `<g transform="${planeMatrix(1.2)}"><rect x="${u + 1.5}" y="${v + 1.5}" width="23" height="15" rx="0.8" class="tab-screen"/>
@@ -518,6 +536,7 @@
 
   function fit(svgInner, bounds, extraClass, label) {
     const [x0, y0, x1, y1] = bounds;
+    if (MAN) { root.IoTScene.manifest = MAN; MAN = null; }
     return `<svg class="scene ${extraClass || ''}" viewBox="${x0} ${y0} ${x1 - x0} ${y1 - y0}" data-vb="${x0} ${y0} ${x1 - x0} ${y1 - y0}" role="img" aria-label="${label}">
       <defs>
         <radialGradient id="g-red"><stop offset="0" stop-color="#ff6a4d" stop-opacity="0.85"/><stop offset="1" stop-color="#ff6a4d" stop-opacity="0"/></radialGradient>
@@ -541,6 +560,7 @@
 
   // Σκηνή άσκησης Python: Raspberry Pi + breadboard, και (με broker) το δίκτυο του σπιτιού γύρω του.
   function piScene(hw, world) {
+    MAN = [];
     const net = !!(world && world.broker);
     let back = '';
     let mid = piHost();
@@ -589,6 +609,7 @@
 
   // Σκηνή άσκησης κώδικα: ESP32 + breadboard + ό,τι χρειάζεται το μάθημα.
   function labScene(hw, world) {
+    MAN = [];
     const net = !!(world && world.broker);
     const wifi = net || hw.includes('router') || (world && world.wifi);
     let back = '';
@@ -665,6 +686,7 @@
 
   // Αρχική: η πλακέτα μόνη της, με ετικέτες για τα μέρη της.
   function homeScene() {
+    MAN = [];
     let inner = esp32();
     const T = PCB_TOP;
     inner += callout(P(16, 14, T + 2.4), -96, -66, 'ESP-WROOM-32', null, 'esp-module');
@@ -692,6 +714,8 @@
     return n.kind === 'pi' ? P(n.u + 15, n.v + 10, 2) : P(n.u + 9, n.v + 6, 2);
   }
   function netScene() {
+    MAN = null;
+    root.IoTScene.manifest = null;
     let nodes = '';
     let links = '';
     let labels = '';
@@ -863,5 +887,5 @@
     });
   }
 
-  root.IoTScene = { buildIn, carOffset, carV, dragToCm, CAR, US, P, labScene, piScene, homeScene, netScene, attachPanZoom, animatePacket, NET_NODES };
+  root.IoTScene = { K, ESP, PCB_TOP, PIN_U, PI_T, PI_PIN_L, PI_PIN_TOP, BB, TL, manifest: null, buildIn, carOffset, carV, dragToCm, CAR, US, P, labScene, piScene, homeScene, netScene, attachPanZoom, animatePacket, NET_NODES };
 })(typeof window !== 'undefined' ? window : globalThis);
