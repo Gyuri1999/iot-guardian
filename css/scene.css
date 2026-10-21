@@ -1,0 +1,117 @@
+/* IoT Guardian — ισομετρική σκηνή. Τα αντικείμενα έχουν σταθερά «υλικά» χρώματα (είναι αντικείμενα του πάγκου).
+   Οι ετικέτες, το πλέγμα και οι γραμμές ακολουθούν το θέμα. */
+.scene { width: 100%; height: 100%; display: block; touch-action: none; cursor: grab; user-select: none; }
+.scene.dragging { cursor: grabbing; }
+.scene .floor path { stroke: var(--grid); stroke-width: 0.7; }
+
+.box polygon { stroke-linejoin: round; }
+.pcb .f-t { fill: #1d2534; } .pcb .f-l { fill: #121925; } .pcb .f-r { fill: #0c121b; }
+.mod-base .f-t { fill: #2b3342; } .mod-base .f-l { fill: #1b222e; } .mod-base .f-r { fill: #151b25; }
+.shield .f-t { fill: #cfd4d9; } .shield .f-l { fill: #959ca4; } .shield .f-r { fill: #b1b7bd; }
+.pinhdr .f-t { fill: #1b1b1d; } .pinhdr .f-l { fill: #0d0d0e; } .pinhdr .f-r { fill: #141416; }
+.usb .f-t { fill: #cdd2d7; } .usb .f-l { fill: #8a9198; } .usb .f-r { fill: #a7adb3; }
+.btn-b .f-t { fill: #e2e4e6; } .btn-b .f-l { fill: #9aa0a6; } .btn-b .f-r { fill: #b9bec3; }
+.pin-pad { fill: #d6aa48; }
+.antenna2 { fill: none; stroke: #c9a24a; stroke-width: 0.45; stroke-linejoin: round; }
+.silk2 { font: 600 2.4px var(--font-code); fill: #cfd7e3; letter-spacing: 0.04em; }
+.shield-t { font: 700 1.9px var(--font-code); fill: #4b535c; letter-spacing: 0.05em; }
+.smd { fill: #4a4f57; transition: fill 0.12s; }
+.smd.pwr.on { fill: #ff4d3d; }
+.smd.d2.on { fill: #7cc4ff; }
+.halo { opacity: 0; transition: opacity 0.12s; pointer-events: none; }
+.halo.red { fill: url(#g-red); } .halo.blue { fill: url(#g-blue); }
+.halo.on { opacity: 1; }
+.sc-esp.asleep .shield, .sc-esp.asleep .mod-base { opacity: 0.45; }
+.zzz { font: 700 12px var(--font-code); fill: #3b8fd6; opacity: 0; }
+.sc-esp.asleep .zzz { opacity: 1; animation: zfloat 2.4s ease-in-out infinite; }
+@keyframes zfloat { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-4px); } }
+
+.bb .f-t { fill: #f5f0e4; } .bb .f-l { fill: #d6cdb8; } .bb .f-r { fill: #e6dece; }
+.bb-holes rect { fill: #8f8878; }
+.rail-r { fill: #d9534f; } .rail-b { fill: #3c6fd6; } .bb-gap { fill: #e0d7c4; }
+
+.legs { stroke: #a2a8ad; stroke-width: 1.5; fill: none; }
+.led-body { fill: #b8352a; }
+.led-rim { fill: #8a2018; }
+.led-dome { fill: #c93a2d; transition: fill 0.12s; }
+.led-shine { fill: #fff; opacity: 0.55; }
+.sc-led.on .led-dome, .sc-led.on .led-body { fill: #ff5a3c; }
+
+.btn-body .f-t { fill: #2a2a2d; } .btn-body .f-l { fill: #141416; } .btn-body .f-r { fill: #1c1c1f; }
+.cap { fill: #d4472f; } .cap-side { fill: #8f2c1f; }
+#sc-btn-cap { transition: transform 0.08s; }
+.sc-btn.on #sc-btn-cap { transform: translateY(2.6px); }
+.sc-btn.on .cap { fill: #ff6a4d; }
+
+.pir-pcb .f-t { fill: #1f7247; } .pir-pcb .f-l { fill: #134a2e; } .pir-pcb .f-r { fill: #18603b; }
+.dome { fill: #f6f4ee; stroke: #c9c3b6; stroke-width: 0.8; }
+.dome-lines { fill: none; stroke: #cfc9bc; stroke-width: 0.7; }
+.pwaves path { fill: none; stroke: #e0a32e; stroke-width: 2; stroke-linecap: round; opacity: 0; }
+.sc-pir.on .pwaves path { animation: wave 1.4s ease-out infinite; }
+.sc-pir.on .pwaves path:nth-child(2) { animation-delay: 0.25s; }
+.sc-pir.on .pwaves path:nth-child(3) { animation-delay: 0.5s; }
+
+.dht .f-t { fill: #f4f4ef; } .dht .f-l { fill: #c9c9c2; } .dht .f-r { fill: #dfdfd8; }
+.vent { fill: #9b9b94; }
+.readout { fill: var(--surface); stroke: var(--line-strong); stroke-width: 0.8; }
+.readout-t { font: 600 10px var(--font-code); fill: var(--ink); }
+.sc-sensor.fault .readout-t { fill: var(--err); }
+
+.router-body .f-t { fill: #2c3549; } .router-body .f-l { fill: #1b2232; } .router-body .f-r { fill: #232b3e; }
+.antenna-rod { stroke: #2c3549; stroke-width: 3.4; stroke-linecap: round; fill: none; }
+.rled { fill: #3e4a62; } .sc-router.on .rled { fill: #39d98a; }
+.waves path { fill: none; stroke: #2f9fe8; stroke-width: 2.2; stroke-linecap: round; opacity: 0; }
+.waves.on path, .sc-router.on .waves path { animation: wave 1.8s ease-out infinite; }
+.waves.on path:nth-child(2), .sc-router.on .waves path:nth-child(2) { animation-delay: 0.3s; }
+.waves.on path:nth-child(3) { animation-delay: 0.6s; }
+@keyframes wave { 0% { opacity: 0; } 30% { opacity: 0.95; } 100% { opacity: 0; } }
+
+.pi-pcb .f-t { fill: #23864f; } .pi-pcb .f-l { fill: #155c35; } .pi-pcb .f-r { fill: #1b6f41; }
+.port .f-t { fill: #d3d7db; } .port .f-l { fill: #8b9198; } .port .f-r { fill: #aab0b6; }
+.chip .f-t { fill: #23262b; } .chip .f-l { fill: #131518; } .chip .f-r { fill: #1a1d21; }
+.sc-pi.restart .pi-pcb .f-t { fill: #8a6b23; }
+
+.tab-body .f-t { fill: #222a3c; } .tab-body .f-l { fill: #131a28; } .tab-body .f-r { fill: #1a2132; }
+.tab-screen { fill: #0e1628; }
+.tab-h { font: 700 2.3px var(--font-code); fill: #7fd0ff; }
+.tab-t { font: 500 2.1px var(--font-code); fill: #d9e4f2; }
+
+.lap-base .f-t { fill: #c9ced4; } .lap-base .f-l { fill: #8e959c; } .lap-base .f-r { fill: #aab0b6; }
+.lap-lid { fill: #2a3346; stroke: #9aa2ab; stroke-width: 0.8; }
+.sc-laptop.unk .lap-lid { fill: #5b4a4a; }
+
+.wire { fill: none; stroke-width: 2.6; stroke-linecap: round; opacity: 0.95; }
+.w-led { stroke: #e8892f; } .w-btn { stroke: #18a196; } .w-pir { stroke: #e2b52d; } .w-gnd { stroke: #34383f; }
+.wire.on { stroke-dasharray: 6 5; animation: flow 0.6s linear infinite; }
+@keyframes flow { to { stroke-dashoffset: -11; } }
+
+.link { fill: none; stroke: var(--muted); stroke-width: 1.6; stroke-dasharray: 4 5; opacity: 0.55; }
+.link.on { stroke: var(--teal); stroke-dasharray: none; opacity: 0.95; }
+.link.deny { stroke: var(--err); stroke-dasharray: 3 4; opacity: 0.9; }
+.link.hot { stroke: var(--accent); stroke-width: 2.6; stroke-dasharray: none; opacity: 1; }
+.packet { fill: var(--accent); stroke: var(--surface); stroke-width: 1.2; }
+.packet.in { fill: var(--teal); }
+
+.callout .co-line { stroke: var(--ink); stroke-width: 0.8; fill: none; }
+.callout .co-dot { fill: var(--teal); stroke: var(--surface); stroke-width: 1.2; }
+.callout .co-box { fill: var(--surface); stroke: var(--ink); stroke-width: 0.8; }
+.callout .co-txt { font: 600 9.5px var(--font-label); fill: var(--ink); letter-spacing: 0.07em; }
+.callout.hot .co-box { fill: var(--accent); stroke: var(--accent); }
+.callout.hot .co-txt { fill: var(--accent-ink); }
+
+.clickable { cursor: pointer; }
+.clickable:focus { outline: none; }
+.clickable:focus-visible > g:first-child polygon, .clickable:focus-visible .f-t { stroke: var(--accent); stroke-width: 1.4; }
+
+.port-tag rect { fill: var(--surface); stroke: var(--line-strong); stroke-width: 0.8; }
+.port-tag text { font: 600 9px var(--font-label); fill: var(--ink); letter-spacing: 0.05em; }
+.port-tag.open rect { stroke: var(--err); } .port-tag.open text { fill: var(--err); }
+.port-tag.tls rect { stroke: var(--ok); } .port-tag.tls text { fill: var(--ok); }
+
+@media (prefers-reduced-motion: reduce) {
+  .waves path, .pwaves path, .wire.on, .zzz { animation: none !important; }
+  .waves.on path, .sc-router.on .waves path, .sc-pir.on .pwaves path { opacity: 0.85; }
+}
+:root[data-reduced-motion="true"] .waves.on path, :root[data-reduced-motion="true"] .sc-router.on .waves path, :root[data-reduced-motion="true"] .sc-pir.on .pwaves path { opacity: 0.85; }
+.smd.act.on { fill: #39d98a; }
+.sc-node .shield { opacity: 0.9; }

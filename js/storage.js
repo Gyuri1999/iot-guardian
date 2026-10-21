@@ -1,0 +1,88 @@
+/*
+ * IoT Guardian — αποθήκευση προόδου στο localStorage.
+ * Κρατά μόνο εκπαιδευτικά δεδομένα: ολοκληρωμένα μαθήματα, απαντήσεις,
+ * πρόχειρο κώδικα και ρυθμίσεις. Κανένα προσωπικό δεδομένο ή μυστικό.
+ */
+(function (root) {
+  'use strict';
+
+  const KEY = 'iot-guardian-progress';
+  const SCHEMA = 1;
+  const MAX_DRAFT = 20000;
+
+  function knownIds() {
+    return new Set((root.IoTLessons ? root.IoTLessons.lessons : []).map(l => l.id));
+  }
+
+  function defaults() {
+    return {
+      schema: SCHEMA,
+      completed: {},
+      quizzes: {},
+      drafts: {},
+      hints: {},
+      current: null,
+      settings: { theme: 'system', fontScale: 1, lineSpacing: 'normal', reducedMotion: false }
+    };
+  }
+
+  function validate(obj) {
+    if (!obj || typeof obj !== 'object' || Array.isArray(obj)) return { ok: false, error: 'Το αρχείο δεν περιέχει έγκυρη πρόοδο.' };
+    if (obj.schema !== SCHEMA) return { ok: false, error: `Άγνωστη έκδοση δεδομένων (${obj.schema}). Περίμενα ${SCHEMA}.` };
+    const ids = knownIds();
+    const out = defaults();
+    const pickBool = src => {
+      const o = {};
+      if (src && typeof src === 'object') for (const [k, v] of Object.entries(src)) if (ids.has(k) && v === true) o[k] = true;
+      return o;
+    };
+    out.completed = pickBool(obj.completed);
+    out.quizzes = pickBool(obj.quizzes);
+    if (obj.drafts && typeof obj.drafts === 'object') {
+      for (const [k, v] of Object.entries(obj.drafts)) if (ids.has(k) && typeof v === 'string' && v.length <= MAX_DRAFT) out.drafts[k] = v;
+    }
+    if (obj.hints && typeof obj.hints === 'object') {
+      for (const [k, v] of Object.entries(obj.hints)) if (ids.has(k) && Number.isInteger(v) && v >= 0 && v <= 3) out.hints[k] = v;
+    }
+    if (typeof obj.current === 'string' && ids.has(obj.current)) out.current = obj.current;
+    const s = obj.settings || {};
+    if (['system', 'light', 'dark'].includes(s.theme)) out.settings.theme = s.theme;
+    if (typeof s.fontScale === 'number' && s.fontScale >= 0.85 && s.fontScale <= 1.6) out.settings.fontScale = s.fontScale;
+    if (['normal', 'relaxed', 'loose'].includes(s.lineSpacing)) out.settings.lineSpacing = s.lineSpacing;
+    if (typeof s.reducedMotion === 'boolean') out.settings.reducedMotion = s.reducedMotion;
+    return { ok: true, data: out };
+  }
+
+  function load() {
+    try {
+      const raw = root.localStorage && root.localStorage.getItem(KEY);
+      if (!raw) return defaults();
+      const v = validate(JSON.parse(raw));
+      return v.ok ? v.data : defaults();
+    } catch (e) {
+      return defaults();
+    }
+  }
+
+  function save(state) {
+    try {
+      if (!root.localStorage) return false;
+      root.localStorage.setItem(KEY, JSON.stringify(state));
+      return true;
+    } catch (e) {
+      return false;
+    }
+  }
+
+  function exportJson(state) {
+    return JSON.stringify(Object.assign({ app: 'IoT Guardian', exported: new Date().toISOString() }, state), null, 2);
+  }
+
+  function parseImport(text) {
+    let obj;
+    try { obj = JSON.parse(text); } catch (e) { return { ok: false, error: 'Το κείμενο δεν είναι έγκυρο JSON. Επικόλλησε ολόκληρο το περιεχόμενο της εξαγωγής.' }; }
+    return validate(obj);
+  }
+
+  root.IoTStorage = { load, save, defaults, validate, exportJson, parseImport, SCHEMA };
+})(typeof window !== 'undefined' ? window : globalThis);

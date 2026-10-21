@@ -1,0 +1,583 @@
+#!/usr/bin/env node
+/* IoT Guardian — unit και integration tests. Εκτέλεση: node tests/run-tests.js */
+'use strict';
+
+const fs = require('fs');
+const path = require('path');
+const vm = require('vm');
+
+const ROOT = path.join(__dirname, '..');
+// Χρήση: node tests/run-tests.js [--only c4]   (το --only περιορίζει τα tests μαθημάτων σε ids που ξεκινούν έτσι)
+const onlyIdx = process.argv.indexOf('--only');
+const ONLY = onlyIdx > 0 ? process.argv[onlyIdx + 1] : null;
+const ctx = vm.createContext({ console });
+const loadErrors = [];
+for (const f of ['interpreter.js', 'pyinterp.js', 'pyweb.js', 'device.js', 'network.js', 'validator.js', 'pisys.js', 'lessons.js']) {
+  vm.runInContext(fs.readFileSync(path.join(ROOT, 'js', f), 'utf8'), ctx, { filename: f });
+}
+const extra = fs.existsSync(path.join(ROOT, 'js', 'lessons')) ? fs.readdirSync(path.join(ROOT, 'js', 'lessons')).filter(f => f.endsWith('.js')).sort() : [];
+for (const f of extra) {
+  try { vm.runInContext(fs.readFileSync(path.join(ROOT, 'js', 'lessons', f), 'utf8'), ctx, { filename: 'lessons/' + f }); }
+  catch (e) { loadErrors.push(f + ': ' + e.message); }
+}
+vm.runInContext(fs.readFileSync(path.join(ROOT, 'js', 'storage.js'), 'utf8'), ctx, { filename: 'storage.js' });
+const { IoTInterp, IoTDevice, IoTValidator, IoTLessons, IoTStorage } = ctx;
+
+let passed = 0;
+let failed = 0;
+function test(name, fn) {
+  try { fn(); passed++; console.log('  ✓ ' + name); }
+  catch (e) { failed++; console.log('  ✗ ' + name + '\n      ' + e.message); }
+}
+function assert(cond, msg) { if (!cond) throw new Error(msg || 'assertion failed'); }
+function eq(a, b, msg) { if (JSON.stringify(a) !== JSON.stringify(b)) throw new Error((msg || '') + ` αναμενόταν ${JSON.stringify(b)}, βρέθηκε ${JSON.stringify(a)}`); }
+function codeError(src) {
+  try { IoTInterp.compile(src); } catch (e) { if (e.name === 'CodeError') return e; throw e; }
+  throw new Error('αναμενόταν CodeError');
+}
+function run(src, loops, world) {
+  const r = new IoTValidator.Runner(src, world);
+  r.runSetup();
+  if (loops) r.runLoops(loops);
+  return r;
+}
+const wrap = (setup, loop, globals) => `${globals || ''}\nvoid setup() {\n${setup || ''}\n}\nvoid loop() {\n${loop || ''}\n}\n`;
+
+console.log('\nParser και μη υποστηριζόμενη σύνταξη');
+test('ελληνικό ερωτηματικό → σφάλμα στη σωστή γραμμή', () => {
+  const e = codeError('void setup() {\n  pinMode(LED_PIN, OUTPUT);\n}\nvoid loop() {}');
+  eq(e.line, 2); assert(/ελληνικό ερωτηματικό/.test(e.message));
+});
+test('λείπει ; → δείχνει τη γραμμή της εντολής', () => {
+  const e = codeError('void setup() {\n  pinMode(LED_PIN, OUTPUT)\n  digitalWrite(LED_PIN, HIGH);\n}\nvoid loop() {}');
+  eq(e.line, 2); assert(/Λείπει το ;/.test(e.message));
+});
+test('λείπει } → αναφέρει τη γραμμή του {', () => {
+  const e = codeError('void setup() {\n  delay(1);\nvoid loop() {}');
+  assert(/ορίσεις συνάρτηση μέσα/.test(e.message) || /Λείπει ένα }/.test(e.message), e.message);
+});
+test('switch → σαφές μήνυμα μη υποστήριξης', () => {
+  const e = codeError(wrap('', 'switch (1) {}'));
+  assert(/switch δεν υποστηρίζεται/.test(e.message));
+});
+test('πίνακες → σαφές μήνυμα', () => {
+  const e = codeError(wrap('', '', 'int a[3];'));
+  assert(/πίνακες/.test(e.message));
+});
+test('λάθος κεφαλαία → πρόταση διόρθωσης', () => {
+  const e = codeError(wrap('digitalwrite(LED_PIN, HIGH);'));
+  assert(/digitalWrite/.test(e.message), e.message);
+});
+test('κενό ____ → οδηγία συμπλήρωσης', () => {
+  const e = codeError(wrap('', 'int x = ____;'));
+  assert(/Συμπλήρωσε το κενό/.test(e.message));
+});
+test('αδήλωτη μεταβλητή', () => {
+  const e = codeError(wrap('', 'counter = 1;'));
+  assert(/δεν έχει δηλωθεί/.test(e.message));
+});
+test('λείπει loop()', () => {
+  const e = codeError('void setup() {}');
+  assert(/loop/.test(e.message));
+});
+test('ανάθεση σε σταθερά → σφάλμα', () => {
+  const e = codeError(wrap('HIGH = 0;'));
+  assert(/σταθερά/.test(e.message));
+});
+test('= μέσα σε if → προειδοποίηση, όχι σφάλμα', () => {
+  const c = IoTInterp.compile(wrap('', 'int b = 0; if (b = HIGH) { }'));
+  assert(c.warnings.some(w => /ανάθεση/.test(w.text)));
+});
+test('σύγκριση χωρίς χρήση → σφάλμα με εξήγηση', () => {
+  const e = codeError(wrap('', 'int b = 0; b == 1;'));
+  assert(/συγκρίνει/.test(e.message));
+});
+
+console.log('\nΜεταβλητές, if/else, χρονισμός');
+test('int κόβει τα δεκαδικά', () => {
+  const r = run(wrap('Serial.begin(115200); int x = 7 / 2; Serial.println(x); float y = 7.0 / 2; Serial.println(y);'));
+  eq(r.board.serialLines(), ['3', '3.50']);
+});
+test('global μεταβλητή θυμάται ανάμεσα σε επαναλήψεις', () => {
+  const r = run(wrap('Serial.begin(115200);', 'counter++; Serial.println(counter);', 'int counter = 0;'), 3);
+  eq(r.board.serialLines(), ['1', '2', '3']);
+});
+test('local μεταβλητή ξαναρχίζει σε κάθε επανάληψη', () => {
+  const r = run(wrap('Serial.begin(115200);', 'int c = 0; c++; Serial.println(c);'), 3);
+  eq(r.board.serialLines(), ['1', '1', '1']);
+});
+test('if/else επιλέγει σωστό σκέλος και καταγράφει γιατί', () => {
+  const src = wrap('pinMode(LED_PIN, OUTPUT);', 'if (digitalRead(BUTTON_PIN) == HIGH) { digitalWrite(LED_PIN, HIGH); } else { digitalWrite(LED_PIN, LOW); }');
+  const off = run(src, 1, { button: false });
+  eq(off.board.led, false); eq(off.machine.lastBranch.branch, 'else');
+  const on = run(src, 1, { button: true });
+  eq(on.board.led, true); eq(on.machine.lastBranch.branch, 'if');
+});
+test('&& και || με βραχυκύκλωμα', () => {
+  const r = run(wrap('Serial.begin(115200); int a = 0; if (a == 1 && 10 / a > 1) { Serial.println("x"); } if (a == 0 || 10 / a > 1) { Serial.println("ok"); }'));
+  eq(r.board.serialLines(), ['ok']);
+});
+test('for και while', () => {
+  const r = run(wrap('Serial.begin(115200); int s = 0; for (int i = 0; i < 4; i++) { s += i; } int k = 3; while (k > 0) { k--; } Serial.println(s); Serial.println(k);'));
+  eq(r.board.serialLines(), ['6', '0']);
+});
+test('συναρτήσεις με παραμέτρους και return', () => {
+  const r = run('int twice(int v) {\n return v * 2;\n}\nvoid setup() { Serial.begin(115200); Serial.println(twice(21)); }\nvoid loop() {}');
+  eq(r.board.serialLines(), ['42']);
+});
+test('delay και millis με εικονικό ρολόι', () => {
+  const r = run(wrap('Serial.begin(115200);', 'delay(1000); Serial.println(millis() / 1000);'), 3);
+  eq(r.board.serialLines(), ['1', '2', '3']);
+});
+test('print + println στην ίδια γραμμή', () => {
+  const r = run(wrap('Serial.begin(115200); Serial.print("A="); Serial.println(5);'));
+  eq(r.board.serialLines(), ['A=5']);
+});
+test('όριο βημάτων σταματά ατέρμονο βρόχο', () => {
+  let err = null;
+  try { run(wrap('', 'while (true) { }'), 1); } catch (e) { err = e; }
+  assert(err && err.name === 'CodeError' && /βήματα/.test(err.message), err && err.message);
+});
+test('διαίρεση με μηδέν → σφάλμα με γραμμή', () => {
+  let err = null;
+  try { run(wrap('int z = 0;\nint q = 5 / z;')); } catch (e) { err = e; }
+  assert(err && err.line === 4, err && (err.message + ' line ' + err.line));
+});
+test('digitalWrite χωρίς pinMode → προειδοποίηση και σβηστό LED', () => {
+  const r = run(wrap('digitalWrite(LED_PIN, HIGH);'));
+  eq(r.board.led, false);
+  assert(r.board.warnings.some(w => /OUTPUT/.test(w.text)));
+});
+test('βήμα-βήμα: κάθε βήμα αντιστοιχεί σε ορατή γραμμή', () => {
+  const src = 'void setup() {\n  pinMode(LED_PIN, OUTPUT);\n  digitalWrite(LED_PIN, HIGH);\n}\nvoid loop() {\n  delay(10);\n}\n';
+  const c = IoTInterp.compile(src);
+  const m = new IoTInterp.Machine(c.program, new IoTDevice.Board());
+  const g = m.main();
+  const seen = [];
+  while (seen.length < 4) { const r = g.next(); if (r.value.kind === 'line') seen.push(r.value.line); }
+  eq(seen, [2, 3, 6, 6]);
+});
+test('ο interpreter δεν χρησιμοποιεί eval ή new Function', () => {
+  for (const f of ['interpreter.js', 'device.js', 'validator.js']) {
+    const s = fs.readFileSync(path.join(ROOT, 'js', f), 'utf8').replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/.*$/gm, '');
+    assert(!/\beval\s*\(/.test(s) && !/new\s+Function\s*\(/.test(s), f);
+  }
+});
+
+console.log('\nΠίνακας επαναλήψεων');
+test('καταγράφει είσοδο, μεταβλητές και έξοδο ανά επανάληψη', () => {
+  const r = new IoTValidator.Runner(wrap('Serial.begin(115200);', 'int m = digitalRead(PIR_PIN); if (m != last) { Serial.println("ch"); } last = m;', 'int last = LOW;'), { pir: false });
+  r.runSetup();
+  for (const v of [0, 1, 1]) { r.board.inputs.pir = !!v; r.runLoops(1); }
+  const log = r.machine.loopLog;
+  eq(log.map(x => x.inputs.pir), [false, true, true]);
+  eq(log.map(x => x.output.length), [0, 1, 0]);
+  eq(log[2].vars.last, '1');
+});
+
+console.log('\nΜαθήματα: λύση περνά, αρχικός κώδικας αποτυγχάνει');
+test('όλα τα αρχεία μαθημάτων φορτώνονται', () => {
+  const relevant = ONLY ? loadErrors.filter(e => e.startsWith('ch' + ONLY.slice(1).padStart(2, '0'))) : loadErrors;
+  assert(!relevant.length, relevant.join(' | '));
+});
+test('μοναδικά ids μαθημάτων και έγκυρα prerequisites', () => {
+  const ids = IoTLessons.lessons.map(l => l.id);
+  eq(ids.length, new Set(ids).size, 'διπλά ids');
+  for (const l of IoTLessons.lessons) for (const p of l.prerequisites) assert(ids.includes(p), l.id + ' → ' + p);
+});
+for (const l of IoTLessons.lessons.filter(x => !ONLY || x.id.startsWith(ONLY + '-'))) {
+  if (l.mode === 'analysis') {
+    test(`${l.id} ανάλυση: η καταγραφή έχει τα τεκμήρια`, () => {
+      const net = IoTValidator.buildCapture(l.capture);
+      if (l.evidence.filter) {
+        const f = ctx.IoTNet.compileFilter(l.evidence.filter);
+        assert(f.ok, f.error);
+        const n = net.packets.filter(f.fn).length;
+        assert(n >= 1 && n < net.packets.length, 'τεκμήρια: ' + n + ' από ' + net.packets.length);
+      } else {
+        const n = net.log.filter(x => x.text.includes(l.evidence.log)).length;
+        assert(n >= 1 && n < net.log.length, 'γραμμές log: ' + n + ' από ' + net.log.length);
+      }
+    });
+    test(`${l.id} έχει 3 hints, quiz και πεδία μαθήματος`, () => {
+      eq(l.hints.length, 3);
+      assert(l.quiz && l.quiz.options[l.quiz.answer]);
+      for (const k of ['id', 'title', 'prerequisites', 'objectives', 'theory', 'glossary', 'steps', 'explanationOnSuccess', 'remediation', 'capture', 'evidence']) assert(k in l, 'λείπει ' + k);
+    });
+    continue;
+  }
+  test(`${l.id} λύση περνά όλους τους ελέγχους`, () => {
+    const res = IoTValidator.runTests(l.solution, l.validationTests, l);
+    const bad = res.filter(r => !r.pass);
+    assert(!bad.length, bad.map(b => b.name + ': ' + b.message).join(' | '));
+  });
+  test(`${l.id} αρχικός κώδικας ${l.initialPasses ? 'περνά (μικρομάθημα παρατήρησης)' : 'δεν περνά'}`, () => {
+    const res = IoTValidator.runTests(l.initialCode, l.validationTests, l);
+    const allPass = res.every(r => r.pass);
+    eq(allPass, !!l.initialPasses);
+  });
+  test(`${l.id} έχει 3 hints, quiz και πεδία μαθήματος`, () => {
+    eq(l.hints.length, 3);
+    assert(l.quiz && l.quiz.options[l.quiz.answer]);
+    for (const k of ['id', 'title', 'prerequisites', 'objectives', 'theory', 'glossary', 'initialCode', 'supportedSyntax', 'initialWorld', 'steps', 'validationTests', 'explanationOnSuccess', 'remediation']) assert(k in l, 'λείπει ' + k);
+  });
+}
+test('κάθε κεφάλαιο έχει ≥3 μικρομαθήματα/ασκήσεις, καθοδηγούμενη, παραλλαγή/ανεξάρτητη και εντοπισμό λάθους', () => {
+  for (const ch of IoTLessons.CHAPTERS.filter(c => c.ready && (!ONLY || 'c' + c.n === ONLY)).map(c => c.n)) {
+    const ls = IoTLessons.lessons.filter(l => l.chapter === ch);
+    assert(ls.length >= 3, 'κεφ. ' + ch);
+    assert(ls.some(l => l.kind === 'guided'), 'guided κεφ. ' + ch);
+    assert(ls.some(l => l.kind === 'checkpoint' || l.kind === 'debug'), 'debug κεφ. ' + ch);
+  }
+});
+test('εναλλακτική σωστή λύση περνά (έλεγχος συμπεριφοράς, όχι κειμένου)', () => {
+  const l = IoTLessons.lessons.find(x => x.id === 'c2-l4');
+  const alt = l.initialCode.replace('digitalWrite(LED_PIN, HIGH);\n  } else {\n    digitalWrite(LED_PIN, LOW);', 'digitalWrite(LED_PIN, LOW);\n  } else {\n    digitalWrite(LED_PIN, HIGH);');
+  assert(alt !== l.initialCode);
+  assert(IoTValidator.runTests(alt, l.validationTests, l).every(r => r.pass));
+});
+
+console.log('\nΑισθητήρες, WiFi, MQTT, δίκτυο');
+const N = ctx.IoTNet;
+const OPEN = 'listener 1883\nallow_anonymous true\n';
+const SECURE = 'listener 8883\ntls on\nallow_anonymous false\npassword esp32-pir pir-Secret-2026\npassword dashboard dash-Secret-2026\nuser esp32-pir\ntopic write home/motion\ntopic read home/led/set\nuser dashboard\ntopic read home/#\ntopic write home/led/set\n';
+test('topicMatches με + και #', () => {
+  assert(N.topicMatches('home/#', 'home/led/set'));
+  assert(N.topicMatches('home/+/state', 'home/led/state'));
+  assert(!N.topicMatches('home/+/state', 'home/led/set'));
+  assert(N.topicMatches('home/#', 'home'));
+  assert(!N.topicMatches('home/led', 'home/led/set'));
+});
+test('filterCovers για ACL σε subscribe', () => {
+  assert(N.filterCovers('home/#', 'home/+/state'));
+  assert(!N.filterCovers('home/+/state', 'home/#'));
+  assert(!N.filterCovers('home/led/state', 'home/+/state'));
+  assert(N.filterCovers('#', 'anything/#'));
+});
+test('parseBrokerConfig: σφάλμα με γραμμή και ελληνική εξήγηση', () => {
+  let e = null;
+  try { N.parseBrokerConfig('listener 1883\ntopic read home/#'); } catch (x) { e = x; }
+  assert(e && e.line === 2 && /user/.test(e.message + e.hint), e && e.message);
+  let e2 = null;
+  try { N.parseBrokerConfig('listener 1883\nallow_anonymus false'); } catch (x) { e2 = x; }
+  assert(e2 && e2.line === 2 && /Άγνωστη/.test(e2.message));
+});
+test('parseBrokerConfig: προειδοποίηση για πολύ ευρύ κανόνα', () => {
+  const r = N.parseBrokerConfig('listener 1883\npassword x abcdefghijklmn\nuser x\ntopic readwrite #');
+  assert(r.warnings.some(w => /ευρύς/.test(w.text)));
+});
+test('broker: ανώνυμη σύνδεση απορρίπτεται όταν allow_anonymous false', () => {
+  const net = new N.Network({ config: N.parseBrokerConfig(SECURE).config });
+  assert(!net.connect('unknown-device', { clientId: 'x', port: 8883, tls: true, verify: true, ca: 'Home Lab CA', host: 'broker.home.lan' }).ok);
+  assert(net.connect('esp32-pir', { clientId: 'esp32-pir', port: 8883, tls: true, verify: true, ca: 'Home Lab CA', host: 'broker.home.lan', username: 'esp32-pir', password: 'pir-Secret-2026' }).ok);
+});
+test('broker: ACL write/read και παράδοση μόνο σε εξουσιοδοτημένους', () => {
+  const net = new N.Network({ config: N.parseBrokerConfig(SECURE).config });
+  const o = (u, p) => ({ clientId: u, port: 8883, tls: true, verify: true, ca: 'Home Lab CA', host: 'broker.home.lan', username: u, password: p });
+  net.connect('esp32-pir', o('esp32-pir', 'pir-Secret-2026'));
+  net.connect('dashboard', o('dashboard', 'dash-Secret-2026'));
+  assert(net.subscribe('dashboard', 'home/#').ok);
+  assert(!net.subscribe('esp32-pir', 'home/#').ok);
+  assert(net.publish('esp32-pir', 'home/motion', '{"motion":true}').ok);
+  assert(!net.publish('esp32-pir', 'home/led/set', 'ON').ok);
+  eq(net.readNext('dashboard').topic, 'home/motion');
+  eq(net.readNext('dashboard'), null);
+});
+test('broker: retained παραδίδεται σε νέο subscriber', () => {
+  const net = new N.Network({ config: N.parseBrokerConfig(OPEN).config });
+  const o = id => ({ clientId: id, port: 1883 });
+  net.connect('esp32-temp', o('t'));
+  net.publish('esp32-temp', 'home/temperature', '{"t":21.5}', true);
+  net.connect('dashboard', o('d'));
+  net.subscribe('dashboard', 'home/#');
+  const m = net.readNext('dashboard');
+  assert(m && m.retained && m.payload === '{"t":21.5}');
+});
+test('TLS: plaintext στη θύρα TLS απορρίπτεται, πιστοποιητικά ελέγχονται', () => {
+  const cfg = N.parseBrokerConfig('listener 8883\ntls on\n').config;
+  const base = { clientId: 'x', port: 8883, ca: 'Home Lab CA', host: 'broker.home.lan' };
+  eq(new N.Network({ config: cfg }).connect('device', Object.assign({ tls: false }, base)).code, 'tls-mismatch');
+  eq(new N.Network({ config: cfg, cert: 'expired' }).connect('device', Object.assign({ tls: true, verify: true }, base)).code, 'bad-cert');
+  eq(new N.Network({ config: cfg, cert: 'wrong-host' }).connect('device', Object.assign({ tls: true, verify: true }, base)).code, 'bad-cert');
+  eq(new N.Network({ config: cfg, cert: 'untrusted' }).connect('device', Object.assign({ tls: true, verify: true }, base)).code, 'bad-cert');
+  assert(new N.Network({ config: cfg, cert: 'expired' }).connect('device', Object.assign({ tls: true, verify: false }, base)).ok, 'insecure δέχεται τα πάντα');
+  assert(new N.Network({ config: cfg }).connect('device', Object.assign({ tls: true, verify: true }, base)).ok);
+});
+test('TLS: η καταγραφή κρύβει περιεχόμενο αλλά δείχνει μεταδεδομένα', () => {
+  const net = new N.Network({ config: N.parseBrokerConfig('listener 8883\ntls on\n').config });
+  net.connect('device', { clientId: 'x', port: 8883, tls: true, verify: true, ca: 'Home Lab CA', host: 'broker.home.lan' });
+  net.publish('device', 'home/door', '{"status":"closed"}');
+  const p = net.packets[net.packets.length - 1];
+  eq(p.proto, 'TLS'); eq(p.info, 'Application Data'); eq(p.src, '192.168.1.42');
+  assert(!JSON.stringify(p.detail.tls).includes('home/door'));
+});
+test('φίλτρα Network Monitor', () => {
+  const net = new N.Network({ config: N.parseBrokerConfig(OPEN).config });
+  net.connect('esp32-temp', { clientId: 't', port: 1883 });
+  net.publish('esp32-temp', 'home/temperature', '21');
+  const f = N.compileFilter('ip.src == 192.168.1.43 && mqtt.topic == "home/temperature"');
+  assert(f.ok); eq(net.packets.filter(f.fn).length, 1);
+  assert(N.compileFilter('tcp.port == 1883').ok);
+  assert(!N.compileFilter('frame.len > 3').ok);
+});
+test('JSON βοηθοί', () => {
+  assert(N.jsonValid('{"cmd":"ON"}')); assert(!N.jsonValid('{cmd:ON}')); assert(!N.jsonValid('[1]'));
+  eq(N.jsonGet('{"id":17,"cmd":"ON"}', 'id'), '17'); eq(N.jsonGet('{"a":1}', 'b'), '');
+});
+const WORLD7 = { wifi: 'connected', broker: OPEN, clients: [{ name: 'dashboard', subs: ['home/#'] }] };
+test('συσκευή: WiFi.begin συνδέεται μετά από εικονικό χρόνο και δίνει IP', () => {
+  const src = wrap('Serial.begin(115200);\nWiFi.begin(WIFI_SSID, WIFI_PASSWORD);\nwhile (WiFi.status() != WL_CONNECTED) { delay(100); }\nSerial.println(WiFi.localIP());');
+  const r = new IoTValidator.Runner(src, {});
+  r.runSetup();
+  eq(r.board.serialLines(), ['192.168.1.42']);
+  assert(r.board.millis >= 1200);
+});
+test('συσκευή: λάθος κωδικός WiFi → WL_CONNECT_FAILED', () => {
+  const src = wrap('Serial.begin(115200);\nWiFi.begin(WIFI_SSID, "wrong");\ndelay(4000);\nSerial.println(WiFi.status());');
+  const r = new IoTValidator.Runner(src, {}); r.runSetup();
+  eq(r.board.serialLines(), ['4']);
+});
+test('συσκευή: router κάτω → WiFi χάνεται και το MQTT αποσυνδέεται', () => {
+  const src = wrap('mqtt.setServer(MQTT_HOST, 1883);\nmqtt.connect("esp32-pir");', '');
+  const r = new IoTValidator.Runner(src, WORLD7); r.runSetup();
+  assert(r.board.net.connected('device'));
+  r.board.setRouter(false); r.runLoops(1);
+  eq(r.board.wifiStatus(), 6); assert(!r.board.net.connected('device'));
+});
+test('συσκευή: publish, subscribe και read', () => {
+  const src = wrap('pinMode(LED_PIN, OUTPUT);\nmqtt.setServer(MQTT_HOST, 1883);\nmqtt.connect("esp32-lamp");\nmqtt.subscribe("home/led/set");',
+    'while (mqtt.read()) {\n if (mqtt.payload() == "ON") { digitalWrite(LED_PIN, HIGH); mqtt.publish("home/led/state", "ON"); }\n}');
+  const r = new IoTValidator.Runner(src, WORLD7); r.runSetup(); r.runLoops(1);
+  r.tick(); r.board.net.publish('dashboard', 'home/led/set', 'ON'); r.runLoops(1);
+  eq(r.board.led, true);
+  eq(r.board.net.dashboard.values['home/led/state'].payload, 'ON');
+});
+test('συσκευή: αισθητήρας με σφάλμα δίνει nan', () => {
+  const r = new IoTValidator.Runner(wrap('Serial.begin(115200);\nfloat t = readTemperature();\nSerial.println(t);\nSerial.println(isnan(t));'), { sensorFault: true });
+  r.runSetup(); eq(r.board.serialLines(), ['nan', '1']);
+});
+test('συσκευή: setInsecure συνδέεται σε ληγμένο cert, setCACert όχι', () => {
+  const W = { wifi: 'connected', broker: 'listener 8883\ntls on\n', cert: 'expired' };
+  const mk = tlsLine => wrap(`mqtt.setServer(MQTT_HOST, 8883);\n${tlsLine}\nmqtt.connect("x");`);
+  const a = new IoTValidator.Runner(mk('mqtt.setInsecure();'), W); a.runSetup(); assert(a.board.net.connected('device'));
+  const b = new IoTValidator.Runner(mk('mqtt.setCACert(HOME_CA);'), W); b.runSetup(); assert(!b.board.net.connected('device'));
+});
+test('επιπλέον σταθερές άσκησης (π.χ. MQTT_USER)', () => {
+  const r = new IoTValidator.Runner(wrap('Serial.begin(115200);\nSerial.println(MQTT_USER);'), { consts: { MQTT_USER: 'esp32-pir' } });
+  r.runSetup(); eq(r.board.serialLines(), ['esp32-pir']);
+});
+
+console.log('\nΕνέργεια, light sleep, deep sleep');
+test('light sleep: η μνήμη κρατιέται και το ρεύμα πέφτει', () => {
+  const r = new IoTValidator.Runner('int c = 0;\nvoid setup() { Serial.begin(115200); WiFi.mode(WIFI_OFF); }\nvoid loop() { c++; Serial.println(c); esp_sleep_enable_timer_wakeup(1000000); esp_light_sleep_start(); }', {});
+  r.runSetup(); r.runFor(3500);
+  eq(r.board.serialLines(), ['1', '2', '3', '4']);
+  assert(r.board.avgMa() < 1, 'avg ' + r.board.avgMa());
+});
+test('deep sleep: επανεκκίνηση, μόνο οι RTC_DATA_ATTR κρατιούνται', () => {
+  const src = 'RTC_DATA_ATTR int boots = 0;\nint normal = 0;\nvoid setup() { Serial.begin(115200); boots++; normal++; Serial.println("" + boots + "/" + normal + "/" + esp_sleep_get_wakeup_cause()); esp_sleep_enable_timer_wakeup(5000000); esp_deep_sleep_start(); }\nvoid loop() {}';
+  const r = new IoTValidator.Runner(src, {}); r.runSetup(); r.runFor(16000);
+  eq(r.board.serialLines(), ['1/1/0', '2/1/4', '3/1/4', '4/1/4']);
+  eq(r.board.boots, 3);
+});
+test('ext0: ο PIR ξυπνά την πλακέτα', () => {
+  const src = 'void setup() { Serial.begin(115200); if (esp_sleep_get_wakeup_cause() == ESP_SLEEP_WAKEUP_EXT0) { Serial.println("motion"); } while (digitalRead(PIR_PIN) == HIGH) { delay(50); } esp_sleep_enable_ext0_wakeup(PIR_PIN, HIGH); esp_deep_sleep_start(); }\nvoid loop() {}';
+  const r = new IoTValidator.Runner(src, {}); r.runSetup(); r.runFor(4000);
+  eq(r.board.serialLines(), []);
+  r.board.inputs.pir = true; r.runFor(300); r.board.inputs.pir = false; r.runFor(2000);
+  eq(r.board.serialLines(), ['motion']);
+});
+test('ύπνος χωρίς πηγή αφύπνισης → σαφές σφάλμα', () => {
+  let e = null;
+  try { const r = new IoTValidator.Runner('void setup() { esp_deep_sleep_start(); }\nvoid loop() {}', {}); r.runSetup(); } catch (x) { e = x; }
+  assert(e && /χωρίς τρόπο να ξυπνήσει/.test(e.message), e && e.message);
+});
+test('ο ύπνος κλείνει το WiFi και το MQTT', () => {
+  const src = 'void setup() { mqtt.setServer(MQTT_HOST, 1883); mqtt.connect("x"); esp_sleep_enable_timer_wakeup(1000000); esp_light_sleep_start(); }\nvoid loop() { delay(100); }';
+  const r = new IoTValidator.Runner(src, { wifi: 'connected', broker: 'listener 1883\nallow_anonymous true\n' }); r.runSetup(); r.runFor(1500);
+  assert(!r.board.net.connected('device')); eq(r.board.wifiStatus(), 6);
+});
+test('RTC_DATA_ATTR μέσα σε συνάρτηση → σφάλμα', () => {
+  const e = codeError(wrap('', 'RTC_DATA_ATTR int x = 0;'));
+  assert(/έξω από τις συναρτήσεις/.test(e.message));
+});
+
+console.log('\nPython (Raspberry Pi)');
+const { IoTPy } = ctx;
+function py(src, world, after) {
+  const r = new IoTValidator.Runner(src, world || {}, {}, 'python');
+  r.runSetup();
+  if (after) after(r);
+  return r;
+}
+const out = r => r.board.serial.map(e => e.text);
+function pyError(src, world, after) {
+  try { py(src, world, after); } catch (e) { if (e.name === 'CodeError') return e; throw e; }
+  throw new Error('αναμενόταν σφάλμα');
+}
+test('αριθμοί και κείμενο όπως η Python', () => {
+  eq(out(py('print(7 / 2, 7 // 2, -7 // 2, -7 % 3, 2 ** 10, 3.0, 0.1 + 0.2)')), ['3.5 3 -4 2 1024 3.0 0.30000000000000004']);
+  eq(out(py('print(round(2.5), round(3.5), round(3.14159, 2), int("42"), float("22.5"))')), ['2 4 3.14 42 22.5']);
+  eq(out(py('t = 22.456\nprint(f"{t:.1f}|{3:03d}|{\'ok\':>4}|{1234567:,}|{0.256:.1%}")')), ['22.5|003|  ok|1,234,567|25.6%']);
+  eq(out(py('print(True, None, [1, "a"], {"k": (1,)}, "x" * 3)')), ["True None [1, 'a'] {'k': (1,)} xxx"]);
+});
+test('json: int/float και μορφή όπως η Python', () => {
+  eq(out(py('import json\nd = json.loads(\'{"t": 22.0, "n": 3}\')\nprint(d, type(d["n"]), json.dumps({"a": 1, "b": [True, None], "g": "ά"}))')),
+    ['{\'t\': 22.0, \'n\': 3} <class \'int\'> {"a": 1, "b": [true, null], "g": "\\u03ac"}']);
+  eq(out(py('import json\ntry:\n    json.loads("nan")\nexcept ValueError as e:\n    print("bad", e)')), ['bad Expecting value: line 1 column 1 (char 0)']);
+});
+test('συνήθειες από C++ → ελληνική εξήγηση', () => {
+  assert(/Λείπει η άνω-κάτω τελεία/.test(pyError('if 1 > 0\n    print(1)').hint));
+  assert(/με \{ \}/.test(pyError('while True {\n}').hint));
+  assert(/and/.test(pyError('if a && b:\n    pass').hint));
+  assert(/True/.test(pyError('x = true').hint));
+  assert(/elif/.test(pyError('if 1:\n    pass\nelse if 2:\n    pass').hint));
+  assert(/#/.test(pyError('// σχόλιο\nprint(1)').hint));
+  eq(pyError('print(1)\n  print(2)').line, 2);
+});
+test('λάθη εκτέλεσης: πραγματικό μήνυμα + εξήγηση', () => {
+  const e1 = pyError('t = "22.5"\nx = t + 1');
+  eq(e1.line, 2); assert(/^TypeError: can only concatenate str/.test(e1.message) && /str\(/.test(e1.hint));
+  const e2 = pyError('count = 0\ndef f():\n    count += 1\nf()');
+  assert(/UnboundLocalError/.test(e2.message) && /global count/.test(e2.hint));
+  assert(/KeyError/.test(pyError('d = {"a": 1}\nprint(d["b"])').message));
+  assert(/float/.test(pyError('int("22.5")').hint));
+});
+test('while True: κάθε γύρος μετρά ως επανάληψη', () => {
+  const r = py('n = 0\nwhile True:\n    n += 1\n    print(n)');
+  r.runLoops(3);
+  eq(out(r), ['1', '2', '3']);
+  eq(r.machine.loopIndex, 3);
+});
+test('βρόχος χωρίς αναμονή → σφάλμα βημάτων', () => {
+  assert(/βήματα/.test(pyError('x = 0\nwhile x >= 0:\n    x += 1').message));
+});
+test('gpiozero: LED, κουμπί και callbacks', () => {
+  const r = py('from gpiozero import LED, Button\nimport time\nled = LED(17)\nbtn = Button(27)\nwhile True:\n    if btn.is_pressed:\n        led.on()\n    else:\n        led.off()\n    time.sleep(0.1)');
+  r.runLoops(2); eq(r.board.led, false);
+  r.board.inputs.button = true; r.runLoops(2); eq(r.board.led, true);
+  const c = py('from gpiozero import LED, Button\nfrom signal import pause\nled = LED(17)\nbtn = Button(27)\ndef toggle():\n    led.toggle()\nbtn.when_pressed = toggle\npause()');
+  c.board.inputs.button = true; c.runFor(200); eq(c.board.led, true);
+  c.board.inputs.button = false; c.runFor(200); c.board.inputs.button = true; c.runFor(200); eq(c.board.led, false);
+  const w = py('from gpiozero import LED\nled = LED(18)\nled.on()');
+  assert(w.board.warnings.some(x => /GPIO 18/.test(x.text)) && !w.board.led);
+});
+const HUB_WORLD = { broker: 'listener 1883\nallow_anonymous true', clients: [
+  { name: 'esp32-temp', publish: [{ topic: 'home/temperature', payload: '{"t": {temp}}', every: 5000, offset: 1000 }] }, { name: 'dashboard', subs: ['home/#'] }] };
+const HUB = `import json
+import paho.mqtt.client as mqtt
+def on_connect(client, userdata, flags, reason_code, properties):
+    client.subscribe("home/temperature")
+def on_message(client, userdata, msg):
+    t = json.loads(msg.payload)["t"]
+    print(t)
+    if t > 25:
+        client.publish("home/alerts", json.dumps({"t": t}))
+client = mqtt.Client(mqtt.CallbackAPIVersion.VERSION2, client_id="pi-hub")
+client.on_connect = on_connect
+client.on_message = on_message
+client.connect("broker.home.lan", 1883)
+client.loop_forever()`;
+test('paho: on_message, publish, επανασύνδεση με on_connect', () => {
+  const r = py(HUB, HUB_WORLD);
+  r.runFor(7000); eq(out(r), ['22.5', '22.5']);
+  r.board.inputs.temp = 30; r.board.net.restartBroker(); r.runFor(6000);
+  eq(out(r).slice(-1), ['30.0']);
+  assert(r.board.net.messages.some(m => m.client === 'device' && m.topic === 'home/alerts' && m.payload === '{"t": 30.0}'));
+  assert(r.board.net.dashboard.values['home/alerts']);
+});
+test('paho: χωρίς loop δεν φτάνει τίποτα · παλιό Client("id") · dict χωρίς json.dumps', () => {
+  const r = py(HUB.replace('client.loop_forever()', 'import time\nwhile True:\n    time.sleep(1)'), HUB_WORLD);
+  r.runFor(8000); eq(out(r), []);
+  assert(/CallbackAPIVersion\.VERSION2/.test(pyError(HUB.replace('mqtt.CallbackAPIVersion.VERSION2, client_id="pi-hub"', '"pi-hub"'), HUB_WORLD).hint));
+  const e = pyError(HUB.replace('json.dumps({"t": t})', '{"t": t}'), Object.assign({}, HUB_WORLD, { temp: 30 }), r2 => r2.runFor(2000));
+  assert(/json\.dumps/.test(e.hint));
+});
+test('εικονικός αισθητήρας με σφάλμα στέλνει μη έγκυρο JSON', () => {
+  const r = py('import paho.mqtt.client as mqtt\nimport json\ndef on_message(c, u, msg):\n    try:\n        json.loads(msg.payload)\n        print("ok")\n    except json.JSONDecodeError:\n        print("bad")\nclient = mqtt.Client(mqtt.CallbackAPIVersion.VERSION2, client_id="hub")\nclient.on_message = on_message\nclient.connect("localhost", 1883)\nclient.subscribe("home/#")\nclient.loop_forever()', Object.assign({}, HUB_WORLD, { sensorFault: true }));
+  r.runFor(2000); eq(out(r), ['bad']);
+});
+test('μεταβλητές: σύντομη εμφάνιση αντικειμένων', () => {
+  const r = py('from gpiozero import LED\nled = LED(17)\nled.on()\nxs = [1, 2]');
+  eq(r.machine.visibleVars().map(v => `${v.name}:${v.type}=${IoTPy.display(v.value)}`), ['led:LED=LED(17) · αναμμένο', 'xs:list=[1, 2]']);
+});
+
+console.log('\nSQLite, Flask και ασφάλεια του Pi');
+const SQL = 'import sqlite3\nconn = sqlite3.connect("home.db")\ncur = conn.cursor()\ncur.execute("CREATE TABLE IF NOT EXISTS readings (id INTEGER PRIMARY KEY, room TEXT NOT NULL, temp REAL)")\n';
+test('sqlite3: INSERT με ?, commit, SELECT με GROUP BY', () => {
+  const r = py(SQL + 'cur.executemany("INSERT INTO readings (room, temp) VALUES (?, ?)", [("salon", 22), ("salon", 23.5), ("kitchen", 25.1)])\nconn.commit()\nfor row in cur.execute("SELECT room, ROUND(AVG(temp), 2), COUNT(*) FROM readings GROUP BY room ORDER BY room"):\n    print(row)\nprint(cur.execute("SELECT temp FROM readings WHERE id = ?", (1,)).fetchone())');
+  eq(out(r), ["('kitchen', 25.1, 1)", "('salon', 22.75, 2)", '(22.0,)']);
+  eq(IoTValidator.CHECKS.dbRows(r.board, { table: 'readings', is: 3 }).pass, true);
+  eq(IoTValidator.CHECKS.dbRows(r.board, { table: 'readings', where: { room: 'salon' }, is: 2 }).pass, true);
+});
+test('sqlite3: χωρίς commit οι αλλαγές χάνονται · f-string = SQL injection', () => {
+  const r = py(SQL + 'cur.execute("INSERT INTO readings (room, temp) VALUES (?, ?)", ("salon", 22))');
+  eq(IoTValidator.CHECKS.dbRows(r.board, { table: 'readings', min: 1 }).pass, false);
+  assert(r.board.warnings.some(w => /commit/.test(w.text)));
+  const q = py(SQL + 'cur.execute("INSERT INTO readings (room, temp) VALUES (?, ?)", ("salon", 22))\nroom = "x\' OR \'1\'=\'1"\nprint(len(cur.execute(f"SELECT * FROM readings WHERE room = \'{room}\'").fetchall()), len(cur.execute("SELECT * FROM readings WHERE room = ?", (room,)).fetchall()))');
+  eq(out(q), ['1 0']);
+});
+test('sqlite3: πραγματικά μηνύματα λάθους', () => {
+  assert(/no such table: logs/.test(pyError(SQL + 'cur.execute("SELECT * FROM logs")').message));
+  const e = pyError(SQL + 'cur.execute("INSERT INTO readings (room) VALUES (?)", ("kitchen"))');
+  assert(/uses 1, and there are 7 supplied/.test(e.message) && /\(x,\)/.test(e.hint));
+  assert(/one statement at a time/.test(pyError(SQL + 'cur.execute("SELECT 1; DROP TABLE readings")').message));
+  assert(/NOT NULL constraint failed: readings.room/.test(pyError(SQL + 'cur.execute("INSERT INTO readings (temp) VALUES (?)", (1,))').message));
+});
+const FLASK = 'from flask import Flask, jsonify, request, abort\nfrom markupsafe import escape\napp = Flask(__name__)\n@app.route("/")\ndef index():\n    return f"<h1>{escape(request.args.get(\'name\', \'x\'))}</h1>"\n@app.route("/api/temp/<room>")\ndef temp(room):\n    if room != "salon":\n        return jsonify({"error": "unknown"}), 404\n    return {"room": room, "temp": 22.5}\n@app.route("/api/led", methods=["POST"])\ndef led():\n    if request.headers.get("X-API-Key") != "k-123":\n        abort(401)\n    return jsonify(ok=True, cmd=request.get_json()["cmd"])\n';
+test('flask: routes, JSON, escape, abort, 404/405/500', () => {
+  const r = py(FLASK + '@app.route("/boom")\ndef boom():\n    return {}["x"]\napp.run(host="0.0.0.0", port=5000)');
+  const C = IoTValidator.CHECKS.response;
+  r.request({ path: '/?name=<script>' }); eq(C(r.board, { status: 200, notContains: '<script>', contains: '&lt;script&gt;' }, r).pass, true);
+  r.request({ path: '/api/temp/salon' }); eq(r.lastRequest.response.body, '{"room":"salon","temp":22.5}\n');
+  r.request({ path: '/api/temp/attic' }); eq(r.lastRequest.response.status, 404);
+  r.request({ path: '/api/led', method: 'POST', json: { cmd: 'ON' } }); eq(r.lastRequest.response.status, 401);
+  r.request({ path: '/api/led', method: 'POST', json: { cmd: 'ON' }, headers: { 'x-api-key': 'k-123' } }); eq(C(r.board, { status: 200, json: { ok: true, cmd: 'ON' } }, r).pass, true);
+  r.request({ path: '/api/led' }); eq(r.lastRequest.response.status, 405);
+  r.request({ path: '/boom' }); eq(r.lastRequest.response.status, 500);
+  assert(out(r).some(l => l === "KeyError: 'x'") && out(r).some(l => /"GET \/boom HTTP\/1.1" 500/.test(l)));
+});
+test('flask: 127.0.0.1 δεν φαίνεται από το tablet · debug=True προειδοποιεί', () => {
+  const r = py(FLASK + 'app.run(debug=True)');
+  r.request({ path: '/' }); eq(r.lastRequest.response.status, 0);
+  r.request({ path: '/', from: 'pi' }); eq(r.lastRequest.response.status, 200);
+  assert(r.board.warnings.some(w => /debug=True/.test(w.text)));
+});
+test('Pi: sshd_config και ufw', () => {
+  const lesson = { mode: 'config', system: true, world: {} };
+  const good = 'PermitRootLogin no\nPasswordAuthentication no\nAllowUsers hubadmin\nufw default deny incoming\nufw allow from 192.168.1.0/24 to any port 22 proto tcp\nufw allow 8883/tcp\nufw enable';
+  const t = [{ name: 't', script: [
+    { ssh: { from: '192.168.1.20', user: 'hubadmin', auth: 'key' }, expect: 'allow', fail: 'a {v}' },
+    { ssh: { from: '192.168.1.20', user: 'pi', auth: 'password' }, expect: 'deny', fail: 'b {v}' },
+    { ssh: { from: '192.168.1.20', user: 'root', auth: 'key' }, expect: 'deny', fail: 'c {v}' },
+    { connect: { from: '203.0.113.50', port: 22 }, expect: 'deny', fail: 'd {v}' },
+    { connect: { from: '203.0.113.50', port: 8883 }, expect: 'allow', fail: 'e {v}' },
+    { connect: { from: '192.168.1.77', port: 1883 }, expect: 'deny', fail: 'f {v}' }] }];
+  const r = IoTValidator.runTests(good, t, lesson)[0];
+  assert(r.pass, r.message);
+  assert(r.log.some(x => /Accepted publickey for hubadmin/.test(x.text)) && r.log.some(x => /UFW BLOCK.*DPT=22/.test(x.text)));
+  eq(IoTValidator.runTests('ufw allow 22', t, lesson)[0].message, 'b Ο pi μπήκε με κωδικό.');
+  const lim = IoTValidator.runTests('ufw limit 22/tcp\nufw enable', [{ name: 'l', script: [{ burst: { from: '203.0.113.50', port: 22, count: 10 }, expect: 'deny', fail: 'x' }] }], lesson)[0];
+  assert(lim.pass && lim.log.some(x => /LIMIT BLOCK/.test(x.text)));
+  assert(ctx.IoTSys.parse('ufw default deny incoming\nufw enable').warnings.some(w => /κλειδωθείς/.test(w.text)));
+});
+
+console.log('\nΑποθήκευση προόδου');
+test('validate δέχεται έγκυρο export', () => {
+  const s = IoTStorage.defaults();
+  s.completed['c1-l1'] = true;
+  s.drafts['c1-l2'] = 'void setup(){}';
+  const v = IoTStorage.validate(JSON.parse(JSON.stringify(s)));
+  assert(v.ok, v.error); eq(v.data.completed['c1-l1'], true);
+});
+test('validate απορρίπτει λάθος schema', () => {
+  assert(!IoTStorage.validate({ schema: 99 }).ok);
+  assert(!IoTStorage.validate('x').ok);
+});
+test('validate πετά άγνωστα μαθήματα και λάθος τύπους', () => {
+  const v = IoTStorage.validate({ schema: 1, completed: { 'c1-l1': true, 'hack': true, 'c1-l2': 'yes' }, drafts: { 'c1-l1': 5 } });
+  assert(v.ok); eq(Object.keys(v.data.completed), ['c1-l1']); eq(Object.keys(v.data.drafts), []);
+});
+
+console.log(`\n${passed} πέρασαν, ${failed} απέτυχαν\n`);
+process.exit(failed ? 1 : 0);

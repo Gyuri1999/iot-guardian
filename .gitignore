@@ -1,0 +1,6 @@
+# Μυστικά και παραγόμενα αρχεία του τοπικού βοηθού (στοιχεία WiFi, πιστοποιητικά, builds)
+real-lab/secrets.json
+real-lab/.work/
+# Συστήματος
+.DS_Store
+node_modules/
