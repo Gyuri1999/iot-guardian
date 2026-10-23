@@ -24,7 +24,7 @@
       current: null,
       track: null,
       stories: {},
-      settings: { theme: 'system', fontScale: 1, lineSpacing: 'normal', reducedMotion: false, sound: true }
+      settings: { theme: 'system', fontScale: 1, lineSpacing: 'normal', reducedMotion: false, sound: true, font: 'noto', letters: 'normal', readRate: 0.9 }
     };
   }
 
@@ -55,6 +55,9 @@
     if (['normal', 'relaxed', 'loose'].includes(s.lineSpacing)) out.settings.lineSpacing = s.lineSpacing;
     if (typeof s.reducedMotion === 'boolean') out.settings.reducedMotion = s.reducedMotion;
     if (typeof s.sound === 'boolean') out.settings.sound = s.sound;
+    if (['noto', 'didact', 'ysabeau'].includes(s.font)) out.settings.font = s.font;
+    if (['normal', 'wide', 'wider'].includes(s.letters)) out.settings.letters = s.letters;
+    if (typeof s.readRate === 'number' && s.readRate >= 0.6 && s.readRate <= 1.4) out.settings.readRate = s.readRate;
     return { ok: true, data: out };
   }
 

@@ -106,6 +106,18 @@
     html.setAttribute('data-spacing', s.lineSpacing);
     html.setAttribute('data-reduced-motion', s.reducedMotion ? 'true' : 'false');
     if (window.IoTSfx) window.IoTSfx.setEnabled(s.sound !== false);
+    if (window.IoTSpeak) window.IoTSpeak.setRate(s.readRate || 0.9);
+    html.setAttribute('data-font', s.font || 'noto');
+    html.setAttribute('data-letters', s.letters || 'normal');
+    // οι γραμματοσειρές για δυσλεξία φορτώνονται μόνο όταν τις διαλέξεις (Google Fonts, με ελληνικά)
+    const FF = { didact: 'Didact+Gothic', ysabeau: 'Ysabeau+Infant:wght@400;600;800' };
+    if (FF[s.font] && !document.getElementById('font-' + s.font)) {
+      const ln = document.createElement('link');
+      ln.id = 'font-' + s.font;
+      ln.rel = 'stylesheet';
+      ln.href = `https://fonts.googleapis.com/css2?family=${FF[s.font]}&display=swap`;
+      document.head.appendChild(ln);
+    }
   }
   const motionOK = () => !P.settings.reducedMotion && !matchMedia('(prefers-reduced-motion: reduce)').matches;
   const sfx = n => { if (window.IoTSfx) window.IoTSfx.play(n); };
@@ -140,6 +152,7 @@
   const IC = {
     home: '<path d="M4 11l8-7 8 7"/><path d="M6 10v10h12V10"/><path d="M10 20v-6h4v6"/>',
     lock: '<rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/>',
+    speaker: '<path d="M4 9.5h3.5L12 5.5v13l-4.5-4H4z"/><path d="M15.5 9a4 4 0 0 1 0 6M18 6.5a7.5 7.5 0 0 1 0 11"/>',
     map: '<path d="M4 6l5-2 6 2 5-2v14l-5 2-6-2-5 2z"/><path d="M9 4v14M15 6v14"/>',
     book: '<path d="M4 5a2 2 0 0 1 2-2h13v16H6a2 2 0 0 0-2 2z"/><path d="M4 19V5"/><path d="M8 7h7"/>',
     chip: '<rect x="7" y="7" width="10" height="10" rx="1.5"/><path d="M10 3v4M14 3v4M10 17v4M14 17v4M3 10h4M3 14h4M17 10h4M17 14h4"/>',
@@ -163,6 +176,9 @@
     lang: '<path d="M8 8l-4 4 4 4M16 8l4 4-4 4M13.5 5l-3 14"/>'
   };
   const icon = (name, label) => `<svg class="ic" viewBox="0 0 24 24" aria-hidden="true"${label ? '' : ''}>${IC[name]}</svg>`;
+  // Κουμπί «Άκουσε»: διαβάζει φωναχτά το κομμάτι που δείχνει το data-say (ή τον πρόγονο, με ^).
+  const sayBtn = (target, what) => (window.IoTSpeak && window.IoTSpeak.supported()
+    ? `<button class="say" type="button" data-say="${target}" aria-pressed="false" title="Άκουσε ${what || 'το κείμενο'} φωναχτά">${icon('speaker')}<span class="say-t">Άκουσε</span></button>` : '');
 
   // Μικρές εικόνες για τη λωρίδα μαθημάτων.
   const TH = {
@@ -478,7 +494,7 @@
       const first = ls.find(l => !P.completed[l.id] && taskUnlocked(l)) || ls[0];
       return `<li><span class="hm-n">${String(chNum(ch.n)).padStart(2, '0')}</span><span class="hm-ct">${esc(ch.title)}<small>${ok ? `${d}/${ls.length} ασκήσεις` : 'κλειδωμένο'}</small></span>${ok ? `<button class="btn sm${d < ls.length ? ' primary' : ''}" data-task="${first.id}">${d === ls.length ? 'Ξανά' : d ? 'Συνέχεια' : 'Ξεκίνα'}</button>` : `<span class="hm-locked">${icon('lock')}</span>`}</li>`;
     }).join('');
-    panel.innerHTML = `<div class="hm-ph"><h3>${esc(name)}</h3><button class="btn quiet sm" id="hm-close" aria-label="Κλείσιμο">✕</button></div>
+    panel.innerHTML = `<div class="hm-ph"><h3>${esc(name)}</h3>${sayBtn('#hm-panel', 'το δωμάτιο')}<button class="btn quiet sm" id="hm-close" aria-label="Κλείσιμο">✕</button></div>
       ${th ? `<p class="hm-story">${esc(th.story)}</p>` : ''}<ul class="hm-chaps">${rows}</ul>`;
     panel.hidden = false;
     panel.dataset.room = key;
@@ -490,6 +506,7 @@
   }
 
   function renderHome() {
+    if (window.IoTSpeak) window.IoTSpeak.stop();
     stopMachine();
     S.task = null;
     document.title = 'IoT Guardian';
@@ -769,6 +786,7 @@
   }
 
   function openTask(id) {
+    if (window.IoTSpeak) window.IoTSpeak.stop();
     const l = byId[id];
     if (!l || !taskUnlocked(l)) return;
     stopMachine();
@@ -878,18 +896,20 @@
     const info = `<div class="card info">
       <div class="info-tabs" role="tablist" aria-label="Πληροφορίες μαθήματος">${tabs.map(([k, n]) => `<button role="tab" class="itab" id="itab-${k}" data-itab="${k}" aria-controls="info-${k}">${n}</button>`).join('')}</div>
       <div class="info-panel guide" id="info-lesson" role="tabpanel" aria-labelledby="itab-lesson">
+        <div class="say-row">${sayBtn('#info-lesson', 'το μάθημα')}</div>
         <span class="kind-tag">${esc(KIND_LABELS[l.kind])}${mode === 'config' ? (l.system ? ' · ρυθμίσεις του Pi' : ' · ρυθμίσεις broker') : mode === 'analysis' ? ' · ανάλυση καταγραφής' : ''} · άσκηση ${idx} από ${ls.length}</span>
         <h2>${esc(l.title)}</h2>
         <ul class="objectives">${l.objectives.map(o => `<li>${esc(o)}</li>`).join('')}</ul>
         <div class="theory">${l.theory}</div>
       </div>
       <div class="info-panel" id="info-steps" role="tabpanel" aria-labelledby="itab-steps" hidden>
+        <div class="say-row">${sayBtn('#info-steps', 'τα βήματα')}</div>
         <ol class="steps">${l.steps.map(s => `<li>${esc(s)}</li>`).join('')}</ol>
         ${l.supportedSyntax ? `<p class="syntax-note"><strong>Υποστηριζόμενα εδώ:</strong> ${esc(l.supportedSyntax)}</p>` : ''}
         ${l.evidenceHint ? `<p class="syntax-note"><strong>Τι ψάχνεις:</strong> ${esc(l.evidenceHint)}</p>` : ''}
       </div>
-      <div class="info-panel quiz" id="info-quiz" role="tabpanel" aria-labelledby="itab-quiz" hidden><h3>${quizTitle}</h3><div id="quiz-body"></div></div>
-      <div class="info-panel" id="info-help" role="tabpanel" aria-labelledby="itab-help" hidden><div id="hints"></div></div>
+      <div class="info-panel quiz" id="info-quiz" role="tabpanel" aria-labelledby="itab-quiz" hidden><div class="say-row">${sayBtn('#info-quiz', 'την ερώτηση')}</div><h3>${quizTitle}</h3><div id="quiz-body"></div></div>
+      <div class="info-panel" id="info-help" role="tabpanel" aria-labelledby="itab-help" hidden><div class="say-row">${sayBtn('#hints', 'τη βοήθεια')}</div><div id="hints"></div></div>
     </div>`;
 
     let tryCard;
@@ -1568,7 +1588,7 @@
     if (modeOf(l) !== 'code' || !l.validationTests || !l.validationTests.length) return '';
     const th = window.IoTThemes ? window.IoTThemes.themeOf(l) : null;
     return `<section class="mission" id="mission" aria-label="Αποστολή">
-      <div class="ms-head">${icon('flag')}<b>Αποστολή</b><span class="ms-count" id="ms-count" aria-live="polite"></span></div>
+      <div class="ms-head">${icon('flag')}<b>Αποστολή</b>${sayBtn('#mission', 'την αποστολή')}<span class="ms-count" id="ms-count" aria-live="polite"></span></div>
       ${th ? `<p class="ms-story">${esc(th.story)}</p>` : ''}
       <ul class="ms-goals">${l.validationTests.map((t, i) => `<li data-i="${i}"><span class="ms-box" aria-hidden="true"></span><span>${esc(t.name)}</span><span class="sr-only ms-sr"> · δεν έχει γίνει ακόμα</span></li>`).join('')}</ul>
     </section>`;
@@ -2245,7 +2265,7 @@
     const e = S.error;
     if (e) {
       html += `<div class="error-box" role="alert">
-        <div class="title">${e.line ? `Σφάλμα στη γραμμή ${e.line}` : 'Σφάλμα'}</div>
+        <div class="err-head"><div class="title">${e.line ? `Σφάλμα στη γραμμή ${e.line}` : 'Σφάλμα'}</div>${sayBtn('^.error-box', 'το σφάλμα')}</div>
         <dl><dt>Τι βρέθηκε</dt><dd>${esc(e.message)}</dd>${e.hint ? `<dt>Τι να κάνεις</dt><dd>${esc(e.hint)}</dd>` : ''}</dl>
         ${e.line ? `<button class="btn" id="goto-err">Πήγαινε στη γραμμή ${e.line}</button>` : ''}
       </div>`;
@@ -2692,6 +2712,12 @@
           <input type="range" id="set-font" min="0.9" max="1.5" step="0.05"></div>
         <div class="field"><label for="set-spacing">Διάστιχο</label>
           <select id="set-spacing"><option value="normal">Κανονικό</option><option value="relaxed">Άνετο</option><option value="loose">Πολύ άνετο</option></select></div>
+        <div class="field"><label for="set-ffont">Γραμματοσειρά</label>
+          <select id="set-ffont"><option value="noto">Κανονική (Noto Sans)</option><option value="didact">Didact Gothic · απλά σχήματα γραμμάτων, για δυσλεξία</option><option value="ysabeau">Ysabeau Infant · στρογγυλά «α» και «g»</option></select></div>
+        <div class="field"><label for="set-letters">Απόσταση γραμμάτων και λέξεων</label>
+          <select id="set-letters"><option value="normal">Κανονική</option><option value="wide">Αυξημένη</option><option value="wider">Πολύ αυξημένη</option></select></div>
+        <div class="field"><label for="set-rate">Ταχύτητα ανάγνωσης φωναχτά: <output id="set-rate-out"></output></label>
+          <input type="range" id="set-rate" min="0.6" max="1.4" step="0.05"></div>
         <label class="check"><input type="checkbox" id="set-motion"> Μειωμένη κίνηση (χωρίς εφέ και κινούμενες μεταβάσεις)</label>
         <label class="check"><input type="checkbox" id="set-sound"> Ήχοι του παιχνιδιού (κλικ, κουδούνι, επιτυχία)</label>
       </div>
@@ -2718,7 +2744,7 @@
       </div>
     </dialog>
     <dialog id="dlg-story" class="dlg-story" aria-labelledby="dlg-story-title">
-      <div class="dlg-head"><h2 id="dlg-story-title">Κάρτα ιστορίας</h2><button class="btn quiet" data-close>Κλείσιμο</button></div>
+      <div class="dlg-head"><h2 id="dlg-story-title">Κάρτα ιστορίας</h2>${sayBtn('#dlg-story-body', 'την ιστορία')}<button class="btn quiet" data-close>Κλείσιμο</button></div>
       <div class="dlg-body" id="dlg-story-body"></div>
     </dialog>
     <dialog id="dlg-collection" class="dlg-wide" aria-labelledby="dlg-collection-title">
@@ -2735,6 +2761,9 @@
     $('#set-spacing').onchange = e => { P.settings.lineSpacing = e.target.value; applySettings(); save(); };
     $('#set-motion').onchange = e => { P.settings.reducedMotion = e.target.checked; applySettings(); save(); };
     $('#set-sound').onchange = e => { P.settings.sound = e.target.checked; applySettings(); save(); sfx('tick'); };
+    $('#set-ffont').onchange = e => { P.settings.font = e.target.value; applySettings(); save(); };
+    $('#set-letters').onchange = e => { P.settings.letters = e.target.value; applySettings(); save(); };
+    $('#set-rate').oninput = e => { P.settings.readRate = Number(e.target.value); $('#set-rate-out').textContent = Math.round(P.settings.readRate * 100) + '%'; applySettings(); save(); };
 
     const sorted = GLOSSARY.slice().sort((a, b) => a.term.localeCompare(b.term, 'el'));
     const renderGl = q => {
@@ -2777,6 +2806,19 @@
       };
     };
 
+    // «Άκουσε»: ανάγνωση φωναχτά (όποιο κομμάτι κι αν είναι, ακόμα και μέσα σε dialog)
+    document.addEventListener('click', e => {
+      const sb = e.target.closest('[data-say]');
+      if (!sb) return;
+      e.preventDefault();
+      e.stopPropagation();
+      const sel = sb.dataset.say;
+      const el = sel[0] === '^' ? sb.closest(sel.slice(1)) : document.querySelector(sel);
+      if (!window.IoTSpeak.toggle(el, sb)) { announce('Ο browser σου δεν μπορεί να διαβάσει φωναχτά.'); return; }
+      if (!window.IoTSpeak.hasGreek()) announce('Δεν βρέθηκε ελληνική φωνή στη συσκευή· η ανάγνωση μπορεί να ακούγεται με ξένη προφορά.');
+    }, true);
+    document.querySelectorAll('dialog').forEach(d => d.addEventListener('close', () => { if (d.querySelector('.say.on')) window.IoTSpeak.stop(); }));
+
     document.addEventListener('click', e => {
       const b = e.target.closest('[data-open]');
       if (!b) return;
@@ -2789,6 +2831,10 @@
         $('#set-spacing').value = P.settings.lineSpacing;
         $('#set-motion').checked = P.settings.reducedMotion;
         $('#set-sound').checked = P.settings.sound !== false;
+        $('#set-ffont').value = P.settings.font || 'noto';
+        $('#set-letters').value = P.settings.letters || 'normal';
+        $('#set-rate').value = String(P.settings.readRate || 0.9);
+        $('#set-rate-out').textContent = Math.round((P.settings.readRate || 0.9) * 100) + '%';
       }
       if (which === 'data') {
         $('#exp-text').value = window.IoTStorage.exportJson(P);
