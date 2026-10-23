@@ -524,7 +524,7 @@
   const BUZ = { u: 112, v: 22 };
   const RGBL = { u: 94, v: 22 };
   const SERVO = { u: 104, v: -15 };
-  const OLED = { u: 134, v: 14 };
+  const OLED = { u: 124, v: 38 };
   // όρθιος κύλινδρος σε 2D (σώμα + πάνω έλλειψη)
   function vcyl(u, v, h0, h1, r, cls) {
     const a = P(u, v, h0), b = P(u, v, h1);
@@ -589,7 +589,8 @@
   const oledPin = i => ({ u: OLED.u + 9 + (i + 2) * 2.54, v: OLED.v + 0.6, h: 20 });
   // Κείμενο της οθόνης (στοιχεία 128×64) → SVG
   function oledSVG(items) {
-    return (items || []).map(t => `<text x="${t.x}" y="${t.y + 7 * t.size}" font-size="${8 * t.size}" class="oled-t">${String(t.text).replace(/[&<>]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c]))}</text>`).join('');
+    // σταθερό πλάτος: κάθε χαρακτήρας 6 κουκκίδες × μέγεθος, όπως στην πραγματική οθόνη
+    return (items || []).map(t => `<text y="${t.y + 7 * t.size}" font-size="${8 * t.size}" class="oled-t">${[...String(t.text)].map((ch, i) => `<tspan x="${t.x + i * 6 * t.size + 3 * t.size}" text-anchor="middle">${ch.replace(/[&<>]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c]))}</tspan>`).join('')}</text>`).join('');
   }
 
   // Αισθητήρας απόστασης HC-SR04: όρθια μπλε πλακέτα στο breadboard, «μάτια» προς τον θεατή (+v).
@@ -874,7 +875,7 @@
       mid += oledScreen();
       wires.push(wire(espPinUV('D21'), oledPin(0), 'w-sda', 58, 'sc-w-sda'));
       wires.push(wire(espPinUV('D22'), oledPin(1), 'w-scl', 62, 'sc-w-scl'));
-      labels.push(callout(P(OLED.u + 26, OLED.v, 10), 50, 34, 'OLED · SDA 21 · SCL 22', null, 'oled'));
+      labels.push(callout(P(OLED.u + 26, OLED.v, 10), 46, 20, 'OLED · SDA 21 · SCL 22', null, 'oled'));
     }
     let links = '';
     if (wifi) links += `<path id="sc-link-wifi" d="M${pt(P(-5, -30, 4))} Q${pt(P(-4, -12, 30))} ${pt(P(3, 14, PCB_TOP + 1))}" class="link"/>`;
@@ -886,6 +887,7 @@
     const b = net ? [-260, -330, 600, 230] : wifi ? [-250, -250, 560, 220] : [-140, -150, 450, 210];
     // servo / OLED κάθονται δεξιά του breadboard: η σκηνή φαρδαίνει
     if (hw.includes('servo') || hw.includes('oled')) { b[2] += 150; b[1] -= 30; }
+    if (hw.includes('oled')) b[3] += 70;   // η οθόνη στέκεται μπροστά δεξιά
     return fit(inner, b, 'lab', 'Ισομετρική σκηνή εργαστηρίου: πλακέτα ESP32, breadboard και εξαρτήματα');
   }
 

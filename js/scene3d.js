@@ -606,7 +606,8 @@
       c.fillRect(0, 0, 256, 128);
       c.fillStyle = '#9fe7ff';
       c.textBaseline = 'alphabetic';
-      for (const t of items || []) { c.font = `${16 * t.size}px "JetBrains Mono", monospace`; c.fillText(String(t.text), t.x * 2, (t.y + 7 * t.size) * 2); }
+      c.textAlign = 'center';
+      for (const t of items || []) { c.font = `${16 * t.size}px "JetBrains Mono", monospace`; [...String(t.text)].forEach((ch, i) => c.fillText(ch, (t.x + i * 6 * t.size + 3 * t.size) * 2, (t.y + 7 * t.size) * 2)); }
       tex.needsUpdate = true;
     };
     g.userData.draw([]);

@@ -1561,6 +1561,39 @@
     });
   }
 
+  // ------------------------------------------------------------ Οθόνη OLED σε μεγέθυνση
+  // Ό,τι γράφει ο κώδικας στην οθόνη φαίνεται καθαρά σε ένα «παράθυρο» πάνω δεξιά στη σκηνή.
+  function oledPop(items) {
+    const wrap = $('#scene');
+    const so = S.scene && S.scene.querySelector('#sc-oled');
+    if (!wrap || !so) return;
+    let pop = $('#oled-pop');
+    if (!pop) {
+      pop = document.createElement('div');
+      pop.id = 'oled-pop';
+      pop.className = 'oled-pop';
+      pop.innerHTML = `<button type="button" class="op-head" aria-expanded="true" aria-controls="op-body"><span aria-hidden="true">🖥</span> <b>Οθόνη OLED</b><span class="op-sub">ό,τι γράφει ο κώδικας</span><span class="op-tog" aria-hidden="true"></span></button>
+        <div class="op-body" id="op-body"><div class="op-screen"><div class="op-px" aria-live="polite"></div></div><p class="op-note">128 × 64 κουκκίδες · εδώ σε διπλάσιο μέγεθος</p></div>`;
+      wrap.appendChild(pop);
+      const setOpen = open => { S.oledClosed = !open; pop.classList.toggle('closed', !open); if (open) pop.classList.remove('ping'); pop.querySelector('.op-head').setAttribute('aria-expanded', String(open)); };
+      pop.querySelector('.op-head').onclick = () => setOpen(!!S.oledClosed);
+      so.addEventListener('click', () => setOpen(true));
+      pop.classList.toggle('closed', !!S.oledClosed);
+    }
+    const sig = JSON.stringify(items);
+    if (pop.dataset.sig === sig) return;
+    const fresh = pop.dataset.sig !== undefined && items.length > 0;
+    pop.dataset.sig = sig;
+    const px = pop.querySelector('.op-px');
+    px.innerHTML = items.length
+      ? items.map(t => [...String(t.text)].map((ch, i) => `<span style="left:${(t.x + i * 6 * t.size) * 2}px;top:${t.y * 2}px;font-size:${16 * t.size}px;width:${12 * t.size}px">${esc(ch)}</span>`).join('')).join('')
+      : '<em>σβηστή · δεν έχει δείξει τίποτα ακόμα</em>';
+    if (fresh) {
+      if (S.oledClosed) pop.classList.add('ping');
+      else if (motionOK()) { pop.classList.remove('pop'); void pop.offsetWidth; pop.classList.add('pop'); }
+    }
+  }
+
   // ------------------------------------------------------------ Γκάρντι, ο βοηθός
   function gardi(text, mood, actions, o) {
     if (!window.IoTGardi || P.settings.gardi === false || (window.IoTTour && window.IoTTour.active())) return;
@@ -3157,6 +3190,7 @@
         const ot = sc.querySelector('#sc-oled-text');
         const sig = JSON.stringify(items);
         if (ot && ot.dataset.sig !== sig) { ot.dataset.sig = sig; ot.innerHTML = window.IoTScene.oledSVG(items); }
+        if (ot) oledPop(items);
         if (window.IoTScene3D && window.IoTScene3D.parts) window.IoTScene3D.parts({ buzz: f > 0, servo: ang, rgb: [rr, gg, bb], oled: items });
       }
       const move = sc.querySelector('#sc-car-move');
