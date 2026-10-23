@@ -14,6 +14,12 @@
  *   IoTSpeak.voices()             οι ελληνικές φωνές, καλύτερη πρώτη: [{ name, label, quality }]
  *   IoTSpeak.setVoiceName(name)   '' = αυτόματα η καλύτερη
  *   IoTSpeak.current()            η φωνή που χρησιμοποιείται τώρα
+ *
+ * Ενσωματωμένη φυσική φωνή (προαιρετική): το Piper, μια ανοιχτή νευρωνική φωνή, τρέχει ΜΕΣΑ στον browser
+ * (WebAssembly). Κατεβαίνει μία φορά (~50 MB) και μένει αποθηκευμένη· το κείμενο δεν φεύγει από τον υπολογιστή.
+ *   IoTSpeak.BUILTIN              όνομα «φωνής» για setVoiceName
+ *   IoTSpeak.prepareBuiltin()     κατεβάζει και ετοιμάζει τη φωνή από πριν
+ *   IoTSpeak.onProgress(f)        f({ state: 'loading'|'ready'|'error', pct, msg })
  */
 (function (root) {
   'use strict';
@@ -24,6 +30,61 @@
   let voice = null;
   let run = null;    // { blocks, i, btn }
   const listeners = [];
+
+  // ------------------------------------------------------------ ενσωματωμένη φωνή (Piper)
+  const BUILTIN = 'builtin:piper-el';
+  const PIPER_VOICE = 'el_GR-rapunzelina-low';
+  const PIPER_URL = 'https://cdn.jsdelivr.net/npm/@mintplex-labs/piper-tts-web@1.0.5/+esm';
+  const ORT_WASM = 'https://cdn.jsdelivr.net/npm/onnxruntime-web@1.27.0/dist/';
+  let piper = null;      // Promise<TtsSession>
+  let piperState = { state: 'idle', pct: 0, msg: '' };
+  let audio = null;      // το <audio> που παίζει τώρα
+  let gen = 0;           // κάθε stop() ακυρώνει ό,τι ετοιμαζόταν
+  const progress = [];
+  const setPiper = st => { piperState = Object.assign({}, piperState, st); progress.forEach(f => f(piperState)); };
+  const canBuiltin = () => typeof root.WebAssembly === 'object' && typeof root.fetch === 'function' && typeof root.Audio === 'function';
+  const useBuiltin = () => wanted === BUILTIN && canBuiltin() && piperState.state !== 'error';
+  function prepareBuiltin() {
+    if (piper) return piper;
+    setPiper({ state: 'loading', pct: 0, msg: 'Κατεβαίνει η φωνή…' });
+    piper = import(PIPER_URL).then(tts => tts.TtsSession.create({
+      voiceId: PIPER_VOICE,
+      // το πακέτο του jsdelivr φέρνει το onnxruntime-web 1.27.0: τα wasm του πρέπει να είναι της ίδιας έκδοσης
+      wasmPaths: Object.assign({}, tts.TtsSession.WASM_LOCATIONS, { onnxWasm: ORT_WASM }),
+      progress: p => { if (p && p.total) setPiper({ state: 'loading', pct: Math.round((p.loaded * 100) / p.total), msg: 'Κατεβαίνει η φωνή…' }); }
+    })).then(session => { setPiper({ state: 'ready', pct: 100, msg: 'Η φυσική φωνή είναι έτοιμη.' }); return session; })
+      .catch(e => { piper = null; setPiper({ state: 'error', pct: 0, msg: 'Δεν κατέβηκε η φωνή (χρειάζεται ίντερνετ την πρώτη φορά). Χρησιμοποιείται η φωνή της συσκευής.' }); throw e; });
+    return piper;
+  }
+  // Συνθέτει μια πρόταση σε ήχο (Blob URL)
+  function synth1(text) { return prepareBuiltin().then(sess => sess.predict(text)).then(blob => URL.createObjectURL(blob)); }
+  // Παίζει τις προτάσεις με τη σειρά· ετοιμάζει την επόμενη όσο ακούγεται η τρέχουσα.
+  function playBuiltin(parts, done) {
+    const my = gen;
+    let k = 0;
+    let nextUrl = parts.length ? synth1(parts[0]) : null;
+    const step = () => {
+      if (my !== gen) return;
+      if (k >= parts.length) { if (done) done(); return; }
+      const cur = nextUrl;
+      k++;
+      nextUrl = k < parts.length ? synth1(parts[k]) : null;
+      cur.then(url => {
+        if (my !== gen) { URL.revokeObjectURL(url); return; }
+        audio = new Audio(url);
+        audio.playbackRate = rate;
+        if ('preservesPitch' in audio) audio.preservesPitch = true;
+        audio.onended = () => { URL.revokeObjectURL(url); step(); };
+        audio.onerror = () => { URL.revokeObjectURL(url); step(); };
+        audio.play().catch(() => step());
+      }, () => {
+        // η φωνή δεν φόρτωσε: συνεχίζουμε με τη φωνή της συσκευής
+        if (my !== gen) return;
+        if (synth) { let j = k - 1; const one = () => { if (my !== gen) return; if (j >= parts.length) { if (done) done(); return; } synth.speak(utter(parts[j++], one)); }; one(); } else if (done) done();
+      });
+    };
+    step();
+  }
 
   const isGreek = v => /^el([-_]|$)/i.test(v.lang);
   // Βαθμός «φυσικότητας» από το όνομα της φωνής (οι browsers δεν δίνουν κάτι καλύτερο).
@@ -140,6 +201,8 @@
       r.blocks.forEach(b => b.classList.remove('reading'));
       setBtn(r.btn, false);
     }
+    gen++;
+    if (audio) { try { audio.pause(); } catch (e) { /* ήδη σταματημένο */ } audio = null; }
     if (synth) synth.cancel();
   }
 
@@ -152,6 +215,7 @@
     if (!parts.length) { next(r); return; }
     b.classList.add('reading');
     try { b.scrollIntoView({ block: 'nearest', behavior: 'smooth' }); } catch (e) { /* παλιοί browsers */ }
+    if (useBuiltin()) { playBuiltin(parts, () => { if (run === r) next(r); }); return; }
     let k = 0;
     const one = () => {
       if (run !== r) return;
@@ -163,7 +227,7 @@
 
   // Επιστρέφει false αν δεν μπορεί να διαβάσει (ο browser δεν έχει σύνθεση ομιλίας).
   function toggle(el, btn) {
-    if (!synth || !el) return false;
+    if (!el || (!synth && !useBuiltin())) return false;
     const same = run && run.btn === btn;
     stop();
     if (same) return true;
@@ -176,6 +240,7 @@
 
   // Σύντομο κείμενο (Γκάρντι, δοκιμή φωνής): σταματά ό,τι ακουγόταν πριν.
   function say(text) {
+    if (useBuiltin()) { stop(); playBuiltin(chunks(clean(text)), null); return true; }
     if (!synth || typeof root.SpeechSynthesisUtterance !== 'function') return false;
     stop();
     pickVoice();
@@ -184,16 +249,21 @@
   }
 
   root.IoTSpeak = {
-    supported: () => !!synth && typeof root.SpeechSynthesisUtterance === 'function',
-    hasGreek: () => !!(voice || pickVoice()),
+    supported: () => (!!synth && typeof root.SpeechSynthesisUtterance === 'function') || canBuiltin(),
+    hasGreek: () => useBuiltin() || !!(voice || pickVoice()),
+    BUILTIN,
+    canBuiltin,
+    prepareBuiltin: () => prepareBuiltin().catch(() => null),
+    builtinState: () => piperState,
+    onProgress: f => { progress.push(f); },
     toggle,
     say,
     stop,
     clean,
     setRate: r => { rate = Math.max(0.6, Math.min(1.4, Number(r) || 0.9)); },
-    setVoiceName: n => { wanted = typeof n === 'string' ? n : ''; pickVoice(); },
+    setVoiceName: n => { wanted = typeof n === 'string' ? n : ''; if (wanted === BUILTIN && canBuiltin()) { if (piperState.state === 'error') setPiper({ state: 'idle' }); prepareBuiltin().catch(() => null); } pickVoice(); },
     voices: () => greekVoices().map(v => ({ name: v.name, label: `${v.name}${v.localService ? '' : ' · online'}`, quality: quality(v) })),
-    current: () => (pickVoice() ? { name: voice.name, quality: quality(voice) } : null),
+    current: () => (useBuiltin() ? { name: 'Ενσωματωμένη φυσική φωνή (Piper)', quality: 'φυσική' } : pickVoice() ? { name: voice.name, quality: quality(voice) } : null),
     onVoices: f => { listeners.push(f); },
     speaking: () => !!run
   };

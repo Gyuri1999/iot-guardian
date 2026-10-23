@@ -3541,15 +3541,20 @@
       if (!sel || !window.IoTSpeak) return;
       const vs = window.IoTSpeak.voices();
       const cur = window.IoTSpeak.current();
-      sel.innerHTML = `<option value="">Αυτόματα: η πιο φυσική${cur ? ` (${esc(cur.name)})` : ''}</option>` + vs.map(v => `<option value="${esc(v.name)}">${esc(v.label)} · ${esc(v.quality)}</option>`).join('');
-      sel.value = vs.some(v => v.name === P.settings.voiceName) ? P.settings.voiceName : '';
+      const B = window.IoTSpeak.BUILTIN;
+      sel.innerHTML = `<option value="">Αυτόματα: η πιο φυσική της συσκευής${cur && P.settings.voiceName !== B ? ` (${esc(cur.name)})` : ''}</option>`
+        + (window.IoTSpeak.canBuiltin() ? `<option value="${B}">★ Ενσωματωμένη φυσική φωνή (Piper · κατεβαίνει μία φορά, ~50 MB)</option>` : '')
+        + vs.map(v => `<option value="${esc(v.name)}">${esc(v.label)} · ${esc(v.quality)}</option>`).join('');
+      sel.value = P.settings.voiceName === B || vs.some(v => v.name === P.settings.voiceName) ? P.settings.voiceName : '';
       const best = vs[0];
+      const st = window.IoTSpeak.builtinState();
+      if (P.settings.voiceName === B && st.state !== 'idle') { $('#set-voice-help').textContent = st.state === 'loading' ? `${st.msg} ${st.pct}%` : st.msg; return; }
       $('#set-voice-help').textContent = !window.IoTSpeak.supported() ? 'Ο browser σου δεν έχει ανάγνωση φωναχτά.'
         : !vs.length ? 'Δεν βρέθηκε ελληνική φωνή στη συσκευή. Πρόσθεσε μία από τις ρυθμίσεις του συστήματος (δες παρακάτω).'
           : best.quality !== 'φυσική' ? 'Η συσκευή έχει μόνο απλές ελληνικές φωνές. Για πιο φυσική: στο Mac, Ρυθμίσεις συστήματος → Προσβασιμότητα → Περιεχόμενο που εκφωνείται → Φωνή συστήματος → Διαχείριση φωνών → Ελληνικά (Melina, βελτιωμένη). Στα Windows, ο Edge έχει τη φυσική φωνή «Athina Online».'
             : 'Πάτα «Δοκιμή φωνής» για να ακούσεις.';
     };
-    if (window.IoTSpeak) window.IoTSpeak.onVoices(fillVoices);
+    if (window.IoTSpeak) { window.IoTSpeak.onVoices(fillVoices); window.IoTSpeak.onProgress(fillVoices); }
     $('#set-voice').onchange = e => { P.settings.voiceName = e.target.value; applySettings(); save(); window.IoTSpeak && window.IoTSpeak.say('Γεια σου! Έτσι ακούγεται αυτή η φωνή.'); };
     $('#set-voice-test').onclick = () => { if (!window.IoTSpeak || !window.IoTSpeak.say('Γεια σου! Είμαι η φωνή του IoT Guardian. Το LED στο GPIO 2 ανάβει όταν πατάς το κουμπί.')) announce('Ο browser σου δεν μπορεί να διαβάσει φωναχτά.'); };
     $('#set-rate').oninput = e => { P.settings.readRate = Number(e.target.value); $('#set-rate-out').textContent = Math.round(P.settings.readRate * 100) + '%'; applySettings(); save(); };
@@ -3645,6 +3650,12 @@
       const sel = sb.dataset.say;
       const el = sel[0] === '^' ? sb.closest(sel.slice(1)) : document.querySelector(sel);
       if (!window.IoTSpeak.toggle(el, sb)) { announce('Ο browser σου δεν μπορεί να διαβάσει φωναχτά.'); return; }
+      // Η πρώτη φορά με απλή/ρομποτική φωνή: ο Γκάρντι προτείνει την ενσωματωμένη φυσική φωνή
+      const cv = window.IoTSpeak.current();
+      if (!S.voiceNudged && window.IoTSpeak.canBuiltin() && P.settings.voiceName !== window.IoTSpeak.BUILTIN && (!cv || cv.quality !== 'φυσική')) {
+        S.voiceNudged = true;
+        gardi('Η φωνή ακούγεται ρομποτική; Έχω μια πιο φυσική ελληνική φωνή μέσα στο παιχνίδι. Κατεβαίνει μία φορά (περίπου 50 MB).', 'think', [{ label: 'Ναι, βάλ\' την', run: () => { P.settings.voiceName = window.IoTSpeak.BUILTIN; applySettings(); save(); window.IoTSpeak.stop(); gardi('Κατεβάζω τη φωνή… Θα σου μιλήσω μόλις είναι έτοιμη.', 'happy'); window.IoTSpeak.prepareBuiltin().then(ok => { if (ok) window.IoTSpeak.say('Γεια σου! Αυτή είναι η νέα μου φωνή.'); }); } }], { force: true, ttl: 15000 });
+      }
       if (!window.IoTSpeak.hasGreek()) announce('Δεν βρέθηκε ελληνική φωνή στη συσκευή· η ανάγνωση μπορεί να ακούγεται με ξένη προφορά.');
     }, true);
     document.querySelectorAll('dialog').forEach(d => d.addEventListener('close', () => { if (d.querySelector('.say.on')) window.IoTSpeak.stop(); }));
