@@ -710,5 +710,16 @@ test('μπλοκ: normalize καθαρίζει άγνωστα και επικί�
   eq(m.loop[0].ms, 60000);
 });
 
+// ------------------------------------------------------------ ανάγνωση φωναχτά: κώδικας στα αγγλικά (js/speak.js)
+test('ανάγνωση: ο κώδικας πάει στην αγγλική φωνή, τα ελληνικά στην ελληνική', () => {
+  const sctx = vm.createContext({ console, speechSynthesis: { getVoices: () => [{ lang: 'en-US', name: 'Samantha', localService: true }, { lang: 'el-GR', name: 'Melina' }], addEventListener() {}, cancel() {}, speak() {} }, SpeechSynthesisUtterance: function () {} });
+  vm.runInContext(fs.readFileSync(path.join(ROOT, 'js', 'speak.js'), 'utf8'), sctx, { filename: 'speak.js' });
+  const p = sctx.IoTSpeak.pieces('1. pinMode(LED_PIN, OUTPUT); λέει στην πλακέτα.');
+  eq(p.map(x => x.en), [false, true, false]);
+  eq(p[1].t, 'pin Mode L E D pin, output');
+  sctx.IoTSpeak.setEnglish(false);
+  assert(sctx.IoTSpeak.pieces('pinMode(LED_PIN, OUTPUT);').every(x => !x.en));
+});
+
 console.log(`\n${passed} πέρασαν, ${failed} απέτυχαν\n`);
 process.exit(failed ? 1 : 0);

@@ -110,6 +110,7 @@
     if (window.IoTSfx) window.IoTSfx.setEnabled(s.sound !== false);
     if (window.IoTGardi) { window.IoTGardi.setEnabled(s.gardi !== false); window.IoTGardi.setVoice(!!s.gardiVoice); }
     if (window.IoTSpeak) { window.IoTSpeak.setRate(s.readRate || 0.9); window.IoTSpeak.setVoiceName(s.voiceName || ''); }
+    if (window.IoTSpeak && window.IoTSpeak.setEnglish) window.IoTSpeak.setEnglish(s.readEnglish !== false);
     html.setAttribute('data-font', s.font || 'noto');
     html.setAttribute('data-letters', s.letters || 'normal');
     const rl = document.getElementById('ruler');
@@ -3469,6 +3470,7 @@
         <div class="field"><label for="set-voice">Φωνή για την ανάγνωση φωναχτά</label>
           <div class="btn-row"><select id="set-voice"></select><button class="btn sm" id="set-voice-test" type="button">Δοκιμή φωνής</button></div>
           <span class="help" id="set-voice-help"></span></div>
+        <label class="check"><input type="checkbox" id="set-english"> Ο κώδικας και οι αγγλικές λέξεις (π.χ. pinMode, GPIO) διαβάζονται με αγγλική φωνή</label>
         <div class="field"><label for="set-rate">Ταχύτητα ανάγνωσης φωναχτά: <output id="set-rate-out"></output></label>
           <input type="range" id="set-rate" min="0.6" max="1.4" step="0.05"></div>
         <div class="field"><label for="set-ruler">Χάρακας ανάγνωσης</label>
@@ -3556,6 +3558,7 @@
     };
     if (window.IoTSpeak) { window.IoTSpeak.onVoices(fillVoices); window.IoTSpeak.onProgress(fillVoices); }
     $('#set-voice').onchange = e => { P.settings.voiceName = e.target.value; applySettings(); save(); window.IoTSpeak && window.IoTSpeak.say('Γεια σου! Έτσι ακούγεται αυτή η φωνή.'); };
+    $('#set-english').onchange = e => { P.settings.readEnglish = e.target.checked; applySettings(); save(); window.IoTSpeak && window.IoTSpeak.say('Για να ανάψει το LED γράφουμε digitalWrite(LED_PIN, HIGH);'); };
     $('#set-voice-test').onclick = () => { if (!window.IoTSpeak || !window.IoTSpeak.say('Γεια σου! Είμαι η φωνή του IoT Guardian. Το LED στο GPIO 2 ανάβει όταν πατάς το κουμπί.')) announce('Ο browser σου δεν μπορεί να διαβάσει φωναχτά.'); };
     $('#set-rate').oninput = e => { P.settings.readRate = Number(e.target.value); $('#set-rate-out').textContent = Math.round(P.settings.readRate * 100) + '%'; applySettings(); save(); };
 
@@ -3674,6 +3677,7 @@
         $('#set-sound').checked = P.settings.sound !== false;
         $('#set-ffont').value = P.settings.font || 'noto';
         $('#set-gardi').checked = P.settings.gardi !== false;
+        $('#set-english').checked = P.settings.readEnglish !== false;
         $('#set-gardi-voice').checked = !!P.settings.gardiVoice;
         $('#set-ruler').value = P.settings.ruler || 'off';
         $('#set-letters').value = P.settings.letters || 'normal';

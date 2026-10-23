@@ -20,6 +20,9 @@
  *   IoTSpeak.BUILTIN              όνομα «φωνής» για setVoiceName
  *   IoTSpeak.prepareBuiltin()     κατεβάζει και ετοιμάζει τη φωνή από πριν
  *   IoTSpeak.onProgress(f)        f({ state: 'loading'|'ready'|'error', pct, msg })
+ *
+ * Κώδικας και αγγλικές λέξεις (pinMode(LED_PIN, OUTPUT), GPIO, MQTT…) διαβάζονται με αγγλική φωνή, αν υπάρχει,
+ * γιατί με ελληνική προφορά δεν βγάζουν νόημα. Κλείνει με IoTSpeak.setEnglish(false).
  */
 (function (root) {
   'use strict';
@@ -57,32 +60,71 @@
     return piper;
   }
   // Συνθέτει μια πρόταση σε ήχο (Blob URL)
-  function synth1(text) { return prepareBuiltin().then(sess => sess.predict(text)).then(blob => URL.createObjectURL(blob)); }
-  // Παίζει τις προτάσεις με τη σειρά· ετοιμάζει την επόμενη όσο ακούγεται η τρέχουσα.
-  function playBuiltin(parts, done) {
+  // Το μοντέλο της Piper δεν έχει τον ήχο [ç] (χ πριν από ε/ι/η/υ: «έχει», «όχι», «χέρι») και «σπάει» σε αυτές τις λέξεις.
+  // Μια τελεία κάτω από το χ (U+0323) αλλάζει τον φωνολογικό κανόνα· η λέξη ακούγεται με σκληρό χ, αλλά ακούγεται.
+  // Αριθμοί από 1000 και πάνω: το espeak τους κάνει «χίλια…» και ξαναβγάζει τον ήχο [ç]. Τους γράφουμε εμείς με λέξεις.
+  const U = ['', 'ένα', 'δύο', 'τρία', 'τέσσερα', 'πέντε', 'έξι', 'επτά', 'οκτώ', 'εννέα'];
+  const TEEN = ['δέκα', 'έντεκα', 'δώδεκα', 'δεκατρία', 'δεκατέσσερα', 'δεκαπέντε', 'δεκαέξι', 'δεκαεπτά', 'δεκαοκτώ', 'δεκαεννέα'];
+  const TENS = ['', '', 'είκοσι', 'τριάντα', 'σαράντα', 'πενήντα', 'εξήντα', 'εβδομήντα', 'ογδόντα', 'ενενήντα'];
+  const HUND = ['', 'εκατό', 'διακόσια', 'τριακόσια', 'τετρακόσια', 'πεντακόσια', 'εξακόσια', 'επτακόσια', 'οκτακόσια', 'εννιακόσια'];
+  function under1000(n, fem) {
+    const h = Math.floor(n / 100), r = n % 100, w = [];
+    if (h) w.push(h === 1 && r ? 'εκατόν' : fem && h > 1 ? HUND[h].replace(/α$/, 'ες') : HUND[h]);
+    if (r >= 10 && r < 20) w.push(TEEN[r - 10]);
+    else {
+      if (r >= 20) w.push(TENS[Math.floor(r / 10)]);
+      const u = r % 10;
+      if (u) w.push(fem && u === 3 ? 'τρεις' : fem && u === 4 ? 'τέσσερις' : fem && u === 1 ? 'μία' : U[u]);
+    }
+    return w.join(' ');
+  }
+  function bigNumber(n) {
+    const th = Math.floor(n / 1000), r = n % 1000;
+    const head = th === 1 ? 'χίλια' : `${under1000(th, true)} χιλιάδες`;
+    return r ? `${head} ${under1000(r, false)}` : head;
+  }
+  const forPiper = t => t.replace(/\b\d{4,6}\b/g, m => bigNumber(Number(m))).replace(/χ(?=[ειηυίέήύϊΐϋΰ]|αι|οι|ει)/gi, 'χ\u0323').replace(/Χ(?=[ΕΙΗΥΈΊΉΎ])/g, 'Χ\u0323');
+  // Αν μια πρόταση αποτύχει, ξαναδοκιμάζει μόνο με ελληνικά γράμματα και αριθμούς πριν την προσπεράσει.
+  function synth1(text) {
+    return prepareBuiltin()
+      .then(sess => sess.predict(forPiper(text)).catch(() => sess.predict(forPiper(text.replace(/[^\p{Script=Greek}\d\s,.;!?·\u0323]/gu, ' ')))))
+      .then(blob => URL.createObjectURL(blob));
+  }
+  // Παίζει ένα έτοιμο κομμάτι ήχου (Blob URL) και μετά καλεί το step.
+  function playUrl(urlP, my, step, fallbackText) {
+    urlP.then(url => {
+      if (my !== gen) { URL.revokeObjectURL(url); return; }
+      audio = new Audio(url);
+      audio.playbackRate = rate;
+      if ('preservesPitch' in audio) audio.preservesPitch = true;
+      audio.onended = () => { URL.revokeObjectURL(url); step(); };
+      audio.onerror = () => { URL.revokeObjectURL(url); step(); };
+      audio.play().catch(() => step());
+    }, () => {
+      // η ενσωματωμένη φωνή δεν φόρτωσε: αυτό το κομμάτι το λέει η φωνή της συσκευής
+      if (my !== gen) return;
+      if (synth) synth.speak(utter(fallbackText, step)); else step();
+    });
+  }
+  // Παίζει τα κομμάτια με τη σειρά: τα ελληνικά με την ελληνική φωνή (ενσωματωμένη ή της συσκευής),
+  // τα αγγλικά (κώδικας, ονόματα) με αγγλική φωνή. Ετοιμάζει από πριν τα επόμενα ελληνικά κομμάτια.
+  function playPieces(list, done) {
     const my = gen;
+    const builtin = useBuiltin();
+    const pre = new Map();
+    const prefetch = from => { if (!builtin) return; for (let x = from; x < list.length && x < from + 2; x++) if (!list[x].en && !pre.has(x)) pre.set(x, synth1(list[x].t)); };
     let k = 0;
-    let nextUrl = parts.length ? synth1(parts[0]) : null;
     const step = () => {
       if (my !== gen) return;
-      if (k >= parts.length) { if (done) done(); return; }
-      const cur = nextUrl;
-      k++;
-      nextUrl = k < parts.length ? synth1(parts[k]) : null;
-      cur.then(url => {
-        if (my !== gen) { URL.revokeObjectURL(url); return; }
-        audio = new Audio(url);
-        audio.playbackRate = rate;
-        if ('preservesPitch' in audio) audio.preservesPitch = true;
-        audio.onended = () => { URL.revokeObjectURL(url); step(); };
-        audio.onerror = () => { URL.revokeObjectURL(url); step(); };
-        audio.play().catch(() => step());
-      }, () => {
-        // η φωνή δεν φόρτωσε: συνεχίζουμε με τη φωνή της συσκευής
-        if (my !== gen) return;
-        if (synth) { let j = k - 1; const one = () => { if (my !== gen) return; if (j >= parts.length) { if (done) done(); return; } synth.speak(utter(parts[j++], one)); }; one(); } else if (done) done();
-      });
+      if (k >= list.length) { if (done) done(); return; }
+      const j = k++;
+      const p = list[j];
+      prefetch(j + 1);
+      if (p.en && enVoice) { synth.speak(utterEn(p.t, step)); return; }
+      if (builtin) { const u = pre.get(j) || synth1(p.t); pre.delete(j); playUrl(u, my, step, p.t); return; }
+      if (synth) synth.speak(utter(p.t, step)); else step();
     };
+    prefetch(0);
     step();
   }
 
@@ -112,7 +154,64 @@
   }
   if (synth) {
     pickVoice();
-    if ('onvoiceschanged' in synth) synth.addEventListener('voiceschanged', () => { pickVoice(); listeners.forEach(f => f()); });
+    if ('onvoiceschanged' in synth) synth.addEventListener('voiceschanged', () => { pickVoice(); pickEnglish(); listeners.forEach(f => f()); });
+  }
+
+  // ------------------------------------------------------------ κώδικας και αγγλικές λέξεις με αγγλική φωνή
+  let english = true;   // ρύθμιση: ο κώδικας διαβάζεται στα αγγλικά
+  let enVoice = null;
+  function pickEnglish() {
+    if (!synth) return null;
+    const en = synth.getVoices().filter(v => /^en([-_]|$)/i.test(v.lang));
+    const sc = v => score(v) + (/en[-_]US/i.test(v.lang) ? 4 : /en[-_]GB/i.test(v.lang) ? 3 : 0) + (/samantha|daniel|karen|alex|google us/i.test(v.name) ? 20 : 0);
+    enVoice = en.sort((a, b) => sc(b) - sc(a))[0] || null;
+    return enVoice;
+  }
+  function utterEn(text, onend) {
+    const u = new SpeechSynthesisUtterance(text);
+    u.lang = enVoice.lang;
+    u.voice = enVoice;
+    u.rate = Math.min(1.3, rate * 1.05);
+    u.onend = onend;
+    u.onerror = onend;
+    return u;
+  }
+  // Μια «αγγλική» περιοχή: λέξεις/κώδικας με λατινικούς χαρακτήρες, μαζί με παρενθέσεις, τελεστές και αριθμούς ανάμεσα.
+  const EN_RUN = /[A-Za-z_][\w.]*(?:\s*\([^()]*\))?;?(?:(?:[ \t]+|[ \t]*(?:==|!=|>=|<=|&&|\|\||[=+\-*/<>])[ \t]*)[A-Za-z_0-9][\w.]*(?:\s*\([^()]*\))?;?)*/g;
+  const ACR = { IoT: 'I o T', LED: 'L E D', LEDs: 'L E Ds', GPIO: 'G P I O', PIR: 'P I R', MQTT: 'M Q T T', TLS: 'T L S', SSH: 'S S H', USB: 'U S B', HTTP: 'H T T P', HTTPS: 'H T T P S', JSON: 'Jason', CPU: 'C P U', SQL: 'sequel', ESP32: 'E S P thirty two', ACL: 'A C L', IP: 'I P', ID: 'I D', DHT22: 'D H T twenty two', SoC: 'S O C', UART: 'you art', PWM: 'P W M', ADC: 'A D C', OTA: 'O T A', PoE: 'P O E', RP1: 'R P one', BCM2712: 'B C M twenty seven twelve' };
+  function speakableEnglish(t) {
+    return t
+      .replace(/HC-SR04/g, 'H C S R zero four')
+      .replace(/\bprintln\b/g, 'print line')
+      .replace(/==/g, ' equals ').replace(/!=/g, ' not equal ').replace(/>=/g, ' greater or equal ').replace(/<=/g, ' less or equal ')
+      .replace(/&&/g, ' and ').replace(/\|\|/g, ' or ').replace(/\+\+/g, ' plus plus ')
+      .replace(/_/g, ' ')
+      .replace(/\b[A-Za-z]*[A-Z][A-Za-z0-9]*\b/g, w => ACR[w] || (/^[A-Z]{3,}$/.test(w) ? w.toLowerCase() : w))   // OUTPUT → output (λέξη, όχι συλλαβισμός)
+      .replace(/([a-z0-9])([A-Z])/g, '$1 $2')
+      .replace(/\.(?=[A-Za-z])/g, ' dot ')
+      .replace(/[();{}[\]"'`]/g, ' ')
+      .replace(/\s*,\s*/g, ', ')
+      .replace(/\s+/g, ' ')
+      .trim();
+  }
+  // Κείμενο → κομμάτια [{ en, t }]: τα ελληνικά «καθαρίζονται» για την ελληνική φωνή, τα αγγλικά για την αγγλική.
+  function pieces(raw) {
+    const src = String(raw || '');
+    const out = [];
+    const greek = t => { for (const c of chunks(clean(t))) if (/[\p{L}\p{N}]/u.test(c)) out.push({ en: false, t: c }); };
+    if (!english || !(enVoice || pickEnglish())) { greek(src); return out; }
+    let last = 0;
+    src.replace(EN_RUN, (m, i) => {
+      // μόνο αριθμοί ή ένα γράμμα (π.χ. «C» στο °C) μένουν στα ελληνικά
+      if (!/[A-Za-z]{2}/.test(m)) return m;
+      if (i > last) greek(src.slice(last, i));
+      const e = speakableEnglish(m);
+      if (e) out.push({ en: true, t: e });
+      last = i + m.length;
+      return m;
+    });
+    if (last < src.length) greek(src.slice(last));
+    return out;
   }
 
   // Προφορά: ό,τι διαβάζεται άσχημα γράμμα-γράμμα ή με αγγλική προφορά, γράφεται όπως ακούγεται.
@@ -183,7 +282,7 @@
   function speechText(b) {
     const c = b.cloneNode(true);
     c.querySelectorAll('button, .say, svg, .ms-box').forEach(x => x.remove());
-    return clean(c.textContent);
+    return c.textContent;
   }
 
   function setBtn(btn, on) {
@@ -211,18 +310,11 @@
     r.blocks.forEach(b => b.classList.remove('reading'));
     if (r.i >= r.blocks.length) { stop(); return; }
     const b = r.blocks[r.i++];
-    const parts = chunks(speechText(b));
-    if (!parts.length) { next(r); return; }
+    const list = pieces(speechText(b));
+    if (!list.length) { next(r); return; }
     b.classList.add('reading');
     try { b.scrollIntoView({ block: 'nearest', behavior: 'smooth' }); } catch (e) { /* παλιοί browsers */ }
-    if (useBuiltin()) { playBuiltin(parts, () => { if (run === r) next(r); }); return; }
-    let k = 0;
-    const one = () => {
-      if (run !== r) return;
-      if (k >= parts.length) { next(r); return; }
-      synth.speak(utter(parts[k++], one));
-    };
-    one();
+    playPieces(list, () => { if (run === r) next(r); });
   }
 
   // Επιστρέφει false αν δεν μπορεί να διαβάσει (ο browser δεν έχει σύνθεση ομιλίας).
@@ -240,11 +332,10 @@
 
   // Σύντομο κείμενο (Γκάρντι, δοκιμή φωνής): σταματά ό,τι ακουγόταν πριν.
   function say(text) {
-    if (useBuiltin()) { stop(); playBuiltin(chunks(clean(text)), null); return true; }
-    if (!synth || typeof root.SpeechSynthesisUtterance !== 'function') return false;
+    if (!useBuiltin() && (!synth || typeof root.SpeechSynthesisUtterance !== 'function')) return false;
     stop();
     pickVoice();
-    chunks(clean(text)).forEach(p => synth.speak(utter(p, null)));
+    playPieces(pieces(text), null);
     return true;
   }
 
@@ -256,6 +347,9 @@
     prepareBuiltin: () => prepareBuiltin().catch(() => null),
     builtinState: () => piperState,
     onProgress: f => { progress.push(f); },
+    setEnglish: on => { english = on !== false; },
+    pieces,
+    hasEnglish: () => !!(enVoice || pickEnglish()),
     toggle,
     say,
     stop,
