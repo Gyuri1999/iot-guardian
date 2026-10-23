@@ -2902,6 +2902,7 @@
     <div class="ruler" id="ruler" aria-hidden="true" hidden></div>
     <div id="live" class="sr-only" aria-live="polite"></div>`;
     document.body.appendChild(host);
+    applySettings(); // ο χάρακας ανάγνωσης υπάρχει μόνο από εδώ και πέρα
 
     host.querySelectorAll('[data-close]').forEach(b => { b.onclick = () => b.closest('dialog').close(); });
 
