@@ -79,24 +79,82 @@
 
   // Καλώδιο jumper (Dupont): αν δοθούν σημεία πάγκου {u, v, h}, σχεδιάζονται και τα πλαστικά βύσματα στις άκρες
   // (θηλυκό πάνω στο pin της πλακέτας, αρσενικό μέσα στην τρύπα του breadboard).
+  // Διαδρομή καλωδίου σε (u, v, h): ανεβαίνει από το pin, ταξιδεύει στη δική του «λωρίδα»
+  // (ύψος και βάθος από το lift), και κατεβαίνει κάθετα στην τρύπα. Έτσι τα καλώδια δεν κολλάνε μεταξύ τους.
+  function wireRoute(A, B, lift) {
+    const a = { u: A.u, v: A.v, h: A.h + 4.6 };
+    const b = { u: B.u, v: B.v, h: B.h + 3.4 };
+    // κάθε καλώδιο ταξιδεύει σε δικό του ύψος (lift 30 → χαμηλά, 70 → ψηλά)
+    const H = 3 + Math.max(0, lift - 24) * 0.36;
+    const top = Math.max(a.h, b.h) + H;
+    const sg = Math.sign(b.u - a.u) || 1;
+    const run = Math.min(6, Math.abs(b.u - a.u) / 4);
+    const dv = b.v - a.v;
+    return [
+      a,
+      { u: a.u, v: a.v, h: a.h + H * 0.55 },
+      { u: a.u + sg * run, v: a.v + dv * 0.12, h: top },
+      { u: b.u - sg * run, v: b.v - dv * 0.12, h: top },
+      { u: b.u, v: b.v, h: b.h + H * 0.5 },
+      b
+    ];
+  }
+  // Ομαλή καμπύλη SVG από σημεία (Catmull-Rom → Bezier).
+  function smoothPath(q) {
+    let d = `M${pt(q[0])}`;
+    for (let i = 0; i < q.length - 1; i++) {
+      const p0 = q[Math.max(0, i - 1)], p1 = q[i], p2 = q[i + 1], p3 = q[Math.min(q.length - 1, i + 2)];
+      const c1 = [p1[0] + (p2[0] - p0[0]) / 6, p1[1] + (p2[1] - p0[1]) / 6];
+      const c2 = [p2[0] - (p3[0] - p1[0]) / 6, p2[1] - (p3[1] - p1[1]) / 6];
+      d += ` C${pt(c1)} ${pt(c2)} ${pt(p2)}`;
+    }
+    return d;
+  }
+  // Ταμπελάκια με το όνομα του pin από όπου φεύγει κάθε καλώδιο (μένουν ορατά και στην 3D σκηνή).
+  // Μπαίνουν σε σειρά μπροστά από την πλακέτα, με γραμμή ως το pin, για να μη σκεπάζει το ένα το άλλο.
+  let TAGS = [];
+  function pinTag(A, cls) { TAGS.push({ A, cls, name: A.name.replace(/^GND\d$/, 'GND') }); }
+  function pinTagsSVG() {
+    const out = [];
+    const ux = [C, S];
+    for (const back of [false, true]) {
+      const list = TAGS.filter(t => (t.A.v < 10) === back).sort((x, y) => x.A.u - y.A.u);
+      if (!list.length) continue;
+      const mu = list.reduce((m, t) => m + t.A.u, 0) / list.length;
+      const A0 = list[0].A;
+      const base = P(mu, back ? A0.v - 16 : A0.v + 16, A0.h);
+      const gap = 58;
+      list.forEach((t, i) => {
+        const anchor = P(t.A.u, t.A.v, t.A.h + 4.6);
+        const k = (i - (list.length - 1) / 2) * gap;
+        const x = base[0] + ux[0] * k;
+        const y = base[1] + ux[1] * k + (back ? -12 : 12);
+        const w = 22 + t.name.length * 9;
+        out.push(`<g class="pintag ${t.cls}" data-part="wire-${t.cls.replace('w-', '')}"><path d="M${pt(anchor)} L${x.toFixed(1)},${(y + (back ? 11 : -11)).toFixed(1)}" class="pt-lead"/><circle cx="${anchor[0].toFixed(1)}" cy="${anchor[1].toFixed(1)}" r="2.4" class="pt-pin"/><rect x="${(x - w / 2).toFixed(1)}" y="${(y - 11).toFixed(1)}" width="${w.toFixed(1)}" height="22" rx="11" class="pt-pill"/><circle cx="${(x - w / 2 + 11).toFixed(1)}" cy="${y.toFixed(1)}" r="4.6" class="pt-dot"/><text x="${(x + 5.5).toFixed(1)}" y="${(y + 4.8).toFixed(1)}" text-anchor="middle" class="pt-t">${t.name}</text></g>`);
+      });
+    }
+    TAGS = [];
+    return out.join('');
+  }
+
   function wire(a, b, cls, lift, id) {
     let plugs = '';
-    if (!Array.isArray(a)) rec({ t: 'wire', a, b, cls, lift: lift || 40, id });
-    if (!Array.isArray(a)) {
-      const A = a;
-      const Bp = b;
-      plugs += box(A.u - 1.1, A.v - 1.1, A.h, 2.2, 2.2, 4.6, 'plug ' + cls);
-      plugs += box(Bp.u - 0.8, Bp.v - 0.8, Bp.h, 1.6, 1.6, 3.4, 'plug ' + cls);
-      a = P(A.u, A.v, A.h + 4.6);
-      b = P(Bp.u, Bp.v, Bp.h + 3.4);
-    }
     const l = lift || 40;
-    const c1 = [a[0], a[1] - l];
-    const c2 = [b[0], b[1] - l];
-    const d = `M${pt(a)} C${pt(c1)} ${pt(c2)} ${pt(b)}`;
+    let d;
+    if (!Array.isArray(a)) {
+      const route = wireRoute(a, b, l);
+      rec({ t: 'wire', a, b, cls, lift: l, id, route });
+      plugs += box(a.u - 1.1, a.v - 1.1, a.h, 2.2, 2.2, 4.6, 'plug ' + cls);
+      plugs += box(b.u - 0.8, b.v - 0.8, b.h, 1.6, 1.6, 3.4, 'plug ' + cls);
+      if (a.name) pinTag(a, cls);
+      d = smoothPath(route.map(q => P(q.u, q.v, q.h)));
+    } else {
+      d = `M${pt(a)} C${pt([a[0], a[1] - l])} ${pt([b[0], b[1] - l])} ${pt(b)}`;
+    }
     return `<g class="wire-g" data-part="wire-${cls.replace('w-', '')}"><path d="${d}" class="wire-ol"/><path${id ? ` id="${id}"` : ''} d="${d}" class="wire ${cls}"/><path d="${d}" class="wire-hl"/>`
       + (plugs || `<circle cx="${a[0].toFixed(1)}" cy="${a[1].toFixed(1)}" r="2.2" class="wire-end ${cls}"/><circle cx="${b[0].toFixed(1)}" cy="${b[1].toFixed(1)}" r="2.2" class="wire-end ${cls}"/>`) + '</g>';
   }
+
 
   // ------------------------------------------------------------ αντικείμενα
 
@@ -109,9 +167,9 @@
   const PCB_TOP = ESP.h + 1.6;
   function espPinUV(name) {
     let i = RIGHT_ROW.indexOf(name);
-    if (i >= 0) return { u: ESP.u + PIN_U(i), v: ESP.v + 26.6, h: PCB_TOP + 0.6 };
+    if (i >= 0) return { u: ESP.u + PIN_U(i), v: ESP.v + 26.6, h: PCB_TOP + 0.6, name };
     i = LEFT_ROW.indexOf(name);
-    return { u: ESP.u + PIN_U(Math.max(0, i)), v: ESP.v + 1.4, h: PCB_TOP + 0.6 };
+    return { u: ESP.u + PIN_U(Math.max(0, i)), v: ESP.v + 1.4, h: PCB_TOP + 0.6, name };
   }
   function espPin(name) { const q = espPinUV(name); return P(q.u, q.v, q.h + 0.4); }
 
@@ -322,9 +380,9 @@
   const PI_EVEN = ['5V', '5Vb', 'GND0', 'GPIO14', 'GPIO15', 'GPIO18', 'GND2', 'GPIO23', 'GPIO24', 'GND3', 'GPIO25', 'GPIO8', 'GPIO7', 'ID_SC', 'GND4', 'GPIO12', 'GND5', 'GPIO16', 'GPIO20', 'GPIO21'];
   function piPinUV(name) {
     const j = PI_EVEN.indexOf(name);
-    if (j >= 0) return { u: ESP.u + 2.4, v: ESP.v + PI_PIN_L(j), h: PI_PIN_TOP };
+    if (j >= 0) return { u: ESP.u + 2.4, v: ESP.v + PI_PIN_L(j), h: PI_PIN_TOP, name };
     const i = PI_ODD.indexOf(name);
-    return { u: ESP.u + 4.4, v: ESP.v + PI_PIN_L(i), h: PI_PIN_TOP };
+    return { u: ESP.u + 4.4, v: ESP.v + PI_PIN_L(i), h: PI_PIN_TOP, name };
   }
   function piPin(name) {
     const q = piPinUV(name);
@@ -541,13 +599,14 @@
   function fit(svgInner, bounds, extraClass, label) {
     const [x0, y0, x1, y1] = bounds;
     if (MAN) { root.IoTScene.manifest = MAN; MAN = null; }
+    const tags = pinTagsSVG();
     return `<svg class="scene ${extraClass || ''}" viewBox="${x0} ${y0} ${x1 - x0} ${y1 - y0}" data-vb="${x0} ${y0} ${x1 - x0} ${y1 - y0}" role="img" aria-label="${label}">
       <defs>
         <radialGradient id="g-red"><stop offset="0" stop-color="#ff6a4d" stop-opacity="0.85"/><stop offset="1" stop-color="#ff6a4d" stop-opacity="0"/></radialGradient>
         <radialGradient id="g-blue"><stop offset="0" stop-color="#5fb4ff" stop-opacity="0.9"/><stop offset="1" stop-color="#5fb4ff" stop-opacity="0"/></radialGradient>
       </defs>
       <g class="floor">${floorGrid()}</g>
-      <g class="sc-content">${svgInner}</g>
+      <g class="sc-content">${svgInner}<g class="sc-pintags">${tags}</g></g>
     </svg>`;
   }
 
@@ -884,18 +943,18 @@
   // Μόνο animations που δεν αφήνουν ίχνος (fill: backwards): όταν τελειώσουν, ισχύει πάλι το κανονικό CSS.
   function buildIn(svg) {
     if (!svg || !svg.animate) return;
-    const bounce = 'cubic-bezier(.2,.9,.25,1.18)';
+    const bounce = 'cubic-bezier(.22,1,.36,1.06)';
     const fade = (el, delay, dur) => el.animate([{ opacity: 0 }, { opacity: 1 }], { duration: dur || 380, delay, fill: 'backwards' });
     const drop = (el, delay) => {
       if (el.hasAttribute('transform')) return fade(el, delay);
-      el.animate([{ opacity: 0, transform: 'translate(0px,-28px)' }, { opacity: 1, transform: 'translate(0px,0px)' }], { duration: 520, delay, easing: bounce, fill: 'backwards' });
+      el.animate([{ opacity: 0, transform: 'translate(0px,-34px)' }, { opacity: 1, offset: 0.35 }, { opacity: 1, transform: 'translate(0px,0px)' }], { duration: 760, delay, easing: bounce, fill: 'backwards' });
     };
     const draw = (path, delay, dur) => {
       let len = 0;
       try { len = path.getTotalLength(); } catch (e) { len = 0; }
       if (!len) return fade(path, delay);
       const da = `${len.toFixed(1)} ${len.toFixed(1)}`;
-      path.animate([{ strokeDasharray: da, strokeDashoffset: len }, { strokeDasharray: da, strokeDashoffset: 0 }], { duration: dur, delay, easing: 'ease-in-out', fill: 'backwards' });
+      path.animate([{ strokeDasharray: da, strokeDashoffset: len }, { strokeDasharray: da, strokeDashoffset: 0 }], { duration: dur, delay, easing: 'cubic-bezier(.65,0,.35,1)', fill: 'backwards' });
     };
     const floor = svg.querySelector('.floor');
     if (floor) fade(floor, 0, 300);
@@ -906,7 +965,7 @@
       if (g) parts.push(...g.children);
     }
     const objects = parts.filter(el => !el.classList.contains('shadow'));
-    const step = Math.min(110, 1100 / Math.max(1, objects.length));
+    const step = Math.min(140, 1300 / Math.max(1, objects.length));
     let t = 120;
     parts.forEach(el => {
       if (el.classList.contains('shadow')) { fade(el, t + 200, 320); return; }
@@ -916,13 +975,14 @@
     // 2. καλώδια και συνδέσεις δικτύου
     let w = t + 260;
     svg.querySelectorAll('.sc-wires .wire-g').forEach(g => {
-      g.querySelectorAll('path').forEach(p => draw(p, w, 620));
-      g.querySelectorAll('.box, circle').forEach(x => fade(x, w + 520, 240));
-      w += 170;
+      g.querySelectorAll('path').forEach(p => draw(p, w, 900));
+      g.querySelectorAll('.box, circle').forEach((x, i) => fade(x, i === 0 ? w : w + 820, 260));
+      w += 220;
     });
     svg.querySelectorAll('.sc-links path').forEach((p, i) => draw(p, t + 200 + i * 120, 700));
     // 3. ετικέτες
     let l = Math.max(w, t + 600) + 120;
+    svg.querySelectorAll('.sc-pintags > *').forEach((el, i) => fade(el, t + 520 + i * 220 + 700, 320));
     svg.querySelectorAll('.sc-labels > *').forEach(el => {
       el.animate([{ opacity: 0, transform: 'translate(0px,8px)' }, { opacity: 1, transform: 'translate(0px,0px)' }], { duration: 340, delay: l, easing: 'ease-out', fill: 'backwards' });
       l += 70;

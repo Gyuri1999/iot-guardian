@@ -413,3 +413,14 @@
 .actor-tip text { font: 600 8px var(--font-label); fill: var(--ink); letter-spacing: 0.04em; }
 .sc-actors:hover .actor-dress { stroke: var(--accent); stroke-width: 1.6; }
 @media (max-width: 720px) { .scene-wrap > svg.scene-bg { position: absolute; top: 0; height: 17rem; } }
+
+/* ταμπελάκια pin στην αρχή κάθε καλωδίου: χρώμα του καλωδίου στο περίγραμμα, στη γραμμή και στην κουκκίδα */
+.pintag { --wc: #34383f; }
+.pintag.w-led { --wc: #e8892f; } .pintag.w-btn { --wc: #18a196; } .pintag.w-pir { --wc: #e2b52d; } .pintag.w-gnd { --wc: #6b7280; }
+.pintag.w-trig, .pintag.w-grn { --wc: #3fae55; } .pintag.w-echo, .pintag.w-yel { --wc: #f2c230; } .pintag.w-red, .pintag.w-vcc { --wc: #e0503f; }
+.pintag .pt-lead { stroke: var(--wc); stroke-width: 1.6; stroke-dasharray: 3 2.5; fill: none; }
+.pintag .pt-pin { fill: var(--surface); stroke: var(--wc); stroke-width: 1.6; }
+.pintag .pt-pill { fill: var(--surface); stroke: var(--wc); stroke-width: 2.2; }
+.pintag .pt-dot { fill: var(--wc); stroke: var(--ink-line); stroke-width: 0.8; }
+.pintag .pt-t { font-family: var(--font-code); font-size: 13px; font-weight: 700; fill: var(--ink); }
+.sc-pintags { pointer-events: none; }

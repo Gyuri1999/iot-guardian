@@ -604,15 +604,20 @@
     const A = o.a, Bp = o.b;
     k.B(g, A.u - 1.1, A.v - 1.1, A.h, 2.2, 2.2, 4.6, plug, { r: 0.3 });
     k.B(g, Bp.u - 0.8, Bp.v - 0.8, Bp.h, 1.6, 1.6, 3.4, plug, { r: 0.25 });
-    const lift = o.lift / K;
-    const a = new THREE.Vector3(A.u, A.h + 4.6, A.v);
-    const b = new THREE.Vector3(Bp.u, Bp.h + 3.4, Bp.v);
-    const curve = new THREE.CubicBezierCurve3(a, a.clone().add(new THREE.Vector3(0, lift, 0)), b.clone().add(new THREE.Vector3(0, lift, 0)), b);
-    const tube = k.keep(new THREE.TubeGeometry(curve, 60, 0.5, 10, false));
+    // ίδια διαδρομή με την SVG: κάθε καλώδιο στη δική του λωρίδα, κάθετα μέσα στην τρύπα
+    let curve;
+    if (o.route) curve = new THREE.CatmullRomCurve3(o.route.map(q => new THREE.Vector3(q.u, q.h, q.v)), false, 'centripetal', 0.5);
+    else {
+      const lift = o.lift / K;
+      const a = new THREE.Vector3(A.u, A.h + 4.6, A.v);
+      const b = new THREE.Vector3(Bp.u, Bp.h + 3.4, Bp.v);
+      curve = new THREE.CubicBezierCurve3(a, a.clone().add(new THREE.Vector3(0, lift, 0)), b.clone().add(new THREE.Vector3(0, lift, 0)), b);
+    }
+    const tube = k.keep(new THREE.TubeGeometry(curve, 140, 0.5, 10, false));
     const t = new THREE.Mesh(tube, body);
     t.castShadow = true;
     g.add(t);
-    const ol = new THREE.Mesh(k.keep(new THREE.TubeGeometry(curve, 60, 0.68, 10, false)), k.ink);
+    const ol = new THREE.Mesh(k.keep(new THREE.TubeGeometry(curve, 140, 0.68, 10, false)), k.ink);
     t.add(ol);
     t.userData.ol = ol;
     k.outlines.push(ol);
@@ -932,17 +937,20 @@
     if (!a.t0) a.t0 = now;
     const t = now - a.t0;
     let busy = false;
-    const back = x => { const c1 = 1.70158, c3 = c1 + 1; return 1 + c3 * Math.pow(x - 1, 3) + c1 * Math.pow(x - 1, 2); };
+    const back = x => { const c1 = 1.1, c3 = c1 + 1; return 1 + c3 * Math.pow(x - 1, 3) + c1 * Math.pow(x - 1, 2); };
+    const inOut = x => (x < 0.5 ? 4 * x * x * x : 1 - Math.pow(-2 * x + 2, 3) / 2);
     for (const it of a.items) {
       const x = Math.min(1, Math.max(0, (t - it.delay) / it.dur));
       if (x < 1) busy = true;
       if (it.kind === 'drop') {
         it.obj.visible = t >= it.delay;
-        it.obj.position.y = (1 - back(x)) * 9;
+        it.obj.position.y = (1 - back(x)) * 14;
       } else {
         it.obj.visible = t >= it.delay;
-        for (const g of it.obj.userData.tubes) g.setDrawRange(0, Math.max(0, Math.floor(g.index.count * x / 3) * 3));
-        it.obj.children.forEach((c, i) => { if (i < 2) c.visible = x >= 0.98; });
+        const e = inOut(x);
+        for (const g of it.obj.userData.tubes) g.setDrawRange(0, Math.max(0, Math.floor(g.index.count * e / 3) * 3));
+        // το πρώτο βύσμα μπαίνει στο pin αμέσως, το δεύτερο όταν το καλώδιο φτάσει στην τρύπα
+        it.obj.children.forEach((c, i) => { if (i === 0) c.visible = true; else if (i === 1) c.visible = e >= 0.97; });
       }
     }
     if (!busy) cur.anim = null;
@@ -989,11 +997,11 @@
       if (opts && opts.animate) {
         const items = [];
         const tops = built.scene.children.filter(o => o.userData.top && !o.userData.isWire);
-        const step = Math.min(110, 1100 / Math.max(1, tops.length));
+        const step = Math.min(140, 1300 / Math.max(1, tops.length));
         let t = 120;
-        for (const o of tops) { items.push({ kind: 'drop', obj: o, delay: t, dur: 520 }); o.visible = false; t += step; }
+        for (const o of tops) { items.push({ kind: 'drop', obj: o, delay: t, dur: 760 }); o.visible = false; t += step; }
         let w = t + 260;
-        for (const o of built.objs.wires) { items.push({ kind: 'wire', obj: o, delay: w, dur: 620 }); o.visible = false; w += 170; }
+        for (const o of built.objs.wires) { items.push({ kind: 'wire', obj: o, delay: w, dur: 900 }); o.visible = false; w += 220; }
         cur.anim = { items, t0: 0 };
       }
       cur.mo = new MutationObserver(() => { sync(); requestRender(); });
