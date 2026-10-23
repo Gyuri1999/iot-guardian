@@ -12,7 +12,7 @@ const onlyIdx = process.argv.indexOf('--only');
 const ONLY = onlyIdx > 0 ? process.argv[onlyIdx + 1] : null;
 const ctx = vm.createContext({ console });
 const loadErrors = [];
-for (const f of ['interpreter.js', 'pyinterp.js', 'pyweb.js', 'pymicro.js', 'device.js', 'network.js', 'validator.js', 'pisys.js', 'rsinterp.js', 'rsruntime.js', 'rslib.js', 'rscheck.js', 'lessons.js']) {
+for (const f of ['interpreter.js', 'pyinterp.js', 'pyweb.js', 'pymicro.js', 'pyparts.js', 'device.js', 'network.js', 'validator.js', 'pisys.js', 'rsinterp.js', 'rsruntime.js', 'rslib.js', 'rscheck.js', 'lessons.js']) {
   vm.runInContext(fs.readFileSync(path.join(ROOT, 'js', f), 'utf8'), ctx, { filename: f });
 }
 const extra = fs.existsSync(path.join(ROOT, 'js', 'lessons')) ? fs.readdirSync(path.join(ROOT, 'js', 'lessons')).filter(f => f.endsWith('.js')).sort() : [];
@@ -738,6 +738,46 @@ test('MicroPython: PWM servo από duty και προειδοποίηση γι�
   const r = new IoTValidator.Runner('from machine import Pin, PWM\nservo = PWM(Pin(19), freq=100)\nservo.duty(128)\n', { board: 'esp32' }, {}, 'python');
   r.runSetup();
   assert(r.board.warnings.some(w => /50 Hz/.test(w.text)), 'περίμενα προειδοποίηση για τα 50 Hz');
+});
+
+// ------------------------------------------------------------ νέα εξαρτήματα στο Raspberry Pi (js/pyparts.js, js/rslib.js)
+test('μπλοκ: buzzer, servo, LED RGB και οθόνη και στο Raspberry Pi (Python και Rust)', () => {
+  const m = { setup: [{ t: 'oled', text: 'Hi!' }], loop: [{ t: 'if', c: 'button', then: [{ t: 'tone', f: 880, ms: 0 }, { t: 'servo', a: 90 }, { t: 'rgb', r: 255, g: 128, b: 0 }, { t: 'change', n: 1 }, { t: 'oledv', v: 'count' }], else: [{ t: 'quiet' }, { t: 'servo', a: 0 }] }, { t: 'wait', ms: 50 }] };
+  for (const [tr, lang] of [['py-pi', 'python'], ['rs-pi', 'rust']]) {
+    const r = new IoTValidator.Runner(IoTBlocks.generate(m, tr), { board: 'pi' }, { button: true }, lang);
+    r.runSetup();
+    r.runLoops(2);
+    const b = r.board;
+    eq(b.buzzerFreq(), 880, tr + ' buzzer');
+    eq(b.servo.angle, 90, tr + ' servo');
+    assert(Math.abs(b.rgb()[0] - 255) <= 2 && Math.abs(b.rgb()[1] - 128) <= 2, tr + ' rgb ' + b.rgb());
+    assert(/\d/.test(b.oledText()), tr + ' oled ' + b.oledText());
+  }
+});
+test('Python στο Pi: Tone, όρια του TonalBuzzer και χρώματα 0–1 του RGBLED', () => {
+  const r = py('from gpiozero import TonalBuzzer, RGBLED\nfrom gpiozero.tones import Tone\nb = TonalBuzzer(22)\nb.play(Tone("A4"))\nled = RGBLED(red=5, green=6, blue=13)\nled.color = (0, 0.5, 1)\n', { board: 'pi' });
+  eq(r.board.buzzerFreq(), 440);
+  eq(r.board.rgb(), [0, 128, 255]);
+  assert(/out of the device's range/.test(pyError('from gpiozero import TonalBuzzer\nb = TonalBuzzer(22)\nb.play(2000)\n', { board: 'pi' }).message));
+  assert(/between 0 and 1/.test(pyError('from gpiozero import RGBLED\nled = RGBLED(5, 6, 13)\nled.color = (255, 0, 0)\n', { board: 'pi' }).message));
+  assert(/color/.test(pyError('import board, busio, adafruit_ssd1306\no = adafruit_ssd1306.SSD1306_I2C(128, 64, busio.I2C(board.SCL, board.SDA))\no.text("hi", 0, 0)\n', { board: 'pi' }).message));
+});
+test('Python στο Pi: AngularServo με παλμούς 0,5–2,5 ms και οθόνη με size=2', () => {
+  const r = py('from gpiozero import AngularServo\nimport board, busio, adafruit_ssd1306\ns = AngularServo(18, min_angle=0, max_angle=180, min_pulse_width=0.0005, max_pulse_width=0.0025)\ns.angle = 45\no = adafruit_ssd1306.SSD1306_I2C(128, 64, busio.I2C(board.SCL, board.SDA))\no.fill(0)\no.text("Hi", 0, 20, 1, size=2)\no.show()\n', { board: 'pi' });
+  eq(r.board.servo.angle, 45);
+  eq(r.board.oled.shown, [{ x: 0, y: 20, size: 2, text: 'Hi' }]);
+});
+test('Python: τα modules του Pi δεν υπάρχουν στη MicroPython του ESP32', () => {
+  assert(/adafruit_ssd1306/.test(pyError('import adafruit_ssd1306\n', { board: 'esp32' }).message));
+});
+test('Rust στο Pi: set_pwm_frequency θέλει f64 και η οθόνη δεν υπάρχει στο ESP32', () => {
+  const bad = 'use rppal::gpio::Gpio;\nuse std::error::Error;\n\nfn main() -> Result<(), Box<dyn Error>> {\n    let gpio = Gpio::new()?;\n    let mut b = gpio.get(22)?.into_output();\n    b.set_pwm_frequency(440, 0.5)?;\n    Ok(())\n}\n';
+  let e = null;
+  try { const r = new IoTValidator.Runner(bad, { board: 'pi' }, {}, 'rust'); r.runSetup(); } catch (x) { e = x; }
+  assert(e && /E0308/.test(e.message) && /440\.0/.test(e.hint), 'περίμενα E0308 για το 440');
+  let e2 = null;
+  try { new IoTValidator.Runner('use ssd1306::Ssd1306;\nfn main() {}\n', { board: 'esp32' }, {}, 'rust'); } catch (x) { e2 = x; }
+  assert(e2 && /E0432/.test(e2.message), 'το ssd1306 είναι μόνο για το Pi στο παιχνίδι');
 });
 
 console.log(`\n${passed} πέρασαν, ${failed} απέτυχαν\n`);

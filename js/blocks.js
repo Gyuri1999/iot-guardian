@@ -29,9 +29,12 @@
   const caps = track => CAPS[track] || CAPS['cpp-esp32'];
   // Python στο Pi (gpiozero): το εικονικό Pi δεν έχει φανάρι για την Python
   const hasTraffic = track => track !== 'py-pi';
-  // buzzer, servo, LED RGB, OLED: στη C++ και στη MicroPython του ESP32
+  // buzzer, servo, LED RGB, OLED: παντού εκτός από τη Rust του ESP32
   const NEWP = ['buzzer', 'servo', 'rgb', 'oled'];
-  const hasNew = track => track === 'cpp-esp32' || track === 'py-esp32';
+  const hasNew = track => track !== 'rs-esp32';
+  // f64 της Rust: 1 → 1.0
+  const f64 = x => (Number.isInteger(x) ? x + '.0' : String(x));
+  const frac = v => Math.round((v / 255) * 100) / 100;
 
   // ------------------------------------------------------------ μοντέλο
 
@@ -172,14 +175,16 @@
             break;
           }
           case 'repeat': L.push(`${p}for ${'ijkmn'[d] || 'r'} in range(${b.n}):`); body(b.body, ind + 4, d + 1); break;
-          case 'tone': L.push(`${p}buzzer.freq(${b.f})`, `${p}buzzer.duty_u16(32768)`); if (b.ms) L.push(`${p}time.sleep_ms(${b.ms})`, `${p}buzzer.duty_u16(0)`); break;
-          case 'quiet': L.push(`${p}buzzer.duty_u16(0)`); break;
-          case 'servo': L.push(`${p}angle(${b.a})`); break;
+          case 'tone':
+            if (pi) { L.push(`${p}buzzer.play(Tone(frequency=${Math.min(7040, Math.max(28, b.f))}))`); if (b.ms) L.push(`${p}time.sleep(${b.ms / 1000})`, `${p}buzzer.stop()`); break; }
+            L.push(`${p}buzzer.freq(${b.f})`, `${p}buzzer.duty_u16(32768)`); if (b.ms) L.push(`${p}time.sleep_ms(${b.ms})`, `${p}buzzer.duty_u16(0)`); break;
+          case 'quiet': L.push(pi ? `${p}buzzer.stop()` : `${p}buzzer.duty_u16(0)`); break;
+          case 'servo': L.push(pi ? `${p}servo.angle = ${b.a}` : `${p}angle(${b.a})`); break;
           case 'rgb': L.push(`${p}color(${b.r}, ${b.g}, ${b.b})`); break;
           case 'oled':
           case 'oledv': {
             const what = b.t === 'oled' ? `"${b.text}"` : b.v === 'count' ? 'str(count)' : b.v === 'temp' ? 'str(temperature())' : 'str(round(distance_cm(), 1))';
-            L.push(`${p}oled.fill(0)`, `${p}oled.text(${what}, 0, 0)`, `${p}oled.show()`);
+            L.push(`${p}oled.fill(0)`, `${p}oled.text(${what}, 0, 0${pi ? ', 1' : ''})`, `${p}oled.show()`);
             break;
           }
         }
@@ -187,13 +192,19 @@
     };
     L.push('# Αυτόν τον κώδικα τον έφτιαξαν τα μπλοκ σου.');
     if (pi) {
-      const imp = [u.led || Object.keys(u.light).length ? 'LED' : null, u.button ? 'Button' : null, u.pir ? 'MotionSensor' : null].filter(Boolean);
+      const imp = [u.led || Object.keys(u.light).length ? 'LED' : null, u.button ? 'Button' : null, u.pir ? 'MotionSensor' : null, u.buzzer ? 'TonalBuzzer' : null, u.servo ? 'AngularServo' : null, u.rgb ? 'RGBLED' : null].filter(Boolean);
       if (imp.length) L.push(`from gpiozero import ${imp.join(', ')}`);
+      if (u.buzzer) L.push('from gpiozero.tones import Tone');
+      if (u.oled) L.push('import board', 'import busio', 'import adafruit_ssd1306');
       L.push('import time', '');
       if (u.led) L.push('led = LED(17)');
       for (const c of Object.keys(u.light)) L.push(`${VAR[c]} = LED(${LIGHT_PIN.pypi[c]})`);
       if (u.button) L.push('button = Button(27)');
       if (u.pir) L.push('pir = MotionSensor(4)');
+      if (u.buzzer) L.push('buzzer = TonalBuzzer(22, octaves=4)');
+      if (u.servo) L.push('servo = AngularServo(18, min_angle=0, max_angle=180, min_pulse_width=0.0005, max_pulse_width=0.0025)');
+      if (u.rgb) L.push('rgb = RGBLED(red=5, green=6, blue=13)', '', 'def color(r, g, b):', '    rgb.color = (r / 255, g / 255, b / 255)');
+      if (u.oled) L.push('i2c = busio.I2C(board.SCL, board.SDA)', 'oled = adafruit_ssd1306.SSD1306_I2C(128, 64, i2c)');
     } else {
       L.push(`from machine import Pin${u.buzzer || u.servo || u.rgb ? ', PWM' : ''}${u.oled ? ', I2C' : ''}${u.dist ? ', time_pulse_us' : ''}`);
       if (u.temp) L.push('import dht');
@@ -240,15 +251,31 @@
           L.push(`${p}}`); break;
         }
         case 'repeat': L.push(`${p}for _ in 0..${b.n} {`); body(b.body, ind + 4, d + 1); L.push(`${p}}`); break;
+        case 'tone': L.push(`${p}buzzer.set_pwm_frequency(${f64(b.f)}, 0.5)?;`); if (b.ms) L.push(`${p}thread::sleep(Duration::from_millis(${b.ms}));`, `${p}buzzer.clear_pwm()?;`); break;
+        case 'quiet': L.push(`${p}buzzer.clear_pwm()?;`); break;
+        case 'servo': L.push(`${p}servo.set_pwm(Duration::from_millis(20), Duration::from_micros(${Math.round(500 + (b.a * 2000) / 180)}))?;   // ${b.a}°`); break;
+        case 'rgb': L.push(`${p}red.set_pwm_frequency(100.0, ${f64(frac(b.r))})?;`, `${p}green.set_pwm_frequency(100.0, ${f64(frac(b.g))})?;`, `${p}blue.set_pwm_frequency(100.0, ${f64(frac(b.b))})?;`); break;
+        case 'oled':
+        case 'oledv': {
+          const what = b.t === 'oled' ? `"${b.text}"` : '&format!("{}", count)';
+          L.push(`${p}display.clear_buffer();`, `${p}Text::with_baseline(${what}, Point::new(0, 0), style, Baseline::Top).draw(&mut display).unwrap();`, `${p}display.flush().unwrap();`);
+          break;
+        }
       }
     });
     L.push('// Αυτόν τον κώδικα τον έφτιαξαν τα μπλοκ σου.');
     if (pi) {
-      L.push('use rppal::gpio::Gpio;', 'use std::error::Error;', 'use std::thread;', 'use std::time::Duration;', '', 'fn main() -> Result<(), Box<dyn Error>> {', '    let gpio = Gpio::new()?;');
+      L.push('use rppal::gpio::Gpio;');
+      if (u.oled) L.push('use rppal::i2c::I2c;', 'use ssd1306::{prelude::*, I2CDisplayInterface, Ssd1306};', 'use embedded_graphics::{', '    mono_font::{ascii::FONT_6X10, MonoTextStyleBuilder},', '    pixelcolor::BinaryColor,', '    prelude::*,', '    text::{Baseline, Text},', '};');
+      L.push('use std::error::Error;', 'use std::thread;', 'use std::time::Duration;', '', 'fn main() -> Result<(), Box<dyn Error>> {', '    let gpio = Gpio::new()?;');
       if (u.led) L.push('    let mut led = gpio.get(17)?.into_output();');
       for (const c of Object.keys(u.light)) L.push(`    let mut ${VAR[c]} = gpio.get(${LIGHT_PIN.rspi[c]})?.into_output();`);
       if (u.button) L.push('    let button = gpio.get(27)?.into_input();');
       if (u.pir) L.push('    let pir = gpio.get(4)?.into_input();');
+      if (u.buzzer) L.push('    let mut buzzer = gpio.get(22)?.into_output();');
+      if (u.servo) L.push('    let mut servo = gpio.get(18)?.into_output();');
+      if (u.rgb) L.push('    let mut red = gpio.get(5)?.into_output();', '    let mut green = gpio.get(6)?.into_output();', '    let mut blue = gpio.get(13)?.into_output();');
+      if (u.oled) L.push('    let i2c = I2c::new()?;', '    let interface = I2CDisplayInterface::new(i2c);', '    let mut display = Ssd1306::new(interface, DisplaySize128x64, DisplayRotation::Rotate0)', '        .into_buffered_graphics_mode();', '    display.init().unwrap();', '    let style = MonoTextStyleBuilder::new().font(&FONT_6X10).text_color(BinaryColor::On).build();');
     } else {
       L.push('use esp_idf_svc::hal::delay::FreeRtos;', 'use esp_idf_svc::hal::gpio::PinDriver;', 'use esp_idf_svc::hal::peripherals::Peripherals;', '', 'fn main() -> anyhow::Result<()> {', '    esp_idf_svc::sys::link_patches();', '    let peripherals = Peripherals::take()?;');
       if (u.led) L.push('    let mut led = PinDriver::output(peripherals.pins.gpio2)?;');

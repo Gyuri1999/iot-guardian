@@ -20,11 +20,11 @@
 
   // όλα τα «modules» που υπάρχουν (προθέματα των LIB)
   function modulePaths() {
-    const out = new Set(['std', 'std::thread', 'std::time', 'std::error', 'std::process', 'std::cmp', 'rppal', 'rppal::gpio', 'esp_idf_svc', 'esp_idf_svc::hal', 'esp_idf_svc::hal::gpio', 'esp_idf_svc::hal::delay', 'esp_idf_svc::hal::peripherals', 'esp_idf_svc::sys', 'esp_idf_svc::log', 'anyhow', 'log', 'esp_idf_svc::hal::prelude']);
+    const out = new Set(['std', 'std::thread', 'std::time', 'std::error', 'std::process', 'std::cmp', 'rppal', 'rppal::gpio', 'rppal::i2c', 'ssd1306', 'ssd1306::prelude', 'embedded_graphics', 'embedded_graphics::prelude', 'embedded_graphics::mono_font', 'embedded_graphics::mono_font::ascii', 'embedded_graphics::pixelcolor', 'embedded_graphics::text', 'embedded_graphics::geometry', 'esp_idf_svc', 'esp_idf_svc::hal', 'esp_idf_svc::hal::gpio', 'esp_idf_svc::hal::delay', 'esp_idf_svc::hal::peripherals', 'esp_idf_svc::sys', 'esp_idf_svc::log', 'anyhow', 'log', 'esp_idf_svc::hal::prelude']);
     return out;
   }
   const MACRO_IMPORTS = new Set(['log::info', 'log::warn', 'log::error', 'log::debug', 'anyhow::anyhow', 'anyhow::bail']);
-  const crateBoard = p => (p.startsWith('rppal') ? 'pi' : p.startsWith('esp_idf_svc') || p.startsWith('esp_idf_hal') ? 'esp32' : null);
+  const crateBoard = p => (p.startsWith('rppal') || p.startsWith('ssd1306') || p.startsWith('embedded_graphics') ? 'pi' : p.startsWith('esp_idf_svc') || p.startsWith('esp_idf_hal') ? 'esp32' : null);
   const normPath = p => p.replace(/^esp_idf_hal::/, 'esp_idf_svc::hal::').replace(/^esp_idf_hal$/, 'esp_idf_svc::hal').replace(/^esp_idf_sys::/, 'esp_idf_svc::sys::');
 
   // ------------------------------------------------------------ τύποι (ως κείμενο)
@@ -96,7 +96,7 @@
           if (u.path[u.path.length - 1] === 'self') { const p = u.path.slice(0, -1); prog.imports.set(u.alias || p[p.length - 1], normPath(p.join('::'))); continue; }
           if (!(full in LIB) && !mods.has(full) && !MACRO_IMPORTS.has(full) && !/^std::(fmt|io|collections|cmp|convert|str)(::|$)/.test(full)) {
             const crate = u.path[0];
-            const known = ['std', 'rppal', 'esp_idf_svc', 'esp_idf_hal', 'anyhow', 'log', 'core'].includes(crate);
+            const known = ['std', 'rppal', 'esp_idf_svc', 'esp_idf_hal', 'anyhow', 'log', 'core', 'ssd1306', 'embedded_graphics'].includes(crate);
             throw rerr('E0432', `unresolved import \`${u.path.join('::')}\``, u.line, known ? `Το «${u.path[u.path.length - 1]}» δεν υπάρχει εκεί. Έλεγξε την ορθογραφία (κεφαλαία/μικρά).` : `Η βιβλιοθήκη «${crate}» δεν είναι διαθέσιμη σε αυτή την προσομοίωση. ${BOARD_HINT[target === 'pi' ? 'esp32' : 'pi'].split('.').pop()}`);
           }
           const name = u.alias || u.path[u.path.length - 1];
@@ -133,7 +133,7 @@
   const MUT_METHODS = {
     String: new Set(['push', 'push_str', 'pop', 'clear', 'insert', 'remove', 'truncate']),
     Vec: new Set(['push', 'pop', 'clear', 'insert', 'remove', 'sort', 'sort_unstable', 'reverse', 'truncate', 'swap', 'iter_mut', 'retain', 'dedup']),
-    OutputPin: new Set(['set_high', 'set_low', 'toggle', 'write']),
+    OutputPin: new Set(['set_high', 'set_low', 'toggle', 'write', 'set_pwm', 'set_pwm_frequency', 'clear_pwm']),
     PinDriver: new Set(['set_high', 'set_low', 'toggle', 'set_level', 'set_pull']),
     Option: new Set(['take', 'insert', 'replace'])
   };
@@ -965,7 +965,7 @@
     'std::time::Duration::from_millis': 'Duration', 'std::time::Duration::from_secs': 'Duration', 'std::time::Duration::from_micros': 'Duration',
     'std::time::Duration::from_secs_f32': 'Duration', 'std::time::Duration::from_secs_f64': 'Duration', 'std::time::Instant::now': 'Instant',
     'std::thread::sleep': '()', 'String::new': 'String', 'String::from': 'String', 'String::with_capacity': 'String', 'Vec::new': 'Vec<_>', 'Vec::with_capacity': 'Vec<_>',
-    'rppal::gpio::Gpio::new': 'Result<Gpio, rppal::gpio::Error>',
+    'rppal::gpio::Gpio::new': 'Result<Gpio, rppal::gpio::Error>', 'rppal::i2c::I2c::new': 'Result<I2c, rppal::i2c::Error>',
     'esp_idf_svc::hal::peripherals::Peripherals::take': 'Result<Peripherals, EspError>',
     'esp_idf_svc::hal::gpio::PinDriver::output': 'Result<PinDriver<Output>, EspError>', 'esp_idf_svc::hal::gpio::PinDriver::input': 'Result<PinDriver<Input>, EspError>',
     'esp_idf_svc::hal::delay::FreeRtos::delay_ms': '()', 'esp_idf_svc::hal::delay::Ets::delay_us': '()', 'esp_idf_svc::sys::link_patches': '()'
@@ -982,7 +982,7 @@
     if (base === 'Pin' && name.startsWith('into_output')) return 'OutputPin';
     if (base === 'Pin' && name.startsWith('into_input')) return 'InputPin';
     if ((base === 'OutputPin' || base === 'InputPin') && (name.startsWith('is_'))) return 'bool';
-    if (base === 'OutputPin') return '()';
+    if (base === 'OutputPin') return ['set_pwm', 'set_pwm_frequency', 'clear_pwm'].includes(name) ? 'Result<(), rppal::gpio::Error>' : '()';
     if (base === 'InputPin' && name === 'read') return 'Level';
     if (base.startsWith('PinDriver')) return name.startsWith('is_') ? 'bool' : name === 'get_level' ? 'Level' : 'Result<(), EspError>';
     if (base === 'Instant') return name === 'elapsed' || name === 'duration_since' ? 'Duration' : null;

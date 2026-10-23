@@ -5,7 +5,7 @@ const fs = require('fs');
 const path = require('path');
 const ROOT = path.join(__dirname, '..');
 const lessonFiles = fs.readdirSync(path.join(ROOT, 'js', 'lessons')).filter(f => f.endsWith('.js')).sort().map(f => 'js/lessons/' + f);
-const scripts = ['js/interpreter.js', 'js/pyinterp.js', 'js/pyweb.js', 'js/pymicro.js', 'js/device.js', 'js/network.js', 'js/validator.js', 'js/pisys.js', 'js/rsinterp.js', 'js/rsruntime.js', 'js/rslib.js', 'js/rscheck.js', 'js/vendor/three.min.js', 'js/scene.js', 'js/scene3d.js', 'js/parts.js', 'js/themes.js', 'js/sfx.js', 'js/housemap.js', 'js/speak.js', 'js/learn.js', 'js/wiring.js', 'js/gardi.js', 'js/challenge.js', 'js/sandbox.js', 'js/blocks.js', 'js/tour.js', 'js/stories.js', 'js/lessons.js', ...lessonFiles, 'js/storage.js', 'js/real.js', 'js/ui.js']
+const scripts = ['js/interpreter.js', 'js/pyinterp.js', 'js/pyweb.js', 'js/pymicro.js', 'js/pyparts.js', 'js/device.js', 'js/network.js', 'js/validator.js', 'js/pisys.js', 'js/rsinterp.js', 'js/rsruntime.js', 'js/rslib.js', 'js/rscheck.js', 'js/vendor/three.min.js', 'js/scene.js', 'js/scene3d.js', 'js/parts.js', 'js/themes.js', 'js/sfx.js', 'js/housemap.js', 'js/speak.js', 'js/learn.js', 'js/wiring.js', 'js/gardi.js', 'js/challenge.js', 'js/sandbox.js', 'js/blocks.js', 'js/tour.js', 'js/stories.js', 'js/lessons.js', ...lessonFiles, 'js/storage.js', 'js/real.js', 'js/ui.js']
   .map(s => `<script src="${s}"></script>`).join('\n');
 const favicon = 'data:image/svg+xml,' + encodeURIComponent(fs.readFileSync(path.join(ROOT, 'favicon.svg'), 'utf8').replace(/\s+/g, ' '));
 const fonts = `<link rel="icon" type="image/svg+xml" href="${favicon}">

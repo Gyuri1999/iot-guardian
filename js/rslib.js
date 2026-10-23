@@ -110,7 +110,7 @@
   }
   function pinHelp(m) {
     return m.target === 'pi'
-      ? 'Στον εικονικό πάγκο: LED = GPIO 17, κουμπί = GPIO 27, PIR = GPIO 4, TRIG = GPIO 23, ECHO = GPIO 24, φανάρι = GPIO 16 / 20 / 21.'
+      ? 'Στον εικονικό πάγκο: LED = GPIO 17, κουμπί = GPIO 27, PIR = GPIO 4, TRIG = GPIO 23, ECHO = GPIO 24, φανάρι = GPIO 16 / 20 / 21, buzzer = GPIO 22, servo = GPIO 18, LED RGB = GPIO 5 / 6 / 13.'
       : 'Στον εικονικό πάγκο: LED = GPIO 2, κουμπί = GPIO 15, PIR = GPIO 4, TRIG = GPIO 5, ECHO = GPIO 18, φανάρι = GPIO 25 / 26 / 27.';
   }
 
@@ -155,8 +155,18 @@
       t: 'obj', cls: 'OutputPin',
       debug: () => `OutputPin { pin: ${n} }`,
       short: () => `OutputPin(GPIO ${n}) · ${get() ? 'High' : 'Low'}`,
-      mutMethods: new Set(['set_high', 'set_low', 'toggle', 'write', 'set_value']),
+      mutMethods: new Set(['set_high', 'set_low', 'toggle', 'write', 'set_value', 'set_pwm', 'set_pwm_frequency', 'clear_pwm']),
       methods: {
+        set_pwm_frequency: (a, line) => { need(a, 2, 'set_pwm_frequency', line); pwmOut(m, n, argF64(a[0], 'set_pwm_frequency', line), argF64(a[1], 'set_pwm_frequency', line), line); return OK(UNIT); },
+        set_pwm: (a, line) => {
+          need(a, 2, 'set_pwm', line);
+          const per = deref(a[0]), pw = deref(a[1]);
+          if (!per || per.t !== 'dur' || !pw || pw.t !== 'dur') throw rerr('E0308', 'mismatched types: expected `Duration`', line, 'Γράψε π.χ. set_pwm(Duration::from_millis(20), Duration::from_micros(1500)).');
+          if (per.us <= 0) return ERR(errVal('Invalid period', 'InvalidArgument', 'rppal::gpio::Error'));
+          pwmOut(m, n, 1e6 / per.us, pw.us / per.us, line);
+          return OK(UNIT);
+        },
+        clear_pwm: (a, line) => { pwmOut(m, n, 0, 0, line); return OK(UNIT); },
         set_high: (a, line) => { writeOutput(m, n, 1, line); return UNIT; },
         set_low: (a, line) => { writeOutput(m, n, 0, line); return UNIT; },
         toggle: (a, line) => { writeOutput(m, n, get() ? 0 : 1, line); return UNIT; },
@@ -179,6 +189,153 @@
       }
     };
   }
+
+  // f64 όπως στη Rust: το 440 (ακέραιος) δεν γίνεται μόνο του 440.0
+  function argF64(a, what, line) {
+    const v = deref(a);
+    if (v && v.t === 'int') throw rerr('E0308', 'mismatched types: expected `f64`, found integer', line, `Το ${what} θέλει δεκαδικό: γράψε ${v.v}.0 αντί για ${v.v}.`);
+    return argNum(a, what, line);
+  }
+  // PWM λογισμικού του rppal: συχνότητα (Hz) και duty 0.0–1.0. Το εξάρτημα στο pin αποφασίζει τι θα γίνει.
+  function pwmOut(m, n, freq, duty, line) {
+    const w = wired(m, n);
+    const b = m.board;
+    if (duty < 0 || duty > 1) b.warnOnce('rspwmduty', line, `Το duty_cycle πάει από 0.0 έως 1.0· έδωσες ${duty}.`, '0.0 = σβηστό, 0.5 = μισό, 1.0 = όλη την ώρα αναμμένο.');
+    const d = Math.max(0, Math.min(1, duty));
+    if (!w) { b.warnOnce('rspwmnc' + n, line, `Στο GPIO ${n} δεν είναι συνδεδεμένο τίποτα που να δέχεται PWM.`, pinHelp(m)); return; }
+    if (w.key === 'BUZZER') {
+      const f = d > 0 ? Math.round(freq) : 0;
+      if (f && (f < 30 || f > 20000)) b.warnOnce('tonefreq', line, `Τα ${f} Hz δεν ακούγονται καλά από ένα buzzer.`, 'Δοκίμασε συχνότητες από 200 έως 4000 Hz (π.χ. 440.0 = λα).');
+      if (f && f !== b.buzzer.freq) b.buzzer.tones.push({ t: b.micros, f, ms: null });
+      b.buzzer.freq = f;
+      b.buzzer.until = null;
+    } else if (w.key === 'SERVO') {
+      if (!d) return;
+      if (Math.abs(freq - 50) > 1) b.warnOnce('servofreq', line, `Το servo θέλει παλμό κάθε 20 ms (50 Hz)· έβαλες ${Math.round(freq)} Hz.`, 'Γράψε set_pwm(Duration::from_millis(20), Duration::from_micros(1500)).');
+      const pulse = (d / freq) * 1e6;
+      const ang = ((pulse - 500) / 2000) * 180;
+      if (ang < -2 || ang > 182) b.warnOnce('servorange', line, `Ο παλμός ${Math.round(pulse)} µs είναι έξω από τα όρια του servo (500–2500 µs).`, '500 µs = 0°, 1500 µs = 90°, 2500 µs = 180°.');
+      b.servo.attached = true;
+      b.servo.angle = Math.max(0, Math.min(180, Math.round(ang)));
+      b.servo.moves.push({ t: b.micros, angle: b.servo.angle });
+    } else if (w.key === 'RGB_R' || w.key === 'RGB_G' || w.key === 'RGB_B' || w.key === 'LED') {
+      b.pwm[w.pin] = Math.round(d * 255);
+      if (w.key === 'LED') { b.modes[w.pin] = 3; b.outputs[w.pin] = d > 0 ? 1 : 0; }
+    } else {
+      b.warnOnce('rspwmkind' + n, line, `Στο GPIO ${n} είναι ${PIN_WORD[w.key]}: δεν χρειάζεται PWM.`, 'Χρησιμοποίησε set_high() / set_low().');
+    }
+  }
+
+  // ------------------------------------------------------------ Raspberry Pi: οθόνη OLED (rppal::i2c + ssd1306 + embedded-graphics)
+  // Η οθόνη είναι στον δίαυλο I2C 1 του Pi: SDA = GPIO 2, SCL = GPIO 3.
+  const tyObj = (cls, extra) => Object.assign({ t: 'obj', cls, debug: () => cls, short: () => cls, methods: {} }, extra || {});
+  LIB['rppal::i2c::I2c'] = {
+    board: 'pi',
+    value: { t: 'type', name: 'I2c', assoc: { new: m => { if (m.i2cTaken) return ERR(errVal('I2C bus is busy', 'Io(ResourceBusy)', 'rppal::i2c::Error')); m.i2cTaken = true; return OK(tyObj('I2c', { short: () => 'I2c (δίαυλος 1 · SDA 2 · SCL 3)', methods: { set_slave_address: () => OK(UNIT) } })); } } }
+  };
+  LIB['ssd1306::I2CDisplayInterface'] = {
+    board: 'pi',
+    value: { t: 'type', name: 'I2CDisplayInterface', assoc: { new: (m, a, line) => { need(a, 1, 'I2CDisplayInterface::new', line); const bus = deref(a[0]); if (!bus || bus.cls !== 'I2c') throw rerr('E0308', 'mismatched types: expected an I2C bus', line, 'Γράψε let i2c = I2c::new()?; και μετά I2CDisplayInterface::new(i2c).'); return tyObj('I2CInterface', { moveOnly: true }); } } }
+  };
+  const SIZE128 = tyObj('DisplaySize128x64', { w: 128, h: 64 });
+  LIB['ssd1306::prelude::DisplaySize128x64'] = { board: 'pi', value: SIZE128 };
+  LIB['ssd1306::size::DisplaySize128x64'] = { board: 'pi', value: SIZE128 };
+  LIB['ssd1306::prelude::DisplaySize128x32'] = { board: 'pi', value: tyObj('DisplaySize128x32', { w: 128, h: 32 }) };
+  const ROT = { t: 'type', name: 'DisplayRotation', consts: { Rotate0: () => tyObj('Rotate0'), Rotate90: () => tyObj('Rotate90'), Rotate180: () => tyObj('Rotate180'), Rotate270: () => tyObj('Rotate270') } };
+  LIB['ssd1306::prelude::DisplayRotation'] = { board: 'pi', value: ROT };
+  LIB['ssd1306::rotation::DisplayRotation'] = { board: 'pi', value: ROT };
+  LIB['ssd1306::Ssd1306'] = {
+    board: 'pi',
+    value: {
+      t: 'type', name: 'Ssd1306',
+      assoc: {
+        new: (m, a, line) => {
+          need(a, 3, 'Ssd1306::new', line);
+          const itf = deref(a[0]), size = deref(a[1]);
+          if (!itf || itf.cls !== 'I2CInterface') throw rerr('E0308', 'mismatched types: expected a display interface', line, 'Το πρώτο όρισμα είναι το interface: I2CDisplayInterface::new(i2c).');
+          if (size && size.h && size.h !== 64) m.board.warnOnce('oledsize', line, 'Η οθόνη μας είναι 128 × 64.', 'Γράψε DisplaySize128x64.');
+          // Ssd1306::new(…) → .into_buffered_graphics_mode() → η οθόνη με buffer
+          return tyObj('Ssd1306', { moveOnly: true, short: () => 'Ssd1306 (χωρίς buffer)', selfMethods: new Set(['into_buffered_graphics_mode']), methods: { into_buffered_graphics_mode: () => oledDisplay(m) } });
+        }
+      }
+    }
+  };
+  function oledDisplay(m) {
+    const b = m.board;
+    const o = b.oled;
+    return {
+      t: 'obj', cls: 'Ssd1306<BufferedGraphicsMode>', oled: true,
+      debug: () => 'Ssd1306 { .. }',
+      short: () => `Ssd1306 · ${o.shown.map(t => t.text).join(' / ') || 'κενή'}`,
+      mutMethods: new Set(['init', 'clear_buffer', 'clear', 'flush', 'set_display_on']),
+      methods: {
+        init: () => { o.begun = true; return OK(UNIT); },
+        clear_buffer: () => { o.buf = []; o.pending = true; return UNIT; },
+        clear: () => { o.buf = []; o.pending = true; return OK(UNIT); },
+        set_display_on: () => OK(UNIT),
+        flush: (a, line) => {
+          if (!o.begun) { b.warnOnce('oledbegin', line, 'Η οθόνη δεν έχει ξεκινήσει: λείπει το display.init().', 'Πρόσθεσε display.init().unwrap(); πριν γράψεις.'); return OK(UNIT); }
+          o.shown = o.buf.slice(); o.updates++; o.pending = false;
+          return OK(UNIT);
+        }
+      }
+    };
+  }
+  // embedded-graphics: γραμματοσειρά, στυλ, θέση και κείμενο
+  const FONTS = { FONT_6X10: 1, FONT_6X13: 1, FONT_5X8: 1, FONT_7X13: 1, FONT_9X15: 1.5, FONT_10X20: 2 };
+  for (const [name, size] of Object.entries(FONTS)) LIB['embedded_graphics::mono_font::ascii::' + name] = { board: 'pi', value: tyObj('MonoFont', { copy: true, size, fontName: name, short: () => name }) };
+  const COLOR = { t: 'type', name: 'BinaryColor', consts: { On: () => tyObj('BinaryColor', { copy: true, on: true, short: () => 'BinaryColor::On' }), Off: () => tyObj('BinaryColor', { copy: true, on: false, short: () => 'BinaryColor::Off' }) } };
+  LIB['embedded_graphics::pixelcolor::BinaryColor'] = { board: 'pi', value: COLOR };
+  LIB['embedded_graphics::prelude::BinaryColor'] = { board: 'pi', value: COLOR };
+  function styleBuilder(st) {
+    return tyObj('MonoTextStyleBuilder', {
+      selfMethods: new Set(['font', 'text_color', 'build', 'background_color']),
+      methods: {
+        font: (a, line) => { const f = deref(a[0]); if (!f || f.cls !== 'MonoFont') throw rerr('E0308', 'mismatched types: expected `&MonoFont`', line, 'Γράψε .font(&FONT_6X10).'); return styleBuilder(Object.assign({}, st, { size: f.size })); },
+        text_color: (a) => { const c = deref(a[0]); return styleBuilder(Object.assign({}, st, { on: !c || c.on !== false })); },
+        background_color: () => styleBuilder(st),
+        build: (a, line) => {
+          if (!st.size) throw rerr('E0599', 'no method named `build` found: the font is missing', line, 'Το στυλ χρειάζεται γραμματοσειρά: .font(&FONT_6X10) πριν από το .build().');
+          return tyObj('MonoTextStyle', { copy: true, size: st.size, on: st.on !== false, short: () => `MonoTextStyle · μέγεθος ${st.size}` });
+        }
+      }
+    });
+  }
+  LIB['embedded_graphics::mono_font::MonoTextStyleBuilder'] = { board: 'pi', value: { t: 'type', name: 'MonoTextStyleBuilder', assoc: { new: () => styleBuilder({ on: true }) } } };
+  LIB['embedded_graphics::mono_font::MonoTextStyle'] = { board: 'pi', value: { t: 'type', name: 'MonoTextStyle', assoc: { new: (m, a, line) => { const f = deref(a[0]); const c = deref(a[1]); return tyObj('MonoTextStyle', { copy: true, size: f && f.size ? f.size : 1, on: !c || c.on !== false }); } } } };
+  const POINT = { t: 'type', name: 'Point', assoc: { new: (m, a, line) => { need(a, 2, 'Point::new', line); const x = argInt(a[0], 'Point::new', line), y = argInt(a[1], 'Point::new', line); return tyObj('Point', { copy: true, x, y, debug: () => `Point { x: ${x}, y: ${y} }`, short: () => `Point(${x}, ${y})` }); }, zero: () => tyObj('Point', { copy: true, x: 0, y: 0 }) } };
+  LIB['embedded_graphics::prelude::Point'] = { board: 'pi', value: POINT };
+  LIB['embedded_graphics::geometry::Point'] = { board: 'pi', value: POINT };
+  const BASELINE = { t: 'type', name: 'Baseline', consts: { Top: () => tyObj('Baseline', { copy: true, top: true }), Middle: () => tyObj('Baseline', { copy: true, mid: true }), Bottom: () => tyObj('Baseline', { copy: true,}), Alphabetic: () => tyObj('Baseline', { copy: true,}) } };
+  LIB['embedded_graphics::text::Baseline'] = { board: 'pi', value: BASELINE };
+  function textObj(m, a, line, baseline) {
+    const txt = deref(a[0]);
+    if (!txt || txt.t !== 'str') throw rerr('E0308', 'mismatched types: expected `&str`', line, 'Το κείμενο μπαίνει σε "εισαγωγικά" ή ως &μεταβλητή (π.χ. &msg).');
+    const p = deref(a[1]);
+    if (!p || p.cls !== 'Point') throw rerr('E0308', 'mismatched types: expected `Point`', line, 'Η θέση γράφεται Point::new(0, 0).');
+    const st = deref(a[2]);
+    if (!st || st.cls !== 'MonoTextStyle') throw rerr('E0308', 'mismatched types: expected `MonoTextStyle`', line, 'Φτιάξε στυλ με MonoTextStyleBuilder::new().font(&FONT_6X10).text_color(BinaryColor::On).build().');
+    const top = baseline && baseline.top;
+    const y = top ? p.y : baseline && baseline.mid ? p.y - 4 * st.size : p.y - 7 * st.size;
+    return tyObj('Text', {
+      short: () => `Text «${txt.v}»`,
+      methods: {
+        draw: (args, ln) => {
+          const d = deref(args[0]);
+          if (!d || !d.oled) throw rerr('E0308', 'mismatched types: expected `&mut` display', ln, 'Γράψε .draw(&mut display).');
+          const o = m.board.oled;
+          if (y + 8 * st.size > 64 || y < 0) m.board.warnOnce('oledfull', ln, `Το κείμενο «${txt.v}» βγαίνει έξω από την οθόνη (ύψος 64).`, 'Με Baseline::Top γραμμές στα y = 0, 12, 24, 36, 48.');
+          if (st.on) o.buf.push({ x: p.x, y: Math.max(0, y), size: st.size, text: txt.v });
+          o.pending = true;
+          return OK(p);
+        }
+      }
+    });
+  }
+  LIB['embedded_graphics::text::Text'] = {
+    board: 'pi',
+    value: { t: 'type', name: 'Text', assoc: { new: (m, a, line) => { need(a, 3, 'Text::new', line); return textObj(m, a, line, null); }, with_baseline: (m, a, line) => { need(a, 4, 'Text::with_baseline', line); return textObj(m, a, line, deref(a[3])); } } }
+  };
 
   // Ονόματα τύπων που γράφονται μόνο σε υπογραφές, π.χ. fn blink(led: &mut OutputPin) ή
   // &mut PinDriver<'static, Gpio2, Output>: χρειάζονται μόνο για να περάσει το use.

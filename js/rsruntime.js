@@ -228,6 +228,7 @@
       case 'vec': return !!v.arr && v.v.every(isCopy);
       case 'opt': return !v.some || isCopy(v.v);
       case 'struct': case 'enum': return !!(v.def && v.def.derives.has('Copy'));
+      case 'obj': return !!v.copy;   // τύποι βιβλιοθήκης που είναι Copy (π.χ. MonoTextStyle, Point)
     }
     return false;
   }
@@ -271,9 +272,9 @@
   }
 
   // ------------------------------------------------------------ πλακέτα
-  const PI_MAP = { 17: 'LED', 27: 'BUTTON', 4: 'PIR', 23: 'TRIG', 24: 'ECHO', 16: 'RED', 20: 'YELLOW', 21: 'GREEN' };
+  const PI_MAP = { 17: 'LED', 27: 'BUTTON', 4: 'PIR', 23: 'TRIG', 24: 'ECHO', 16: 'RED', 20: 'YELLOW', 21: 'GREEN', 22: 'BUZZER', 18: 'SERVO', 5: 'RGB_R', 6: 'RGB_G', 13: 'RGB_B' };
   const ESP_MAP = { 2: 'LED', 15: 'BUTTON', 4: 'PIR', 5: 'TRIG', 18: 'ECHO', 25: 'RED', 26: 'YELLOW', 27: 'GREEN' };
-  const PIN_WORD = { LED: 'το LED', BUTTON: 'το κουμπί', PIR: 'ο αισθητήρας κίνησης PIR', TRIG: 'το TRIG του HC-SR04', ECHO: 'το ECHO του HC-SR04', RED: 'το κόκκινο φως', YELLOW: 'το κίτρινο φως', GREEN: 'το πράσινο φως' };
+  const PIN_WORD = { LED: 'το LED', BUTTON: 'το κουμπί', PIR: 'ο αισθητήρας κίνησης PIR', TRIG: 'το TRIG του HC-SR04', ECHO: 'το ECHO του HC-SR04', RED: 'το κόκκινο φως', YELLOW: 'το κίτρινο φως', GREEN: 'το πράσινο φως', BUZZER: 'το buzzer', SERVO: 'το servo', RGB_R: 'το κόκκινο του LED RGB', RGB_G: 'το πράσινο του LED RGB', RGB_B: 'το μπλε του LED RGB' };
 
   // ------------------------------------------------------------ Machine
   class RustMachine {

@@ -766,6 +766,30 @@
       wires.push(wire(piPinUV('GPIO21'), tlPinUV(2), 'w-grn', 74, 'sc-w-grn'));
       labels.push(callout(P(TL.u, TL.v + 1.6, 22), 40, -60, 'ΦΑΝΑΡΙ · 16 · 20 · 21', null, 'traffic'));
     }
+    // buzzer, LED RGB, servo, OLED: ίδιες θέσεις με του ESP32, καλώδια από το header του Pi
+    if (hw.includes('buzzer')) {
+      front += buzzer();
+      wires.push(wire(piPinUV('GPIO22'), buzPin(), 'w-buz', 36, 'sc-w-buz'));
+      labels.push(callout(P(BUZ.u, BUZ.v, 8), -70, 56, 'BUZZER · GPIO 22', null, 'buzzer'));
+    }
+    if (hw.includes('rgb')) {
+      front += rgbLed();
+      wires.push(wire(piPinUV('GPIO5'), rgbPin(0), 'w-rgbr', 70, 'sc-w-rgbr'));
+      wires.push(wire(piPinUV('GPIO6'), rgbPin(1), 'w-rgbg', 70, 'sc-w-rgbg'));
+      wires.push(wire(piPinUV('GPIO13'), rgbPin(2), 'w-rgbb', 70, 'sc-w-rgbb'));
+      labels.push(callout(P(RGBL.u, RGBL.v, 14), -40, 80, 'LED RGB · 5 · 6 · 13', null, 'rgb'));
+    }
+    if (hw.includes('servo')) {
+      mid += servoMotor();
+      wires.push(wire(piPinUV('GPIO18'), { u: SERVO.u + 0.5, v: SERVO.v + 4.5, h: 4 }, 'w-servo', 46, 'sc-w-servo'));
+      labels.push(callout(P(SERVO.u + 6, SERVO.v, 11), 40, -60, 'SERVO · GPIO 18', null, 'servo'));
+    }
+    if (hw.includes('oled')) {
+      mid += oledScreen();
+      wires.push(wire(piPinUV('GPIO2'), oledPin(0), 'w-sda', 58, 'sc-w-sda'));
+      wires.push(wire(piPinUV('GPIO3'), oledPin(1), 'w-scl', 62, 'sc-w-scl'));
+      labels.push(callout(P(OLED.u + 26, OLED.v, 10), 46, 20, 'OLED · SDA 2 · SCL 3', null, 'oled'));
+    }
     let links = '';
     const web = hw.includes('web');
     if (net || web) {
@@ -783,7 +807,10 @@
       links += `<path id="sc-link-esp-pi" d="M${pt(P(51, -44, 2))} Q${pt(P(40, -20, 34))} ${pt(P(28, 6, 2))}" class="link"/>`;
     }
     const inner = `<g class="sc-back">${back}</g><g class="sc-links">${links}</g><g class="sc-mid">${mid}</g><g class="sc-wires">${wires.join('')}</g><g class="sc-front">${front}</g><g class="sc-labels">${labels.join('')}</g><g id="sc-packets"></g>`;
-    return fit(inner, net || web ? [-260, -340, 620, 260] : [-160, -160, 470, 230], 'lab', 'Ισομετρική σκηνή: Raspberry Pi, breadboard και εξαρτήματα');
+    const b = net || web ? [-260, -340, 620, 260] : [-160, -160, 470, 230];
+    if (hw.includes('servo') || hw.includes('oled')) { b[2] += 150; b[1] -= 30; }
+    if (hw.includes('oled')) b[3] += 70;
+    return fit(inner, b, 'lab', 'Ισομετρική σκηνή: Raspberry Pi, breadboard και εξαρτήματα');
   }
 
   // Σκηνή άσκησης κώδικα: ESP32 + breadboard + ό,τι χρειάζεται το μάθημα.

@@ -18,7 +18,7 @@
 
   // modules ανά πλακέτα
   const ESP_ONLY = new Set(['machine', 'network', 'umqtt', 'umqtt.simple', 'dht', 'esp32', 'ssd1306']);
-  const PI_ONLY = new Set(['gpiozero', 'signal', 'paho', 'paho.mqtt', 'paho.mqtt.client', 'flask', 'sqlite3', 'markupsafe']);
+  const PI_ONLY = new Set(['gpiozero', 'gpiozero.tones', 'board', 'busio', 'adafruit_ssd1306', 'signal', 'paho', 'paho.mqtt', 'paho.mqtt.client', 'flask', 'sqlite3', 'markupsafe']);
   const proto = PyM.Machine.prototype;
   const moduleOrig = proto.module;
   proto.module = function (path, line) {
