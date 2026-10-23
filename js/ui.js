@@ -109,6 +109,8 @@
     if (window.IoTSpeak) window.IoTSpeak.setRate(s.readRate || 0.9);
     html.setAttribute('data-font', s.font || 'noto');
     html.setAttribute('data-letters', s.letters || 'normal');
+    const rl = document.getElementById('ruler');
+    if (rl) { rl.hidden = !s.ruler || s.ruler === 'off'; rl.classList.toggle('focus', s.ruler === 'focus'); }
     // οι γραμματοσειρές για δυσλεξία φορτώνονται μόνο όταν τις διαλέξεις (Google Fonts, με ελληνικά)
     const FF = { didact: 'Didact+Gothic', ysabeau: 'Ysabeau+Infant:wght@400;600;800' };
     if (FF[s.font] && !document.getElementById('font-' + s.font)) {
@@ -152,6 +154,7 @@
   const IC = {
     home: '<path d="M4 11l8-7 8 7"/><path d="M6 10v10h12V10"/><path d="M10 20v-6h4v6"/>',
     lock: '<rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/>',
+    bulb: '<path d="M12 3a6 6 0 0 0-3.5 10.9V17h7v-3.1A6 6 0 0 0 12 3zM9.5 20h5"/>',
     speaker: '<path d="M4 9.5h3.5L12 5.5v13l-4.5-4H4z"/><path d="M15.5 9a4 4 0 0 1 0 6M18 6.5a7.5 7.5 0 0 1 0 11"/>',
     map: '<path d="M4 6l5-2 6 2 5-2v14l-5 2-6-2-5 2z"/><path d="M9 4v14M15 6v14"/>',
     book: '<path d="M4 5a2 2 0 0 1 2-2h13v16H6a2 2 0 0 0-2 2z"/><path d="M4 19V5"/><path d="M8 7h7"/>',
@@ -429,6 +432,103 @@
 
   // ------------------------------------------------------------ Το σπίτι-χάρτης
 
+  // ------------------------------------------------------------ Μάθηση: επανάληψη, σημειώσεις, «τι κάνει η γραμμή»
+
+  const todayStr = () => window.IoTLearn.dayStr(new Date());
+  // Οι ασκήσεις που τελείωσαν πριν υπάρξει η επανάληψη μπαίνουν κι αυτές, για σήμερα.
+  function syncReview(tr) {
+    if (!window.IoTLearn) return;
+    const today = todayStr();
+    for (const l of trackLessons(tr.id)) if (P.completed[l.id] && l.quiz && !P.review[l.id]) P.review[l.id] = { box: 1, due: today };
+  }
+  function reviewCard(tr) {
+    if (!window.IoTLearn) return '';
+    syncReview(tr);
+    const L = window.IoTLearn;
+    const today = todayStr();
+    const mine = new Set(trackLessons(tr.id).map(l => l.id));
+    const due = L.dueIds(P.review, today).filter(id => mine.has(id));
+    const dv = L.dailyView(P.daily, today);
+    const all = Object.keys(P.review).filter(id => mine.has(id));
+    const next = all.map(id => P.review[id].due).filter(d => d > today).sort()[0];
+    const boxes = [1, 2, 3, 4, 5].map(b => all.filter(id => P.review[id].box === b).length);
+    const dots = Array.from({ length: dv.goal }, (_, i) => `<i class="${i < dv.count ? 'on' : ''}"></i>`).join('');
+    return `<div class="card review-card">
+      <div class="card-head"><h3>Επανάληψη και στόχος ημέρας</h3><span class="streak" title="Συνεχόμενες μέρες με τον στόχο">🔥 ${dv.streak} ${dv.streak === 1 ? 'μέρα' : 'μέρες'}</span></div>
+      <div class="goal"><span class="goal-dots" aria-hidden="true">${dots}</span><span>Σήμερα ${dv.count}/${dv.goal}${dv.met ? ' · ο στόχος έγινε!' : ' ασκήσεις ή σωστές επαναλήψεις'}</span></div>
+      ${all.length ? `<div class="boxes" aria-label="Κουτιά επανάληψης">${boxes.map((n, i) => `<span title="Κουτί ${i + 1}: ξαναρωτιέται σε ${L.BOX_DAYS[i + 1]} ${L.BOX_DAYS[i + 1] === 1 ? 'μέρα' : 'μέρες'}"><b>${n}</b>κουτί ${i + 1}</span>`).join('')}</div>` : ''}
+      <p class="muted" style="margin:0.4rem 0">${due.length ? `Σε περιμένουν <b>${due.length}</b> ερωτήσεις από ασκήσεις που έχεις κάνει. Ό,τι θυμάσαι, ανεβαίνει κουτί και ξαναέρχεται σε περισσότερες μέρες.` : all.length ? `Καμία ερώτηση για σήμερα.${next ? ` Η επόμενη επανάληψη: ${next.split('-').reverse().join('/')}.` : ''}` : 'Μόλις τελειώσεις μια άσκηση, η ερώτησή της θα ξανάρθει εδώ αύριο, για να μη την ξεχάσεις.'}</p>
+      ${due.length ? `<button class="btn primary" id="start-review">${icon('play')} Ξεκίνα επανάληψη (${Math.min(10, due.length)})</button>` : ''}
+    </div>`;
+  }
+  function openReview(tr) {
+    const L = window.IoTLearn;
+    const mine = new Set(trackLessons(tr.id).map(l => l.id));
+    const queue = L.dueIds(P.review, todayStr()).filter(id => mine.has(id) && byId[id] && byId[id].quiz).slice(0, 10);
+    const d = $('#dlg-review');
+    const body = $('#dlg-review-body');
+    let i = 0;
+    let right = 0;
+    const show = () => {
+      if (i >= queue.length) {
+        body.innerHTML = `<div class="rv-end"><p class="rv-big">${right} / ${queue.length} σωστές</p><p>${right === queue.length ? 'Τέλεια! Όλες ανέβηκαν κουτί.' : 'Όσες ξέχασες γύρισαν στο κουτί 1 και θα ξανάρθουν αύριο. Έτσι μαθαίνεται κάτι για πάντα: λίγο-λίγο, κάθε μέρα.'}</p><button class="btn primary" data-close>Τέλος</button></div>`;
+        body.querySelector('[data-close]').onclick = () => d.close();
+        sfx(right === queue.length ? 'win' : 'tick');
+        return;
+      }
+      const l = byId[queue[i]];
+      const q = l.quiz;
+      const box = (P.review[l.id] || {}).box || 1;
+      body.innerHTML = `<p class="rv-meta">Ερώτηση ${i + 1} από ${queue.length} · Κεφ. ${chNum(l.chapter)} · ${esc(l.title)} · κουτί ${box}</p>
+        <fieldset class="rv-q"><legend>${esc(q.question)}</legend>${q.options.map((o, k) => `<label><input type="radio" name="rv-opt" value="${k}"><span>${esc(o)}</span></label>`).join('')}</fieldset>
+        <div id="rv-fb" aria-live="polite"></div>
+        <div class="btn-row"><button class="btn primary" id="rv-check">Έλεγχος</button></div>`;
+      $('#rv-check').onclick = () => {
+        const sel = body.querySelector('input:checked');
+        if (!sel) { $('#rv-fb').innerHTML = '<div class="feedback no"><strong>Διάλεξε μια απάντηση</strong>Επίλεξε μία από τις επιλογές.</div>'; return; }
+        const ok = Number(sel.value) === q.answer;
+        const e = L.answer(P.review, l.id, ok, todayStr());
+        if (ok) { right++; P.daily = L.bump(P.daily, todayStr(), 1); sfx('tick'); } else sfx('err');
+        save();
+        body.querySelectorAll('input').forEach(x => { x.disabled = true; });
+        body.querySelectorAll('label')[q.answer].classList.add('rv-right');
+        $('#rv-fb').innerHTML = ok
+          ? `<div class="feedback ok"><strong>Σωστό · πάει στο κουτί ${e.box}</strong>${esc(q.explain)}</div>`
+          : `<div class="feedback no"><strong>Όχι ακόμα · ξανά αύριο</strong>Η σωστή απάντηση: «${esc(q.options[q.answer])}». ${esc(q.explain.replace(/^Σωστά\.\s*/, ''))}</div>`;
+        const b = $('#rv-check');
+        b.textContent = i + 1 < queue.length ? 'Επόμενη ερώτηση' : 'Αποτέλεσμα';
+        b.onclick = () => { i++; show(); };
+        b.focus();
+      };
+    };
+    show();
+    d.addEventListener('close', () => { if (!S.task) renderHome(); }, { once: true });
+    d.showModal();
+  }
+  function openNotes(n) {
+    const ch = CHAPTERS.find(c => c.n === n);
+    if (!ch || !window.IoTLearn) return;
+    $('#dlg-notes-body').innerHTML = window.IoTLearn.chapterNotes(Object.assign({ label: chNum(n) }, ch), chapterLessons(n), GLOSSARY, P.completed);
+    $('#dlg-notes').showModal();
+  }
+  // «Τι κάνει αυτή η γραμμή;»: εξήγηση της γραμμής όπου βρίσκεται ο κέρσορας, σε απλά ελληνικά.
+  function bindExplain(l) {
+    const ta = $('#code');
+    const out = $('#explain-a');
+    if (!ta || !out || !window.IoTLearn) return;
+    let last = -1;
+    const upd = () => {
+      const pos = ta.selectionStart;
+      const n = ta.value.slice(0, pos).split('\n').length;
+      if (n === last) return;
+      last = n;
+      const line = ta.value.split('\n')[n - 1] || '';
+      const ex = window.IoTLearn.explainLine(line, langOf(l));
+      out.innerHTML = ex ? `<b>Γραμμή ${n}:</b> ${esc(ex)}` : line.trim() ? `<b>Γραμμή ${n}:</b> <span class="muted">δεν έχω εξήγηση για αυτή τη γραμμή · δες το «Μάθημα» ή τη «Βοήθεια».</span>` : `<b>Γραμμή ${n}:</b> <span class="muted">κενή γραμμή.</span>`;
+    };
+    ['click', 'keyup', 'focus'].forEach(ev => ta.addEventListener(ev, upd));
+  }
+
   // Η πλακέτα της αρχικής: ESP32 ή Raspberry Pi 5, η καθεμία μόνη της με ετικέτες «τι είναι».
   const homeBoard = tr => S.homeBoard || (tr.board === 'pi' ? 'pi' : 'esp32');
   function mountHomeBoard(bd) {
@@ -515,7 +615,7 @@
       const d = ls.filter(l => P.completed[l.id]).length;
       const ok = chapterUnlocked(ch.n);
       const first = ls.find(l => !P.completed[l.id] && taskUnlocked(l)) || ls[0];
-      return `<li><span class="hm-n">${String(chNum(ch.n)).padStart(2, '0')}</span><span class="hm-ct">${esc(ch.title)}<small>${ok ? `${d}/${ls.length} ασκήσεις` : 'κλειδωμένο'}</small></span>${ok ? `<button class="btn sm${d < ls.length ? ' primary' : ''}" data-task="${first.id}">${d === ls.length ? 'Ξανά' : d ? 'Συνέχεια' : 'Ξεκίνα'}</button>` : `<span class="hm-locked">${icon('lock')}</span>`}</li>`;
+      return `<li><span class="hm-n">${String(chNum(ch.n)).padStart(2, '0')}</span><span class="hm-ct">${esc(ch.title)}<small>${ok ? `${d}/${ls.length} ασκήσεις` : 'κλειδωμένο'}</small></span>${ok ? `<button class="btn sm quiet" data-notes="${ch.n}" title="Σημειώσεις κεφαλαίου" aria-label="Σημειώσεις κεφαλαίου ${chNum(ch.n)}">${icon('book')}</button><button class="btn sm${d < ls.length ? ' primary' : ''}" data-task="${first.id}">${d === ls.length ? 'Ξανά' : d ? 'Συνέχεια' : 'Ξεκίνα'}</button>` : `<span class="hm-locked">${icon('lock')}</span>`}</li>`;
     }).join('');
     panel.innerHTML = `<div class="hm-ph"><h3>${esc(name)}</h3>${sayBtn('#hm-panel', 'το δωμάτιο')}<button class="btn quiet sm" id="hm-close" aria-label="Κλείσιμο">✕</button></div>
       ${th ? `<p class="hm-story">${esc(th.story)}</p>` : ''}<ul class="hm-chaps">${rows}</ul>`;
@@ -596,6 +696,7 @@
               <div id="confirm-slot"></div>
             </div>
             ${cert}
+            ${reviewCard(tr)}
             <div class="card"><div class="card-head"><h3>Δεξιότητες</h3><span class="muted" style="font-size:0.85rem">${done} από ${total} ασκήσεις</span></div><ul class="skills">${skills}</ul></div>
             ${collectionTeaser(tr)}
             <div class="card"><h3>Γνώρισε την πλακέτα</h3><p class="muted" style="margin:0">${tr.board === 'pi' ? 'Το Raspberry Pi 5 είναι ένας μικρός υπολογιστής με Linux. Το header με τα 40 pins (GPIO) συνδέει LED, κουμπιά και αισθητήρες: στον πάγκο το LED είναι στο GPIO 17, το κουμπί στο GPIO 27 και ο PIR στο GPIO 4.' : 'Το ESP32 έχει επεξεργαστή, WiFi και Bluetooth σε ένα μικρό module. Τα pins (GPIO) συνδέουν LED, κουμπιά και αισθητήρες. Το μπλε LED «D2» είναι συνδεδεμένο στο GPIO 2. Σε πραγματικές πλακέτες τα GPIO διαφέρουν από μοντέλο σε μοντέλο.'}</p></div>
@@ -606,6 +707,7 @@
 
     mountHomeBoard(homeBoard(tr));
     bindHouse(tr);
+    if ($('#start-review')) $('#start-review').onclick = () => openReview(tr);
     bindRail();
     $('#continue').onclick = () => openTask((nxt || mine[0]).id);
     $('#change-track').onclick = renderPicker;
@@ -926,6 +1028,8 @@
         <h2>${esc(l.title)}</h2>
         <ul class="objectives">${l.objectives.map(o => `<li>${esc(o)}</li>`).join('')}</ul>
         <div class="theory">${l.theory}</div>
+        ${l.glossary && l.glossary.length ? `<div class="lesson-words"><b>Λέξεις του μαθήματος</b>${l.glossary.map(t => `<button type="button" class="gl-term chip" data-term="${esc(t)}">${esc(t)}</button>`).join('')}</div>` : ''}
+        <button type="button" class="btn sm notes-btn" data-notes="${l.chapter}">${icon('book')} Σημειώσεις κεφαλαίου</button>
       </div>
       <div class="info-panel" id="info-steps" role="tabpanel" aria-labelledby="itab-steps" hidden>
         <div class="say-row">${sayBtn('#info-steps', 'τα βήματα')}</div>
@@ -974,6 +1078,7 @@
           <button class="mm-head" id="mm-toggle" aria-expanded="${!S.miniCollapsed}" aria-controls="mm-body"><span class="mm-dot" aria-hidden="true"></span><b>${langOf(l) === 'python' ? 'Τερματικό' : 'Serial Monitor'}</b><span class="mm-state" id="mm-state">ΕΤΟΙΜΟ</span><span class="mm-caret" aria-hidden="true">▾</span></button>
           <pre class="mm-body" id="mm-body" aria-live="off"></pre>
         </div>`}
+        ${isConfig ? '' : `<div class="explain" id="explain" aria-live="polite"><span class="ex-q">${icon('bulb')} Τι κάνει αυτή η γραμμή;</span><span class="ex-a" id="explain-a">Πάτα σε μια γραμμή του κώδικα.</span></div>`}
         <p class="editor-help" id="editor-help">${isConfig
           ? 'Σχόλιο είναι μόνο γραμμή που ξεκινά με #. Tab: εσοχή · Esc και μετά Tab: έξοδος.'
           : langOf(l) === 'python' ? 'Tab: εσοχή 4 κενών · Enter μετά από «:» μεγαλώνει την εσοχή · Esc και μετά Tab: έξοδος · Ctrl+Enter: εκτέλεση'
@@ -1052,6 +1157,8 @@
     refreshMission(60);
     renderQuiz();
     renderHints();
+    if (window.IoTLearn) window.IoTLearn.linkTerms($('#info-lesson .theory'), l.glossary, GLOSSARY);
+    bindExplain(l);
     updateAll();
     window.scrollTo(0, 0);
   }
@@ -2057,6 +2164,11 @@
     const quizOk = !l.quiz || P.quizzes[l.id];
     if (S.results && S.results.allPass && quizOk && !P.completed[l.id]) {
       P.completed[l.id] = true;
+      if (window.IoTLearn) {
+        const today = window.IoTLearn.dayStr(new Date());
+        window.IoTLearn.enroll(P.review, l.id, today);
+        P.daily = window.IoTLearn.bump(P.daily, today, 1);
+      }
       celebrate();
       // Τέλος κεφαλαίου: νέα κάρτα ιστορίας και σήμα (μία φορά)
       const n = l.chapter;
@@ -2743,6 +2855,8 @@
           <select id="set-letters"><option value="normal">Κανονική</option><option value="wide">Αυξημένη</option><option value="wider">Πολύ αυξημένη</option></select></div>
         <div class="field"><label for="set-rate">Ταχύτητα ανάγνωσης φωναχτά: <output id="set-rate-out"></output></label>
           <input type="range" id="set-rate" min="0.6" max="1.4" step="0.05"></div>
+        <div class="field"><label for="set-ruler">Χάρακας ανάγνωσης</label>
+          <select id="set-ruler"><option value="off">Κλειστός</option><option value="line">Λωρίδα που ακολουθεί το ποντίκι</option><option value="focus">Λωρίδα και σκίαση στο υπόλοιπο κείμενο</option></select></div>
         <label class="check"><input type="checkbox" id="set-motion"> Μειωμένη κίνηση (χωρίς εφέ και κινούμενες μεταβάσεις)</label>
         <label class="check"><input type="checkbox" id="set-sound"> Ήχοι του παιχνιδιού (κλικ, κουδούνι, επιτυχία)</label>
       </div>
@@ -2776,6 +2890,16 @@
       <div class="dlg-head"><h2 id="dlg-collection-title">Η συλλογή σου</h2><button class="btn quiet" data-close>Κλείσιμο</button></div>
       <div class="dlg-body" id="dlg-collection-body"></div>
     </dialog>
+    <dialog id="dlg-review" class="dlg-wide" aria-labelledby="dlg-review-title">
+      <div class="dlg-head"><h2 id="dlg-review-title">Επανάληψη</h2>${sayBtn('#dlg-review-body', 'την ερώτηση')}<button class="btn quiet" data-close>Κλείσιμο</button></div>
+      <div class="dlg-body" id="dlg-review-body"></div>
+    </dialog>
+    <dialog id="dlg-notes" class="dlg-wide" aria-labelledby="dlg-notes-title">
+      <div class="dlg-head"><h2 id="dlg-notes-title">Σημειώσεις</h2>${sayBtn('#dlg-notes-body', 'τις σημειώσεις')}<button class="btn" id="notes-print">Εκτύπωση</button><button class="btn quiet" data-close>Κλείσιμο</button></div>
+      <div class="dlg-body" id="dlg-notes-body"></div>
+    </dialog>
+    <div class="gl-pop" id="gl-pop" role="dialog" aria-label="Ορισμός" hidden></div>
+    <div class="ruler" id="ruler" aria-hidden="true" hidden></div>
     <div id="live" class="sr-only" aria-live="polite"></div>`;
     document.body.appendChild(host);
 
@@ -2787,6 +2911,7 @@
     $('#set-motion').onchange = e => { P.settings.reducedMotion = e.target.checked; applySettings(); save(); };
     $('#set-sound').onchange = e => { P.settings.sound = e.target.checked; applySettings(); save(); sfx('tick'); };
     $('#set-ffont').onchange = e => { P.settings.font = e.target.value; applySettings(); save(); };
+    $('#set-ruler').onchange = e => { P.settings.ruler = e.target.value; applySettings(); save(); };
     $('#set-letters').onchange = e => { P.settings.letters = e.target.value; applySettings(); save(); };
     $('#set-rate').oninput = e => { P.settings.readRate = Number(e.target.value); $('#set-rate-out').textContent = Math.round(P.settings.readRate * 100) + '%'; applySettings(); save(); };
 
@@ -2831,6 +2956,47 @@
       };
     };
 
+    // Γλωσσάρι: πατάς μια υπογραμμισμένη λέξη και βλέπεις τον ορισμό της δίπλα της.
+    const pop = $('#gl-pop');
+    const closePop = () => { if (!pop.hidden) { pop.hidden = true; if (pop._from) pop._from.focus(); } };
+    document.addEventListener('click', e => {
+      const t = e.target.closest('.gl-term');
+      if (!t) { if (!e.target.closest('#gl-pop')) closePop(); return; }
+      e.preventDefault();
+      const g = GLOSSARY.find(x => x.term.toLowerCase() === t.dataset.term.toLowerCase());
+      if (!g) return;
+      pop.innerHTML = `<div class="gp-head"><b>${esc(g.term)}</b>${sayBtn('#gl-pop', 'τον ορισμό')}<button class="btn quiet sm" id="gp-close" aria-label="Κλείσιμο">✕</button></div><p>${esc(g.def)}</p>`;
+      pop.hidden = false;
+      pop._from = t;
+      const r = t.getBoundingClientRect();
+      const w = Math.min(320, innerWidth - 24);
+      pop.style.width = w + 'px';
+      pop.style.left = Math.max(12, Math.min(innerWidth - w - 12, r.left + scrollX - 20)) + 'px';
+      pop.style.top = (r.bottom + scrollY + 8) + 'px';
+      $('#gp-close').onclick = closePop;
+      $('#gp-close').focus();
+    });
+    document.addEventListener('keydown', e => { if (e.key === 'Escape') closePop(); });
+    // Σημειώσεις κεφαλαίου
+    document.addEventListener('click', e => {
+      const b = e.target.closest('[data-notes]');
+      if (!b) return;
+      e.preventDefault();
+      openNotes(Number(b.dataset.notes));
+    });
+    $('#notes-print').onclick = () => {
+      document.documentElement.classList.add('print-notes');
+      const off = () => { document.documentElement.classList.remove('print-notes'); removeEventListener('afterprint', off); };
+      addEventListener('afterprint', off);
+      window.print();
+    };
+    // Χάρακας ανάγνωσης: μια λωρίδα ακολουθεί τη γραμμή που διαβάζεις
+    const ruler = $('#ruler');
+    addEventListener('pointermove', e => {
+      if (ruler.hidden || e.pointerType === 'touch') return;
+      ruler.style.transform = `translateY(${Math.round(e.clientY - ruler.offsetHeight / 2)}px)`;
+    }, { passive: true });
+
     // «Άκουσε»: ανάγνωση φωναχτά (όποιο κομμάτι κι αν είναι, ακόμα και μέσα σε dialog)
     document.addEventListener('click', e => {
       const sb = e.target.closest('[data-say]');
@@ -2857,6 +3023,7 @@
         $('#set-motion').checked = P.settings.reducedMotion;
         $('#set-sound').checked = P.settings.sound !== false;
         $('#set-ffont').value = P.settings.font || 'noto';
+        $('#set-ruler').value = P.settings.ruler || 'off';
         $('#set-letters').value = P.settings.letters || 'normal';
         $('#set-rate').value = String(P.settings.readRate || 0.9);
         $('#set-rate-out').textContent = Math.round((P.settings.readRate || 0.9) * 100) + '%';

@@ -24,7 +24,9 @@
       current: null,
       track: null,
       stories: {},
-      settings: { theme: 'system', fontScale: 1, lineSpacing: 'normal', reducedMotion: false, sound: true, font: 'noto', letters: 'normal', readRate: 0.9 }
+      review: {},
+      daily: null,
+      settings: { theme: 'system', fontScale: 1, lineSpacing: 'normal', reducedMotion: false, sound: true, font: 'noto', letters: 'normal', readRate: 0.9, ruler: 'off' }
     };
   }
 
@@ -49,6 +51,14 @@
     if (typeof obj.current === 'string' && ids.has(obj.current)) out.current = obj.current;
     if (typeof obj.track === 'string' && /^(cpp|py|rs)-(esp32|pi)$/.test(obj.track)) out.track = obj.track;
     if (obj.stories && typeof obj.stories === 'object') for (const [k, v] of Object.entries(obj.stories)) if (/^\d{1,3}$/.test(k) && v === true) out.stories[k] = true;
+    const day = /^\d{4}-\d{2}-\d{2}$/;
+    if (obj.review && typeof obj.review === 'object') {
+      for (const [k, v] of Object.entries(obj.review)) if (ids.has(k) && v && Number.isInteger(v.box) && v.box >= 1 && v.box <= 5 && day.test(v.due)) out.review[k] = { box: v.box, due: v.due };
+    }
+    const dl = obj.daily;
+    if (dl && typeof dl === 'object' && day.test(dl.date) && Number.isInteger(dl.count) && dl.count >= 0 && dl.count < 1000) {
+      out.daily = { date: dl.date, count: dl.count, streak: Number.isInteger(dl.streak) && dl.streak >= 0 ? dl.streak : 0, best: Number.isInteger(dl.best) && dl.best >= 0 ? dl.best : 0, lastMet: day.test(dl.lastMet) ? dl.lastMet : '' };
+    }
     const s = obj.settings || {};
     if (['system', 'light', 'dark'].includes(s.theme)) out.settings.theme = s.theme;
     if (typeof s.fontScale === 'number' && s.fontScale >= 0.85 && s.fontScale <= 1.6) out.settings.fontScale = s.fontScale;
@@ -57,6 +67,7 @@
     if (typeof s.sound === 'boolean') out.settings.sound = s.sound;
     if (['noto', 'didact', 'ysabeau'].includes(s.font)) out.settings.font = s.font;
     if (['normal', 'wide', 'wider'].includes(s.letters)) out.settings.letters = s.letters;
+    if (['off', 'line', 'focus'].includes(s.ruler)) out.settings.ruler = s.ruler;
     if (typeof s.readRate === 'number' && s.readRate >= 0.6 && s.readRate <= 1.4) out.settings.readRate = s.readRate;
     return { ok: true, data: out };
   }

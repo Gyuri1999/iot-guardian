@@ -21,7 +21,8 @@ for (const f of extra) {
   catch (e) { loadErrors.push(f + ': ' + e.message); }
 }
 vm.runInContext(fs.readFileSync(path.join(ROOT, 'js', 'storage.js'), 'utf8'), ctx, { filename: 'storage.js' });
-const { IoTInterp, IoTDevice, IoTValidator, IoTLessons, IoTStorage } = ctx;
+vm.runInContext(fs.readFileSync(path.join(ROOT, 'js', 'learn.js'), 'utf8'), ctx, { filename: 'learn.js' });
+const { IoTInterp, IoTDevice, IoTValidator, IoTLessons, IoTStorage, IoTLearn } = ctx;
 
 let passed = 0;
 let failed = 0;
@@ -577,6 +578,54 @@ test('validate απορρίπτει λάθος schema', () => {
 test('validate πετά άγνωστα μαθήματα και λάθος τύπους', () => {
   const v = IoTStorage.validate({ schema: 1, completed: { 'c1-l1': true, 'hack': true, 'c1-l2': 'yes' }, drafts: { 'c1-l1': 5 } });
   assert(v.ok); eq(Object.keys(v.data.completed), ['c1-l1']); eq(Object.keys(v.data.drafts), []);
+});
+
+// ------------------------------------------------------------ εργαλεία μάθησης (js/learn.js)
+test('εξήγηση γραμμής: pinMode, digitalWrite, delay, if', () => {
+  assert(/έξοδο/.test(IoTLearn.explainLine('  pinMode(LED_PIN, OUTPUT);', 'cpp')));
+  assert(/HIGH/.test(IoTLearn.explainLine('digitalWrite(LED_PIN, HIGH); // άναψε', 'cpp')));
+  assert(/0,5 δευτ/.test(IoTLearn.explainLine('delay(500);', 'cpp')));
+  assert(/Ελέγχει αν ισχύει motion == HIGH/.test(IoTLearn.explainLine('if (motion == HIGH) {', 'cpp')));
+  eq(IoTLearn.explainLine('   ', 'cpp'), null);
+});
+test('εξήγηση γραμμής: Python και Rust', () => {
+  assert(/GPIO 17/.test(IoTLearn.explainLine('led = LED(17)', 'python')));
+  assert(/για πάντα/.test(IoTLearn.explainLine('while True:', 'python')));
+  assert(/mut/.test(IoTLearn.explainLine('let mut n: u32 = 0;', 'rust')));
+  assert(/ΟΛΕΣ/.test(IoTLearn.explainLine('match d {', 'rust')));
+});
+test('κάθε γραμμή κάθε λύσης εξηγείται χωρίς σφάλμα', () => {
+  for (const l of IoTLessons.lessons) for (const line of String(l.solution || '').split('\n')) IoTLearn.explainLine(line, l.lang || 'cpp');
+});
+test('επανάληψη: σωστό ανεβάζει κουτί, λάθος γυρίζει στο 1', () => {
+  const r = {};
+  IoTLearn.enroll(r, 'c1-l1', '2026-10-23');
+  eq(r['c1-l1'], { box: 1, due: '2026-10-24' });
+  eq(IoTLearn.dueIds(r, '2026-10-23'), []);
+  eq(IoTLearn.dueIds(r, '2026-10-24'), ['c1-l1']);
+  eq(IoTLearn.answer(r, 'c1-l1', true, '2026-10-24'), { box: 2, due: '2026-10-26' });
+  eq(IoTLearn.answer(r, 'c1-l1', false, '2026-10-26'), { box: 1, due: '2026-10-27' });
+});
+test('στόχος ημέρας και σερί', () => {
+  let d = IoTLearn.bump(null, '2026-10-22', 3);
+  eq(d.streak, 1);
+  d = IoTLearn.bump(d, '2026-10-23', 2);
+  eq(d.streak, 1);
+  d = IoTLearn.bump(d, '2026-10-23', 1);
+  eq(d.streak, 2);
+  eq(IoTLearn.dailyView(d, '2026-10-24').streak, 2);
+  eq(IoTLearn.dailyView(d, '2026-10-26').streak, 0);
+});
+test('validate κρατά έγκυρη επανάληψη και πετά τα λάθος', () => {
+  const v = IoTStorage.validate({ schema: 1, review: { 'c1-l1': { box: 2, due: '2026-10-25' }, 'c1-l2': { box: 9, due: 'x' }, hack: { box: 1, due: '2026-10-25' } }, daily: { date: '2026-10-23', count: 2, streak: 1, best: 3, lastMet: '2026-10-22' } });
+  assert(v.ok, v.error);
+  eq(Object.keys(v.data.review), ['c1-l1']);
+  eq(v.data.daily.count, 2);
+});
+test('σημειώσεις κεφαλαίου: στόχοι και λέξεις', () => {
+  const ls = IoTLessons.lessons.filter(l => l.chapter === 1);
+  const html = IoTLearn.chapterNotes({ n: 1, title: 'Πρώτο πρόγραμμα' }, ls, IoTLessons.GLOSSARY, {});
+  assert(html.includes('Τι μαθαίνω') && html.includes('setup()'));
 });
 
 console.log(`\n${passed} πέρασαν, ${failed} απέτυχαν\n`);

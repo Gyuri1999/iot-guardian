@@ -643,3 +643,55 @@ dialog::backdrop { background: rgba(15, 24, 40, 0.55); }
 .bs-b { padding: 0.32rem 0.85rem; border: 1px solid var(--line-strong); border-radius: 8px; background: var(--surface); color: var(--ink); font: 700 0.85rem var(--font-label); letter-spacing: 0.04em; cursor: pointer; }
 .bs-b[aria-pressed="true"] { background: var(--teal); border-color: var(--teal); color: #fff; }
 .bs-hint { color: var(--muted); font-size: 0.85rem; margin-left: 0.3rem; }
+
+/* ---------- γλωσσάρι μέσα στο κείμενο */
+.gl-term { font: inherit; color: inherit; background: none; border: 0; padding: 0; cursor: help; text-decoration: underline dotted var(--teal) 2px; text-underline-offset: 3px; }
+.gl-term:hover, .gl-term:focus-visible { background: color-mix(in srgb, var(--teal) 14%, transparent); border-radius: 3px; outline: none; }
+code .gl-term { font-family: var(--font-code); }
+.gl-term.chip { text-decoration: none; padding: 0.12rem 0.55rem; border: 1px solid var(--line-strong); border-radius: 999px; background: var(--paper); font-size: 0.85rem; }
+.lesson-words { display: flex; flex-wrap: wrap; align-items: center; gap: 0.35rem; margin: 0.8rem 0 0.5rem; }
+.lesson-words b { font: 700 0.78rem var(--font-label); text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); margin-right: 0.2rem; }
+.notes-btn { margin-top: 0.3rem; }
+.gl-pop { position: absolute; z-index: 60; background: var(--surface); border: 1.5px solid var(--teal); border-radius: 10px; padding: 0.55rem 0.75rem 0.65rem; box-shadow: 0 8px 0 -3px color-mix(in srgb, var(--ink) 18%, transparent); }
+.gl-pop[hidden] { display: none; }
+.gp-head { display: flex; align-items: center; gap: 0.5rem; }
+.gp-head b { font-family: var(--font-code); color: var(--teal); margin-right: auto; }
+.gl-pop p { margin: 0.35rem 0 0; }
+/* ---------- «Τι κάνει αυτή η γραμμή;» */
+.explain { display: grid; gap: 0.15rem; padding: 0.5rem 0.7rem; border: 1px dashed var(--line-strong); border-radius: 8px; background: color-mix(in srgb, #e2b52d 7%, var(--surface)); font-size: 0.92rem; }
+.explain .ex-q { display: inline-flex; align-items: center; gap: 0.35rem; font: 700 0.75rem var(--font-label); text-transform: uppercase; letter-spacing: 0.06em; color: var(--warn); }
+.explain .ex-q .ic { width: 1rem; height: 1rem; }
+/* ---------- χάρακας ανάγνωσης */
+.ruler { position: fixed; left: 0; right: 0; top: 0; height: calc(var(--lh) * 1rem + 0.6rem); background: color-mix(in srgb, #e2b52d 16%, transparent); border-top: 1px solid color-mix(in srgb, #e2b52d 60%, transparent); border-bottom: 1px solid color-mix(in srgb, #e2b52d 60%, transparent); pointer-events: none; z-index: 70; }
+.ruler[hidden] { display: none; }
+.ruler.focus { background: transparent; box-shadow: 0 0 0 200vmax rgba(15, 20, 32, 0.32); }
+/* ---------- επανάληψη και στόχος */
+.review-card .streak { font: 700 0.9rem var(--font-label); color: var(--accent); }
+.goal { display: flex; align-items: center; gap: 0.6rem; font-size: 0.92rem; }
+.goal-dots { display: inline-flex; gap: 0.25rem; }
+.goal-dots i { width: 0.8rem; height: 0.8rem; border-radius: 50%; border: 2px solid var(--line-strong); }
+.goal-dots i.on { background: var(--ok); border-color: var(--ok); }
+.boxes { display: grid; grid-template-columns: repeat(5, 1fr); gap: 0.3rem; margin-top: 0.55rem; }
+.boxes span { display: grid; justify-items: center; padding: 0.3rem 0.1rem; border: 1px solid var(--line); border-radius: 8px; background: var(--paper); font-size: 0.72rem; color: var(--muted); }
+.boxes b { font: 700 1.05rem var(--font-code); color: var(--ink); }
+.rv-meta { color: var(--muted); font-size: 0.85rem; margin: 0 0 0.4rem; }
+.rv-q { border: 0; padding: 0; margin: 0 0 0.6rem; display: grid; gap: 0.4rem; }
+.rv-q legend { font-weight: 600; margin-bottom: 0.5rem; }
+.rv-q label { display: flex; gap: 0.5rem; align-items: flex-start; padding: 0.45rem 0.6rem; border: 1px solid var(--line); border-radius: 8px; cursor: pointer; }
+.rv-q label.rv-right { border-color: var(--ok); background: color-mix(in srgb, var(--ok) 10%, transparent); }
+.rv-end { text-align: center; padding: 1rem 0; }
+.rv-big { font: 700 2rem var(--font-label); margin: 0; }
+/* ---------- σημειώσεις κεφαλαίου */
+.notes h2 { margin-top: 0; }
+.notes h3 { font-family: var(--font-label); text-transform: uppercase; letter-spacing: 0.05em; font-size: 0.95rem; border-bottom: 1px solid var(--line); padding-bottom: 0.2rem; }
+.notes-gl { display: grid; gap: 0.35rem; margin: 0; }
+.notes-gl dt { font-family: var(--font-code); font-weight: 700; color: var(--teal); }
+.notes-gl dd { margin: 0 0 0.2rem; }
+.notes-st { margin: 0.5rem 0 0.2rem; font-weight: 600; }
+.notes pre { background: var(--code-bg); border: 1px solid var(--line); border-radius: 8px; padding: 0.5rem 0.7rem; overflow-x: auto; }
+@media print {
+  html.print-notes body * { visibility: hidden !important; }
+  html.print-notes #dlg-notes, html.print-notes #dlg-notes * { visibility: visible !important; }
+  html.print-notes #dlg-notes { position: absolute; inset: 0; max-width: none; width: auto; border: 0; box-shadow: none; background: #fff; color: #000; }
+  html.print-notes #dlg-notes .dlg-head .btn, html.print-notes #dlg-notes .say { display: none !important; }
+}
