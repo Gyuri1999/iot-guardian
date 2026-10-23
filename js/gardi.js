@@ -91,14 +91,8 @@
     clearTimeout(hideT);
     hideT = setTimeout(hide, o.ttl || Math.min(14000, 4500 + text.length * 55));
     if (voice && root.speechSynthesis && root.SpeechSynthesisUtterance) {
-      try {
-        root.speechSynthesis.cancel();
-        const u = new SpeechSynthesisUtterance(text.replace(/→/g, ', '));
-        u.lang = 'el-GR';
-        const v = root.speechSynthesis.getVoices().find(x => /^el/i.test(x.lang));
-        if (v) u.voice = v;
-        root.speechSynthesis.speak(u);
-      } catch (e) { /* χωρίς φωνή, μόνο κείμενο */ }
+      // ίδια φωνή και προφορά με την ανάγνωση φωναχτά (js/speak.js)
+      try { if (root.IoTSpeak) root.IoTSpeak.say(text); } catch (e) { /* χωρίς φωνή, μόνο κείμενο */ }
     }
   }
 

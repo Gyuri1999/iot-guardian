@@ -108,7 +108,7 @@
     html.setAttribute('data-reduced-motion', s.reducedMotion ? 'true' : 'false');
     if (window.IoTSfx) window.IoTSfx.setEnabled(s.sound !== false);
     if (window.IoTGardi) { window.IoTGardi.setEnabled(s.gardi !== false); window.IoTGardi.setVoice(!!s.gardiVoice); }
-    if (window.IoTSpeak) window.IoTSpeak.setRate(s.readRate || 0.9);
+    if (window.IoTSpeak) { window.IoTSpeak.setRate(s.readRate || 0.9); window.IoTSpeak.setVoiceName(s.voiceName || ''); }
     html.setAttribute('data-font', s.font || 'noto');
     html.setAttribute('data-letters', s.letters || 'normal');
     const rl = document.getElementById('ruler');
@@ -3281,6 +3281,9 @@
           <select id="set-ffont"><option value="noto">Κανονική (Noto Sans)</option><option value="didact">Didact Gothic · απλά σχήματα γραμμάτων, για δυσλεξία</option><option value="ysabeau">Ysabeau Infant · στρογγυλά «α» και «g»</option></select></div>
         <div class="field"><label for="set-letters">Απόσταση γραμμάτων και λέξεων</label>
           <select id="set-letters"><option value="normal">Κανονική</option><option value="wide">Αυξημένη</option><option value="wider">Πολύ αυξημένη</option></select></div>
+        <div class="field"><label for="set-voice">Φωνή για την ανάγνωση φωναχτά</label>
+          <div class="btn-row"><select id="set-voice"></select><button class="btn sm" id="set-voice-test" type="button">Δοκιμή φωνής</button></div>
+          <span class="help" id="set-voice-help"></span></div>
         <div class="field"><label for="set-rate">Ταχύτητα ανάγνωσης φωναχτά: <output id="set-rate-out"></output></label>
           <input type="range" id="set-rate" min="0.6" max="1.4" step="0.05"></div>
         <div class="field"><label for="set-ruler">Χάρακας ανάγνωσης</label>
@@ -3347,6 +3350,23 @@
     $('#set-ffont').onchange = e => { P.settings.font = e.target.value; applySettings(); save(); };
     $('#set-ruler').onchange = e => { P.settings.ruler = e.target.value; applySettings(); save(); };
     $('#set-letters').onchange = e => { P.settings.letters = e.target.value; applySettings(); save(); };
+    // Φωνή: λίστα με τις ελληνικές φωνές της συσκευής, η πιο φυσική πρώτη
+    const fillVoices = () => {
+      const sel = $('#set-voice');
+      if (!sel || !window.IoTSpeak) return;
+      const vs = window.IoTSpeak.voices();
+      const cur = window.IoTSpeak.current();
+      sel.innerHTML = `<option value="">Αυτόματα: η πιο φυσική${cur ? ` (${esc(cur.name)})` : ''}</option>` + vs.map(v => `<option value="${esc(v.name)}">${esc(v.label)} · ${esc(v.quality)}</option>`).join('');
+      sel.value = vs.some(v => v.name === P.settings.voiceName) ? P.settings.voiceName : '';
+      const best = vs[0];
+      $('#set-voice-help').textContent = !window.IoTSpeak.supported() ? 'Ο browser σου δεν έχει ανάγνωση φωναχτά.'
+        : !vs.length ? 'Δεν βρέθηκε ελληνική φωνή στη συσκευή. Πρόσθεσε μία από τις ρυθμίσεις του συστήματος (δες παρακάτω).'
+          : best.quality !== 'φυσική' ? 'Η συσκευή έχει μόνο απλές ελληνικές φωνές. Για πιο φυσική: στο Mac, Ρυθμίσεις συστήματος → Προσβασιμότητα → Περιεχόμενο που εκφωνείται → Φωνή συστήματος → Διαχείριση φωνών → Ελληνικά (Melina, βελτιωμένη). Στα Windows, ο Edge έχει τη φυσική φωνή «Athina Online».'
+            : 'Πάτα «Δοκιμή φωνής» για να ακούσεις.';
+    };
+    if (window.IoTSpeak) window.IoTSpeak.onVoices(fillVoices);
+    $('#set-voice').onchange = e => { P.settings.voiceName = e.target.value; applySettings(); save(); window.IoTSpeak && window.IoTSpeak.say('Γεια σου! Έτσι ακούγεται αυτή η φωνή.'); };
+    $('#set-voice-test').onclick = () => { if (!window.IoTSpeak || !window.IoTSpeak.say('Γεια σου! Είμαι η φωνή του IoT Guardian. Το LED στο GPIO 2 ανάβει όταν πατάς το κουμπί.')) announce('Ο browser σου δεν μπορεί να διαβάσει φωναχτά.'); };
     $('#set-rate').oninput = e => { P.settings.readRate = Number(e.target.value); $('#set-rate-out').textContent = Math.round(P.settings.readRate * 100) + '%'; applySettings(); save(); };
 
     const sorted = GLOSSARY.slice().sort((a, b) => a.term.localeCompare(b.term, 'el'));
@@ -3461,6 +3481,7 @@
         $('#set-gardi-voice').checked = !!P.settings.gardiVoice;
         $('#set-ruler').value = P.settings.ruler || 'off';
         $('#set-letters').value = P.settings.letters || 'normal';
+        fillVoices();
         $('#set-rate').value = String(P.settings.readRate || 0.9);
         $('#set-rate-out').textContent = Math.round((P.settings.readRate || 0.9) * 100) + '%';
       }

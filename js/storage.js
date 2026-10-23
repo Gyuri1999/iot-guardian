@@ -76,6 +76,7 @@
     if (typeof s.gardi === 'boolean') out.settings.gardi = s.gardi;
     if (typeof s.gardiVoice === 'boolean') out.settings.gardiVoice = s.gardiVoice;
     if (typeof s.readRate === 'number' && s.readRate >= 0.6 && s.readRate <= 1.4) out.settings.readRate = s.readRate;
+    if (typeof s.voiceName === 'string' && s.voiceName.length <= 120) out.settings.voiceName = s.voiceName;
     return { ok: true, data: out };
   }
 
