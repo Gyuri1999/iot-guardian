@@ -24,7 +24,8 @@ vm.runInContext(fs.readFileSync(path.join(ROOT, 'js', 'storage.js'), 'utf8'), ct
 vm.runInContext(fs.readFileSync(path.join(ROOT, 'js', 'learn.js'), 'utf8'), ctx, { filename: 'learn.js' });
 vm.runInContext(fs.readFileSync(path.join(ROOT, 'js', 'wiring.js'), 'utf8'), ctx, { filename: 'wiring.js' });
 vm.runInContext(fs.readFileSync(path.join(ROOT, 'js', 'challenge.js'), 'utf8'), ctx, { filename: 'challenge.js' });
-const { IoTInterp, IoTDevice, IoTValidator, IoTLessons, IoTStorage, IoTLearn, IoTWiring, IoTChallenge } = ctx;
+vm.runInContext(fs.readFileSync(path.join(ROOT, 'js', 'blocks.js'), 'utf8'), ctx, { filename: 'blocks.js' });
+const { IoTInterp, IoTDevice, IoTValidator, IoTLessons, IoTStorage, IoTLearn, IoTWiring, IoTChallenge, IoTBlocks } = ctx;
 
 let passed = 0;
 let failed = 0;
@@ -674,6 +675,39 @@ test('πρόκληση: κάθε κεφάλαιο με λύση δίνει λά�
     n++;
   }
   assert(n > 20);
+});
+
+// ------------------------------------------------------------ μπλοκ (js/blocks.js)
+test('μπλοκ: ο κώδικας που φτιάχνουν τρέχει σε όλες τις διαδρομές', () => {
+  const TR = { 'cpp-esp32': ['cpp', 'esp32'], 'py-pi': ['python', 'pi'], 'py-esp32': ['python', 'esp32'], 'rs-pi': ['rust', 'pi'], 'rs-esp32': ['rust', 'esp32'] };
+  for (const [tr, [lang, board]] of Object.entries(TR)) {
+    const caps = IoTBlocks.caps(tr);
+    const model = {
+      setup: [{ t: 'print', text: 'Γεια!' }, { t: 'set', n: 0 }],
+      loop: [
+        { t: 'if', c: 'button', then: [{ t: 'led', on: true }, { t: 'change', n: 1 }], else: [{ t: 'led', on: false }] },
+        { t: 'repeat', n: 2, body: [{ t: 'wait', ms: 100 }] },
+        { t: 'if', c: 'count', n: 3, then: [{ t: 'printv', v: 'count' }, { t: 'set', n: 0 }], else: null },
+        ...(caps.includes('temp') ? [{ t: 'if', c: 'temp', n: 20, then: [{ t: 'printv', v: 'temp' }], else: null }] : []),
+        ...(caps.includes('dist') ? [{ t: 'if', c: 'dist', n: 100, then: [{ t: 'printv', v: 'dist' }], else: null }] : [])
+      ]
+    };
+    for (const m of [model, IoTBlocks.STARTER(), { setup: [], loop: [] }]) {
+      const r = new IoTValidator.Runner(IoTBlocks.generate(m, tr), { board, temp: 24, distance: 50 }, { button: true }, lang);
+      r.runSetup();
+      r.runFor(1200);
+    }
+    const r = new IoTValidator.Runner(IoTBlocks.generate(model, tr), { board }, { button: true }, lang);
+    r.runSetup();
+    r.runFor(800);
+    eq(r.board.outputs[2], 1, tr + ': με πατημένο κουμπί το LED ανάβει');
+  }
+});
+test('μπλοκ: normalize καθαρίζει άγνωστα και επικίνδυνα δεδομένα', () => {
+  const m = IoTBlocks.normalize({ setup: [{ t: 'print', text: 'a"); evil(); ("' }, { t: 'hack' }], loop: [{ t: 'wait', ms: 1e9 }] });
+  eq(m.setup.length, 1);
+  assert(!/"/.test(m.setup[0].text));
+  eq(m.loop[0].ms, 60000);
 });
 
 console.log(`\n${passed} πέρασαν, ${failed} απέτυχαν\n`);

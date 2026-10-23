@@ -157,6 +157,7 @@
   const IC = {
     home: '<path d="M4 11l8-7 8 7"/><path d="M6 10v10h12V10"/><path d="M10 20v-6h4v6"/>',
     lock: '<rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/>',
+    code: '<path d="M8 7l-5 5 5 5M16 7l5 5-5 5M14 4l-4 16"/>',
     tool: '<path d="M14.5 6.5a4 4 0 0 0-5.3 5.3L4 17l3 3 5.2-5.2a4 4 0 0 0 5.3-5.3l-2.5 2.5-2.5-.5-.5-2.5z"/>',
     plug: '<path d="M9 3v5M15 3v5M7 8h10v3a5 5 0 0 1-10 0zM12 16v5"/>',
     bulb: '<path d="M12 3a6 6 0 0 0-3.5 10.9V17h7v-3.1A6 6 0 0 0 12 3zM9.5 20h5"/>',
@@ -1084,6 +1085,7 @@
             <button class="ib run" id="${isConfig ? 'b-validate' : 'b-run'}" title="${isConfig ? 'Έλεγχος ρυθμίσεων' : 'Εκτέλεση'} (Ctrl+Enter)" aria-label="${isConfig ? 'Έλεγχος ρυθμίσεων' : 'Εκτέλεση'}">${icon('play')}</button>
           </div></div>
         ${isConfig ? '' : '<div class="run-state" id="run-state" aria-live="off"></div>'}
+        ${mode === 'code' && window.IoTBlocks ? `<div class="code-mode" role="tablist" aria-label="Πώς γράφεις"><button role="tab" class="cm-b" data-cm="text" aria-selected="true">${icon('code')} Κείμενο</button><button role="tab" class="cm-b" data-cm="blocks" aria-selected="false">🧩 Μπλοκ</button></div><div class="blocks" id="blocks" hidden></div>` : ''}
         <div class="editor">
           <div class="gutter" id="gutter" aria-hidden="true"></div>
           <div class="code-wrap">
@@ -1180,6 +1182,7 @@
     renderHints();
     if (window.IoTLearn) window.IoTLearn.linkTerms($('#info-lesson .theory'), l.glossary, GLOSSARY);
     bindExplain(l);
+    bindCodeMode(l);
     if (l.sandbox) {
       ['b-help', 'itab-help', 'itab-quiz', 'b-check'].forEach(id => { const x = $('#' + id); if (x) x.hidden = true; });
       bindBench(l);
@@ -1335,6 +1338,58 @@
         }).join('') : '<p class="muted">Η βάση δεν έχει ακόμα πίνακες.</p>'}</div>`;
     }).join('');
   }
+
+  // ------------------------------------------------------------ Κείμενο ή μπλοκ
+  const blocksKey = l => (l.sandbox ? 'sandbox:' + P.track : l.id);
+  function bindCodeMode(l) {
+    const tabs = app().querySelectorAll('[data-cm]');
+    if (!tabs.length) return;
+    tabs.forEach(b => { b.onclick = () => setCodeMode(l, b.dataset.cm, true); });
+    if (P.settings.codeView === 'blocks') setCodeMode(l, 'blocks', false);
+  }
+  function setCodeMode(l, mode, userAction) {
+    const ta = $('#code');
+    const box = $('#blocks');
+    if (!ta || !box) return;
+    app().querySelectorAll('[data-cm]').forEach(b => b.setAttribute('aria-selected', String(b.dataset.cm === mode)));
+    const help = $('#editor-help');
+    if (mode === 'text') {
+      box.hidden = true;
+      box.innerHTML = '';
+      ta.readOnly = false;
+      $('.editor').classList.remove('from-blocks');
+      if (help && help.dataset.text) help.textContent = help.dataset.text;
+      S.blocksEd = null;
+    } else {
+      if (S.runState === 'running') doStop();
+      const key = blocksKey(l);
+      const before = ta.value;
+      const model = P.blocks[key] || (l.sandbox ? window.IoTBlocks.STARTER() : { setup: [], loop: [] });
+      box.hidden = false;
+      ta.readOnly = true;
+      $('.editor').classList.add('from-blocks');
+      if (help) { help.dataset.text = help.dataset.text || help.textContent; help.textContent = `Αυτός είναι ο ίδιος κώδικας σε ${langName(l)}: τον γράφουν τα μπλοκ σου. Για να τον αλλάξεις με το χέρι, πάτα «Κείμενο».`; }
+      S.blocksEd = window.IoTBlocks.mount(box, model, {
+        track: P.track || 'cpp-esp32',
+        hw: hardwareOf(l).concat(hardwareOf(l).includes('ultrasonic') || hardwareOf(l).includes('traffic') ? [] : ['led']),
+        onChange: (m, code) => {
+          P.blocks[key] = m;
+          ta.value = code;
+          ta.dispatchEvent(new Event('input', { bubbles: true }));
+          renderEditor();
+        }
+      });
+      // ο κώδικας του κειμένου αντικαθίσταται: κρατάμε το παλιό για «Αναίρεση»
+      const code = window.IoTBlocks.generate(model, P.track || 'cpp-esp32');
+      if (before.trim() && before !== code && userAction) gardi('Τα μπλοκ έγραψαν από την αρχή τον κώδικα. Αν θες τον παλιό σου κώδικα, πάτα «Αναίρεση».', 'think', [{ label: 'Αναίρεση', run: () => { setCodeMode(l, 'text', false); ta.value = before; ta.dispatchEvent(new Event('input', { bubbles: true })); renderEditor(); } }], { force: true });
+      else if (userAction) gardi('Πάτα ένα μπλοκ για να μπει στο πρόγραμμα, και μετά «Εκτέλεση»! Δίπλα βλέπεις τον ίδιο κώδικα σε κείμενο.', 'happy', null, { force: true });
+      ta.value = code;
+      ta.dispatchEvent(new Event('input', { bubbles: true }));
+      renderEditor();
+    }
+    if (userAction) { P.settings.codeView = mode; save(); sfx('click'); }
+  }
+  const langName = l => ({ cpp: 'C++', python: boardOf(l) === 'pi' ? 'Python' : 'MicroPython', rust: 'Rust' })[langOf(l)];
 
   // ------------------------------------------------------------ Ελεύθερο εργαστήριο
   function sandboxLesson(tr) {

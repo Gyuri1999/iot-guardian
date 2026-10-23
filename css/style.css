@@ -823,3 +823,43 @@ code .gl-term { font-family: var(--font-code); }
 .bench-row .spacer { flex: 1; }
 .sandbox-card h3 { display: flex; align-items: center; gap: 0.4rem; }
 .sandbox-card h3 .ic { width: 1.1rem; height: 1.1rem; color: var(--accent); }
+
+/* ---------- μπλοκ για μικρότερους */
+.code-mode { display: flex; gap: 0.3rem; margin-bottom: 0.4rem; }
+.cm-b { display: inline-flex; align-items: center; gap: 0.35rem; padding: 0.3rem 0.85rem; border: 1px solid var(--line-strong); border-radius: 999px; background: var(--surface); color: var(--muted); font: 700 0.85rem var(--font-label); cursor: pointer; }
+.cm-b .ic { width: 1rem; height: 1rem; }
+.cm-b[aria-selected="true"] { background: var(--ink); color: var(--surface); border-color: var(--ink); }
+.blocks { border: 1px solid var(--line); border-radius: 10px; background: var(--paper); padding: 0.55rem; margin-bottom: 0.5rem; display: grid; gap: 0.45rem; }
+.blocks[hidden] { display: none; }
+.bk-pal { display: flex; flex-wrap: wrap; gap: 0.3rem; }
+.bk-p { padding: 0.35rem 0.65rem; border: 0; border-radius: 8px; color: #fff; font: 700 0.85rem var(--font-body); cursor: grab; box-shadow: 0 2px 0 rgba(0,0,0,0.25); }
+.bk-p:active { cursor: grabbing; transform: translateY(1px); }
+.bk-hint { margin: 0; color: var(--muted); font-size: 0.82rem; }
+.bk-prog { display: grid; gap: 0.25rem; }
+.bk-hat { justify-self: start; padding: 0.3rem 0.8rem 0.3rem 0.6rem; border-radius: 12px 12px 4px 4px; background: #c25a22; color: #fff; font: 700 0.85rem var(--font-label); letter-spacing: 0.03em; cursor: pointer; margin-top: 0.3rem; }
+.bk-hat-setup { background: #13857f; }
+.bk-slot { display: grid; gap: 0; padding: 0.25rem 0.25rem 0.25rem 0.7rem; border-left: 4px solid var(--line-strong); border-radius: 0 6px 6px 0; min-height: 1.6rem; }
+.bk-slot.active { border-left-color: #e2b52d; background: color-mix(in srgb, #e2b52d 10%, transparent); }
+.bk-slot-l { font: 700 0.72rem var(--font-label); text-transform: uppercase; color: var(--muted); letter-spacing: 0.05em; }
+.bk { border-radius: 8px; color: #fff; box-shadow: 0 2px 0 rgba(0,0,0,0.22); margin: 0.12rem 0; }
+.bk-row { display: flex; align-items: center; gap: 0.35rem; padding: 0.3rem 0.4rem; flex-wrap: wrap; }
+.bk-in { display: flex; flex-wrap: wrap; align-items: center; gap: 0.3rem; font: 700 0.86rem var(--font-body); }
+.bk select, .bk input[type=number], .bk input[type=text] { font: 600 0.85rem var(--font-body); padding: 0.1rem 0.3rem; border-radius: 6px; border: 0; background: rgba(255,255,255,0.92); color: #1c2130; min-height: 0; height: auto; }
+.bk-else { display: inline-flex; align-items: center; gap: 0.2rem; font-weight: 600; font-size: 0.8rem; opacity: 0.95; }
+.bk-grip { cursor: grab; opacity: 0.7; }
+.bk-tools { margin-left: auto; display: inline-flex; gap: 0.1rem; }
+.bk-tools button { border: 0; background: rgba(0,0,0,0.18); color: #fff; border-radius: 5px; width: 1.5rem; height: 1.5rem; cursor: pointer; font-size: 0.7rem; }
+.bk-tools button:hover, .bk-tools button:focus-visible { background: rgba(0,0,0,0.38); }
+.bk > .bk-slot { margin: 0 0.35rem 0.35rem 0.6rem; background: rgba(255,255,255,0.14); border-left-color: rgba(255,255,255,0.55); color: #fff; }
+.bk > .bk-slot .bk-slot-l { color: rgba(255,255,255,0.85); }
+.bk > .bk-slot.active { border-left-color: #ffe08a; background: rgba(255,224,138,0.22); }
+.bk-drop { height: 0.35rem; border-radius: 3px; }
+.bk-drop.end { height: auto; min-height: 0.9rem; font-size: 0.75rem; color: var(--muted); padding: 0.1rem 0.2rem; }
+.bk > .bk-slot .bk-drop.end { color: rgba(255,255,255,0.75); }
+.bk-drop.over { background: #e2b52d; min-height: 0.5rem; }
+.bk-out { background: #e0803a; } .bk-time { background: #3d8fd6; } .bk-say { background: #8e5bd0; } .bk-ctl { background: #d4a417; } .bk-var { background: #2f9a55; }
+.bk-ctl .bk-in { color: #1c2130; } .bk-ctl .bk-tools button { color: #1c2130; background: rgba(0,0,0,0.1); }
+.bk-ctl > .bk-slot { color: #1c2130; background: rgba(255,255,255,0.35); }
+.bk-ctl > .bk-slot .bk-slot-l, .bk-ctl > .bk-slot .bk-drop.end { color: rgba(28,33,48,0.7); }
+.editor.from-blocks textarea { cursor: default; }
+.editor.from-blocks { box-shadow: inset 0 0 0 2px color-mix(in srgb, #8e5bd0 35%, transparent); border-radius: 8px; }

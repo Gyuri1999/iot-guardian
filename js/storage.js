@@ -28,8 +28,9 @@
       wired: {},
       challenges: {},
       sandbox: { hw: {}, code: {} },
+      blocks: {},
       daily: null,
-      settings: { theme: 'system', fontScale: 1, lineSpacing: 'normal', reducedMotion: false, sound: true, font: 'noto', letters: 'normal', readRate: 0.9, ruler: 'off', gardi: true, gardiVoice: false }
+      settings: { theme: 'system', fontScale: 1, lineSpacing: 'normal', reducedMotion: false, sound: true, font: 'noto', letters: 'normal', readRate: 0.9, ruler: 'off', gardi: true, gardiVoice: false, codeView: 'text' }
     };
   }
 
@@ -54,6 +55,9 @@
     if (typeof obj.current === 'string' && ids.has(obj.current)) out.current = obj.current;
     if (typeof obj.track === 'string' && /^(cpp|py|rs)-(esp32|pi)$/.test(obj.track)) out.track = obj.track;
     if (obj.stories && typeof obj.stories === 'object') for (const [k, v] of Object.entries(obj.stories)) if (/^\d{1,3}$/.test(k) && v === true) out.stories[k] = true;
+    if (obj.blocks && typeof obj.blocks === 'object' && root.IoTBlocks) {
+      for (const [k, v] of Object.entries(obj.blocks)) if ((ids.has(k) || /^sandbox:(cpp|py|rs)-(esp32|pi)$/.test(k)) && v && typeof v === 'object') out.blocks[k] = root.IoTBlocks.normalize(v);
+    }
     const sb = obj.sandbox;
     if (sb && typeof sb === 'object') {
       const TR = /^(cpp|py|rs)-(esp32|pi)$/;
@@ -82,6 +86,7 @@
     if (['normal', 'wide', 'wider'].includes(s.letters)) out.settings.letters = s.letters;
     if (['off', 'line', 'focus'].includes(s.ruler)) out.settings.ruler = s.ruler;
     if (typeof s.gardi === 'boolean') out.settings.gardi = s.gardi;
+    if (['text', 'blocks'].includes(s.codeView)) out.settings.codeView = s.codeView;
     if (typeof s.gardiVoice === 'boolean') out.settings.gardiVoice = s.gardiVoice;
     if (typeof s.readRate === 'number' && s.readRate >= 0.6 && s.readRate <= 1.4) out.settings.readRate = s.readRate;
     if (typeof s.voiceName === 'string' && s.voiceName.length <= 120) out.settings.voiceName = s.voiceName;
