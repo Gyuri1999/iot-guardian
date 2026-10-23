@@ -743,8 +743,8 @@ test('MicroPython: PWM servo από duty και προειδοποίηση γι�
 // ------------------------------------------------------------ νέα εξαρτήματα στο Raspberry Pi (js/pyparts.js, js/rslib.js)
 test('μπλοκ: buzzer, servo, LED RGB και οθόνη και στο Raspberry Pi (Python και Rust)', () => {
   const m = { setup: [{ t: 'oled', text: 'Hi!' }], loop: [{ t: 'if', c: 'button', then: [{ t: 'tone', f: 880, ms: 0 }, { t: 'servo', a: 90 }, { t: 'rgb', r: 255, g: 128, b: 0 }, { t: 'change', n: 1 }, { t: 'oledv', v: 'count' }], else: [{ t: 'quiet' }, { t: 'servo', a: 0 }] }, { t: 'wait', ms: 50 }] };
-  for (const [tr, lang] of [['py-pi', 'python'], ['rs-pi', 'rust']]) {
-    const r = new IoTValidator.Runner(IoTBlocks.generate(m, tr), { board: 'pi' }, { button: true }, lang);
+  for (const [tr, lang, board] of [['py-pi', 'python', 'pi'], ['rs-pi', 'rust', 'pi'], ['rs-esp32', 'rust', 'esp32']]) {
+    const r = new IoTValidator.Runner(IoTBlocks.generate(m, tr), { board }, { button: true }, lang);
     r.runSetup();
     r.runLoops(2);
     const b = r.board;
@@ -770,14 +770,14 @@ test('Python στο Pi: AngularServo με παλμούς 0,5–2,5 ms και ο�
 test('Python: τα modules του Pi δεν υπάρχουν στη MicroPython του ESP32', () => {
   assert(/adafruit_ssd1306/.test(pyError('import adafruit_ssd1306\n', { board: 'esp32' }).message));
 });
-test('Rust στο Pi: set_pwm_frequency θέλει f64 και η οθόνη δεν υπάρχει στο ESP32', () => {
+test('Rust στο Pi: set_pwm_frequency θέλει f64 και το rppal::i2c δεν υπάρχει στο ESP32', () => {
   const bad = 'use rppal::gpio::Gpio;\nuse std::error::Error;\n\nfn main() -> Result<(), Box<dyn Error>> {\n    let gpio = Gpio::new()?;\n    let mut b = gpio.get(22)?.into_output();\n    b.set_pwm_frequency(440, 0.5)?;\n    Ok(())\n}\n';
   let e = null;
   try { const r = new IoTValidator.Runner(bad, { board: 'pi' }, {}, 'rust'); r.runSetup(); } catch (x) { e = x; }
   assert(e && /E0308/.test(e.message) && /440\.0/.test(e.hint), 'περίμενα E0308 για το 440');
   let e2 = null;
-  try { new IoTValidator.Runner('use ssd1306::Ssd1306;\nfn main() {}\n', { board: 'esp32' }, {}, 'rust'); } catch (x) { e2 = x; }
-  assert(e2 && /E0432/.test(e2.message), 'το ssd1306 είναι μόνο για το Pi στο παιχνίδι');
+  try { new IoTValidator.Runner('use rppal::i2c::I2c;\nfn main() {}\n', { board: 'esp32' }, {}, 'rust'); } catch (x) { e2 = x; }
+  assert(e2 && /E0432/.test(e2.message), 'το rppal είναι μόνο για το Pi');
 });
 
 console.log(`\n${passed} πέρασαν, ${failed} απέτυχαν\n`);

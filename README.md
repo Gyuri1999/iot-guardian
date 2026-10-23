@@ -59,6 +59,7 @@
 Και στο **Raspberry Pi**, πάλι με τις πραγματικές βιβλιοθήκες:
 - **Python (Κεφ. 26):** `Buzzer`, `TonalBuzzer` με `Tone("A4")`, `AngularServo`, `RGBLED` (χρώματα 0–1) από το gpiozero, και οθόνη με `busio.I2C(board.SCL, board.SDA)` και `adafruit_ssd1306`.
 - **Rust (Κεφ. 7 της διαδρομής):** PWM του rppal (`set_pwm_frequency(880.0, 0.5)?`, `set_pwm(…)`, `clear_pwm()?`) και οθόνη με `rppal::i2c`, `ssd1306` και `embedded-graphics` (`Text::with_baseline(…).draw(&mut display)`, `display.flush()`).
+- **Rust στο ESP32 (Κεφ. 7 της διαδρομής):** PWM με το LEDC (`LedcTimerDriver`, `LedcDriver`, `set_duty`), servo στα 50 Hz με 14 bits, και οθόνη με `I2cDriver`. Ο κώδικας της οθόνης (`ssd1306`, `embedded-graphics`) είναι ίδιος με του Pi.
 
 Pins στο Pi: buzzer GPIO 22, servo GPIO 18, LED RGB GPIO 5 / 6 / 13, οθόνη SDA 2 · SCL 3.
 

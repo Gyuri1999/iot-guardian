@@ -314,7 +314,7 @@
     1: 'desk', 2: 'entrance', 3: 'hallway', 4: 'workshop', 5: 'greenhouse', 6: 'livingroom', 7: 'hallway', 8: 'greenhouse',
     9: 'serverroom', 10: 'serverroom', 11: 'serverroom', 12: 'serverroom', 13: 'livingroom', 14: 'serverroom', 15: 'hallway', 16: 'hallway',
     17: 'desk', 18: 'entrance', 19: 'greenhouse', 20: 'greenhouse', 21: 'serverroom', 22: 'livingroom', 23: 'serverroom', 24: 'garage', 25: 'livingroom',
-    30: 'desk', 31: 'entrance', 32: 'greenhouse', 33: 'livingroom', 34: 'greenhouse', 35: 'garage', 36: 'livingroom', 26: 'livingroom', 47: 'livingroom',
+    30: 'desk', 31: 'entrance', 32: 'greenhouse', 33: 'livingroom', 34: 'greenhouse', 35: 'garage', 36: 'livingroom', 26: 'livingroom', 47: 'livingroom', 57: 'livingroom',
     41: 'desk', 42: 'entrance', 43: 'workshop', 44: 'hallway', 45: 'garage', 46: 'workshop',
     51: 'desk', 52: 'entrance', 53: 'workshop', 54: 'hallway', 55: 'garage', 56: 'workshop'
   };

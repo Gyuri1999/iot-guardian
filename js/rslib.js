@@ -111,7 +111,7 @@
   function pinHelp(m) {
     return m.target === 'pi'
       ? 'Στον εικονικό πάγκο: LED = GPIO 17, κουμπί = GPIO 27, PIR = GPIO 4, TRIG = GPIO 23, ECHO = GPIO 24, φανάρι = GPIO 16 / 20 / 21, buzzer = GPIO 22, servo = GPIO 18, LED RGB = GPIO 5 / 6 / 13.'
-      : 'Στον εικονικό πάγκο: LED = GPIO 2, κουμπί = GPIO 15, PIR = GPIO 4, TRIG = GPIO 5, ECHO = GPIO 18, φανάρι = GPIO 25 / 26 / 27.';
+      : 'Στον εικονικό πάγκο: LED = GPIO 2, κουμπί = GPIO 15, PIR = GPIO 4, TRIG = GPIO 5, ECHO = GPIO 18, φανάρι = GPIO 25 / 26 / 27, buzzer = GPIO 23, servo = GPIO 19, LED RGB = GPIO 32 / 33 / 14.';
   }
 
   function gpioObj(m) {
@@ -234,18 +234,16 @@
     value: { t: 'type', name: 'I2c', assoc: { new: m => { if (m.i2cTaken) return ERR(errVal('I2C bus is busy', 'Io(ResourceBusy)', 'rppal::i2c::Error')); m.i2cTaken = true; return OK(tyObj('I2c', { short: () => 'I2c (δίαυλος 1 · SDA 2 · SCL 3)', methods: { set_slave_address: () => OK(UNIT) } })); } } }
   };
   LIB['ssd1306::I2CDisplayInterface'] = {
-    board: 'pi',
-    value: { t: 'type', name: 'I2CDisplayInterface', assoc: { new: (m, a, line) => { need(a, 1, 'I2CDisplayInterface::new', line); const bus = deref(a[0]); if (!bus || bus.cls !== 'I2c') throw rerr('E0308', 'mismatched types: expected an I2C bus', line, 'Γράψε let i2c = I2c::new()?; και μετά I2CDisplayInterface::new(i2c).'); return tyObj('I2CInterface', { moveOnly: true }); } } }
+    value: { t: 'type', name: 'I2CDisplayInterface', assoc: { new: (m, a, line) => { need(a, 1, 'I2CDisplayInterface::new', line); const bus = deref(a[0]); if (!bus || (bus.cls !== 'I2c' && bus.cls !== 'I2cDriver')) throw rerr('E0308', 'mismatched types: expected an I2C bus', line, m.target === 'pi' ? 'Γράψε let i2c = I2c::new()?; και μετά I2CDisplayInterface::new(i2c).' : 'Φτιάξε πρώτα τον δίαυλο με I2cDriver::new(…)? και μετά I2CDisplayInterface::new(i2c).'); m.board.oled.wired = bus.ok !== false; return tyObj('I2CInterface', { moveOnly: true }); } } }
   };
   const SIZE128 = tyObj('DisplaySize128x64', { w: 128, h: 64 });
-  LIB['ssd1306::prelude::DisplaySize128x64'] = { board: 'pi', value: SIZE128 };
-  LIB['ssd1306::size::DisplaySize128x64'] = { board: 'pi', value: SIZE128 };
-  LIB['ssd1306::prelude::DisplaySize128x32'] = { board: 'pi', value: tyObj('DisplaySize128x32', { w: 128, h: 32 }) };
+  LIB['ssd1306::prelude::DisplaySize128x64'] = { value: SIZE128 };
+  LIB['ssd1306::size::DisplaySize128x64'] = { value: SIZE128 };
+  LIB['ssd1306::prelude::DisplaySize128x32'] = { value: tyObj('DisplaySize128x32', { w: 128, h: 32 }) };
   const ROT = { t: 'type', name: 'DisplayRotation', consts: { Rotate0: () => tyObj('Rotate0'), Rotate90: () => tyObj('Rotate90'), Rotate180: () => tyObj('Rotate180'), Rotate270: () => tyObj('Rotate270') } };
-  LIB['ssd1306::prelude::DisplayRotation'] = { board: 'pi', value: ROT };
-  LIB['ssd1306::rotation::DisplayRotation'] = { board: 'pi', value: ROT };
+  LIB['ssd1306::prelude::DisplayRotation'] = { value: ROT };
+  LIB['ssd1306::rotation::DisplayRotation'] = { value: ROT };
   LIB['ssd1306::Ssd1306'] = {
-    board: 'pi',
     value: {
       t: 'type', name: 'Ssd1306',
       assoc: {
@@ -269,7 +267,7 @@
       short: () => `Ssd1306 · ${o.shown.map(t => t.text).join(' / ') || 'κενή'}`,
       mutMethods: new Set(['init', 'clear_buffer', 'clear', 'flush', 'set_display_on']),
       methods: {
-        init: () => { o.begun = true; return OK(UNIT); },
+        init: () => { o.begun = o.wired !== false; return OK(UNIT); },
         clear_buffer: () => { o.buf = []; o.pending = true; return UNIT; },
         clear: () => { o.buf = []; o.pending = true; return OK(UNIT); },
         set_display_on: () => OK(UNIT),
@@ -283,10 +281,10 @@
   }
   // embedded-graphics: γραμματοσειρά, στυλ, θέση και κείμενο
   const FONTS = { FONT_6X10: 1, FONT_6X13: 1, FONT_5X8: 1, FONT_7X13: 1, FONT_9X15: 1.5, FONT_10X20: 2 };
-  for (const [name, size] of Object.entries(FONTS)) LIB['embedded_graphics::mono_font::ascii::' + name] = { board: 'pi', value: tyObj('MonoFont', { copy: true, size, fontName: name, short: () => name }) };
+  for (const [name, size] of Object.entries(FONTS)) LIB['embedded_graphics::mono_font::ascii::' + name] = { value: tyObj('MonoFont', { copy: true, size, fontName: name, short: () => name }) };
   const COLOR = { t: 'type', name: 'BinaryColor', consts: { On: () => tyObj('BinaryColor', { copy: true, on: true, short: () => 'BinaryColor::On' }), Off: () => tyObj('BinaryColor', { copy: true, on: false, short: () => 'BinaryColor::Off' }) } };
-  LIB['embedded_graphics::pixelcolor::BinaryColor'] = { board: 'pi', value: COLOR };
-  LIB['embedded_graphics::prelude::BinaryColor'] = { board: 'pi', value: COLOR };
+  LIB['embedded_graphics::pixelcolor::BinaryColor'] = { value: COLOR };
+  LIB['embedded_graphics::prelude::BinaryColor'] = { value: COLOR };
   function styleBuilder(st) {
     return tyObj('MonoTextStyleBuilder', {
       selfMethods: new Set(['font', 'text_color', 'build', 'background_color']),
@@ -301,13 +299,13 @@
       }
     });
   }
-  LIB['embedded_graphics::mono_font::MonoTextStyleBuilder'] = { board: 'pi', value: { t: 'type', name: 'MonoTextStyleBuilder', assoc: { new: () => styleBuilder({ on: true }) } } };
-  LIB['embedded_graphics::mono_font::MonoTextStyle'] = { board: 'pi', value: { t: 'type', name: 'MonoTextStyle', assoc: { new: (m, a, line) => { const f = deref(a[0]); const c = deref(a[1]); return tyObj('MonoTextStyle', { copy: true, size: f && f.size ? f.size : 1, on: !c || c.on !== false }); } } } };
+  LIB['embedded_graphics::mono_font::MonoTextStyleBuilder'] = { value: { t: 'type', name: 'MonoTextStyleBuilder', assoc: { new: () => styleBuilder({ on: true }) } } };
+  LIB['embedded_graphics::mono_font::MonoTextStyle'] = { value: { t: 'type', name: 'MonoTextStyle', assoc: { new: (m, a, line) => { const f = deref(a[0]); const c = deref(a[1]); return tyObj('MonoTextStyle', { copy: true, size: f && f.size ? f.size : 1, on: !c || c.on !== false }); } } } };
   const POINT = { t: 'type', name: 'Point', assoc: { new: (m, a, line) => { need(a, 2, 'Point::new', line); const x = argInt(a[0], 'Point::new', line), y = argInt(a[1], 'Point::new', line); return tyObj('Point', { copy: true, x, y, debug: () => `Point { x: ${x}, y: ${y} }`, short: () => `Point(${x}, ${y})` }); }, zero: () => tyObj('Point', { copy: true, x: 0, y: 0 }) } };
-  LIB['embedded_graphics::prelude::Point'] = { board: 'pi', value: POINT };
-  LIB['embedded_graphics::geometry::Point'] = { board: 'pi', value: POINT };
+  LIB['embedded_graphics::prelude::Point'] = { value: POINT };
+  LIB['embedded_graphics::geometry::Point'] = { value: POINT };
   const BASELINE = { t: 'type', name: 'Baseline', consts: { Top: () => tyObj('Baseline', { copy: true, top: true }), Middle: () => tyObj('Baseline', { copy: true, mid: true }), Bottom: () => tyObj('Baseline', { copy: true,}), Alphabetic: () => tyObj('Baseline', { copy: true,}) } };
-  LIB['embedded_graphics::text::Baseline'] = { board: 'pi', value: BASELINE };
+  LIB['embedded_graphics::text::Baseline'] = { value: BASELINE };
   function textObj(m, a, line, baseline) {
     const txt = deref(a[0]);
     if (!txt || txt.t !== 'str') throw rerr('E0308', 'mismatched types: expected `&str`', line, 'Το κείμενο μπαίνει σε "εισαγωγικά" ή ως &μεταβλητή (π.χ. &msg).');
@@ -333,8 +331,116 @@
     });
   }
   LIB['embedded_graphics::text::Text'] = {
-    board: 'pi',
     value: { t: 'type', name: 'Text', assoc: { new: (m, a, line) => { need(a, 3, 'Text::new', line); return textObj(m, a, line, null); }, with_baseline: (m, a, line) => { need(a, 4, 'Text::with_baseline', line); return textObj(m, a, line, deref(a[3])); } } }
+  };
+
+  // ------------------------------------------------------------ ESP32: PWM με LEDC και δίαυλος I2C (esp_idf_svc::hal)
+  // Όπως στο πραγματικό ESP32: ένας timer δίνει τη συχνότητα, ένα κανάλι (LedcDriver) οδηγεί ένα pin με duty 0…get_max_duty().
+  const hzOf = (v, what, line) => {
+    const h = deref(v);
+    if (h && h.cls === 'Hertz') return h.hz;
+    throw rerr('E0308', `mismatched types: expected \`Hertz\`, found \`${h ? typeOfVal(h) : '()'}\``, line, `Το ${what} θέλει συχνότητα: γράψε π.χ. Hertz(880).`);
+  };
+  const HERTZ = { t: 'ctor', make: args => { const v = deref(args[0]); const hz = v && v.t === 'int' ? v.v : NaN; return tyObj('Hertz', { copy: true, hz, debug: () => `Hertz(${hz})`, short: () => `${hz} Hz` }); } };
+  LIB['esp_idf_svc::hal::units::Hertz'] = { board: 'esp32', value: HERTZ };
+  LIB['esp_idf_svc::hal::prelude::Hertz'] = { board: 'esp32', value: HERTZ };
+  const RES = { t: 'type', name: 'Resolution', consts: {} };
+  for (let b = 1; b <= 14; b++) RES.consts['Bits' + b] = () => tyObj('Resolution', { copy: true, bits: b, short: () => `Bits${b}` });
+  LIB['esp_idf_svc::hal::ledc::Resolution'] = { board: 'esp32', value: RES };
+  function timerConfig(c) {
+    return tyObj('TimerConfig', {
+      copy: true, cfg: c, short: () => `TimerConfig · ${c.hz} Hz · ${c.bits} bits`,
+      methods: {
+        frequency: (a, line) => timerConfig(Object.assign({}, c, { hz: hzOf(a[0], '.frequency()', line) })),
+        resolution: (a, line) => { const r = deref(a[0]); if (!r || r.cls !== 'Resolution') throw rerr('E0308', 'mismatched types: expected `Resolution`', line, 'Γράψε π.χ. .resolution(Resolution::Bits14).'); return timerConfig(Object.assign({}, c, { bits: r.bits })); },
+        speed_mode: () => timerConfig(c)
+      }
+    });
+  }
+  const TCFG = { t: 'type', name: 'TimerConfig', assoc: { new: () => timerConfig({ hz: 1000, bits: 8 }), default: () => timerConfig({ hz: 1000, bits: 8 }) } };
+  LIB['esp_idf_svc::hal::ledc::config::TimerConfig'] = { board: 'esp32', value: TCFG };
+  LIB['esp_idf_svc::hal::ledc::TimerConfig'] = { board: 'esp32', value: TCFG };
+  LIB['esp_idf_svc::hal::ledc::LedcTimerDriver'] = {
+    board: 'esp32',
+    value: {
+      t: 'type', name: 'LedcTimerDriver',
+      assoc: {
+        new: (m, a, line) => {
+          need(a, 2, 'LedcTimerDriver::new', line);
+          const tm = deref(a[0]), cfg = deref(a[1]);
+          if (!tm || tm.ledcTimer === undefined) throw rerr('E0308', 'mismatched types: expected a LEDC timer', line, 'Το πρώτο όρισμα είναι ένας timer: peripherals.ledc.timer0.');
+          if (!cfg || cfg.cls !== 'TimerConfig') throw rerr('E0308', 'mismatched types: expected `&TimerConfig`', line, 'Το δεύτερο όρισμα είναι οι ρυθμίσεις: &TimerConfig::new().frequency(Hertz(880)).');
+          if (cfg.cfg.hz * Math.pow(2, cfg.cfg.bits) > 80e6) return ERR(errVal('ESP_FAIL', 'EspError(ESP_FAIL)', 'EspError'));
+          const t = { hz: cfg.cfg.hz, bits: cfg.cfg.bits, chans: [] };
+          return OK(tyObj('LedcTimerDriver', {
+            timer: t, short: () => `LedcTimerDriver · ${t.hz} Hz · ${t.bits} bits`,
+            mutMethods: new Set(['set_frequency']),
+            methods: {
+              set_frequency: (args, ln) => { t.hz = hzOf(args[0], '.set_frequency()', ln); t.chans.forEach(ch => ch.apply(ln)); return OK(UNIT); },
+              frequency: () => tyObj('Hertz', { copy: true, hz: t.hz })
+            }
+          }));
+        }
+      }
+    }
+  };
+  LIB['esp_idf_svc::hal::ledc::LedcDriver'] = {
+    board: 'esp32',
+    value: {
+      t: 'type', name: 'LedcDriver',
+      assoc: {
+        new: (m, a, line) => {
+          need(a, 3, 'LedcDriver::new', line);
+          const ch = deref(a[0]), tmr = deref(a[1]);
+          if (!ch || ch.ledcChannel === undefined) throw rerr('E0308', 'mismatched types: expected a LEDC channel', line, 'Το πρώτο όρισμα είναι ένα κανάλι: peripherals.ledc.channel0.');
+          if (!tmr || tmr.cls !== 'LedcTimerDriver') throw rerr('E0308', 'mismatched types: expected `&LedcTimerDriver`', line, 'Το δεύτερο όρισμα είναι ο timer που έφτιαξες: &timer.');
+          const n = pinToken(a[2], 'LedcDriver::new', line);
+          const t = tmr.timer;
+          const max = Math.pow(2, t.bits) - 1;
+          let duty = 0;
+          const st = { apply: ln => pwmOut(m, n, t.hz, max ? duty / max : 0, ln) };
+          t.chans.push(st);
+          setupPin(m, n, 3);
+          return OK(tyObj('LedcDriver', {
+            short: () => `LedcDriver(GPIO ${n}) · duty ${duty}/${max} · ${t.hz} Hz`,
+            mutMethods: new Set(['set_duty', 'enable', 'disable']),
+            methods: {
+              get_max_duty: () => I(max, 'u32'),
+              get_duty: () => I(duty, 'u32'),
+              set_duty: (args, ln) => {
+                need(args, 1, 'set_duty', ln);
+                const d = argInt(args[0], '.set_duty()', ln);
+                if (d > max) { m.board.warnOnce('ledcmax', ln, `Το duty ${d} είναι πάνω από το μέγιστο ${max}.`, 'Πάρε το μέγιστο με get_max_duty() και γράψε π.χ. max / 2.'); return ERR(errVal('ESP_ERR_INVALID_ARG', 'EspError(ESP_ERR_INVALID_ARG)', 'EspError')); }
+                duty = d; st.apply(ln); return OK(UNIT);
+              },
+              enable: (args, ln) => { st.apply(ln); return OK(UNIT); },
+              disable: (args, ln) => { pwmOut(m, n, t.hz, 0, ln); return OK(UNIT); }
+            }
+          }));
+        }
+      }
+    }
+  };
+  function i2cConfig(hz) { return tyObj('I2cConfig', { copy: true, hz, methods: { baudrate: (a, line) => i2cConfig(hzOf(a[0], '.baudrate()', line)) } }); }
+  const ICFG = { t: 'type', name: 'I2cConfig', assoc: { new: () => i2cConfig(100000), default: () => i2cConfig(100000) } };
+  LIB['esp_idf_svc::hal::i2c::I2cConfig'] = { board: 'esp32', value: ICFG };
+  LIB['esp_idf_svc::hal::i2c::config::Config'] = { board: 'esp32', value: ICFG };
+  LIB['esp_idf_svc::hal::i2c::I2cDriver'] = {
+    board: 'esp32',
+    value: {
+      t: 'type', name: 'I2cDriver',
+      assoc: {
+        new: (m, a, line) => {
+          need(a, 4, 'I2cDriver::new', line);
+          const port = deref(a[0]);
+          if (!port || port.i2cPort === undefined) throw rerr('E0308', 'mismatched types: expected an I2C peripheral', line, 'Το πρώτο όρισμα είναι το peripherals.i2c0.');
+          const sda = pinToken(a[1], 'I2cDriver::new (SDA)', line), scl = pinToken(a[2], 'I2cDriver::new (SCL)', line);
+          const ok = sda === 21 && scl === 22;
+          if (!ok) m.board.warnOnce('rsi2cpins', line, `Η οθόνη είναι στα SDA = GPIO 21 και SCL = GPIO 22· έδωσες SDA ${sda}, SCL ${scl}.`, 'Η σειρά είναι: I2cDriver::new(peripherals.i2c0, peripherals.pins.gpio21, peripherals.pins.gpio22, &config).');
+          return OK(tyObj('I2cDriver', { moveOnly: true, ok, short: () => `I2cDriver · SDA ${sda} · SCL ${scl}${ok ? '' : ' (λάθος pins)'}` }));
+        }
+      }
+    }
   };
 
   // Ονόματα τύπων που γράφονται μόνο σε υπογραφές, π.χ. fn blink(led: &mut OutputPin) ή
@@ -355,7 +461,12 @@
           const pins = {};
           for (let n = 0; n <= 39; n++) pins['gpio' + n] = { t: 'obj', cls: `Gpio${n}`, gpio: n, moveOnly: true, debug: () => `Gpio${n}`, short: () => `Gpio${n}`, methods: {} };
           const pinsObj = { t: 'obj', cls: 'Pins', fields: pins, debug: () => 'Pins { … }', short: () => 'Pins', methods: {} };
-          return OK({ t: 'obj', cls: 'Peripherals', fields: { pins: pinsObj }, debug: () => 'Peripherals { … }', short: () => 'Peripherals (όλα τα «κομμάτια» του ESP32)', methods: {} });
+          const periph = (cls, extra) => Object.assign({ t: 'obj', cls, moveOnly: true, debug: () => cls, short: () => cls, methods: {} }, extra || {});
+          const ledcF = {};
+          for (let i = 0; i < 4; i++) ledcF['timer' + i] = periph(`TIMER${i}`, { ledcTimer: i });
+          for (let i = 0; i < 8; i++) ledcF['channel' + i] = periph(`CHANNEL${i}`, { ledcChannel: i });
+          const ledc = { t: 'obj', cls: 'LEDC', fields: ledcF, debug: () => 'LEDC { … }', short: () => 'LEDC (PWM: 4 timers, 8 κανάλια)', methods: {} };
+          return OK({ t: 'obj', cls: 'Peripherals', fields: { pins: pinsObj, ledc, i2c0: periph('I2C0', { i2cPort: 0 }), i2c1: periph('I2C1', { i2cPort: 1 }) }, debug: () => 'Peripherals { … }', short: () => 'Peripherals (όλα τα «κομμάτια» του ESP32)', methods: {} });
         }
       }
     }

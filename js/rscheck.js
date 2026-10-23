@@ -20,11 +20,11 @@
 
   // όλα τα «modules» που υπάρχουν (προθέματα των LIB)
   function modulePaths() {
-    const out = new Set(['std', 'std::thread', 'std::time', 'std::error', 'std::process', 'std::cmp', 'rppal', 'rppal::gpio', 'rppal::i2c', 'ssd1306', 'ssd1306::prelude', 'embedded_graphics', 'embedded_graphics::prelude', 'embedded_graphics::mono_font', 'embedded_graphics::mono_font::ascii', 'embedded_graphics::pixelcolor', 'embedded_graphics::text', 'embedded_graphics::geometry', 'esp_idf_svc', 'esp_idf_svc::hal', 'esp_idf_svc::hal::gpio', 'esp_idf_svc::hal::delay', 'esp_idf_svc::hal::peripherals', 'esp_idf_svc::sys', 'esp_idf_svc::log', 'anyhow', 'log', 'esp_idf_svc::hal::prelude']);
+    const out = new Set(['std', 'std::thread', 'std::time', 'std::error', 'std::process', 'std::cmp', 'rppal', 'rppal::gpio', 'rppal::i2c', 'ssd1306', 'ssd1306::prelude', 'embedded_graphics', 'embedded_graphics::prelude', 'embedded_graphics::mono_font', 'embedded_graphics::mono_font::ascii', 'embedded_graphics::pixelcolor', 'embedded_graphics::text', 'embedded_graphics::geometry', 'esp_idf_svc', 'esp_idf_svc::hal', 'esp_idf_svc::hal::gpio', 'esp_idf_svc::hal::delay', 'esp_idf_svc::hal::peripherals', 'esp_idf_svc::sys', 'esp_idf_svc::log', 'anyhow', 'log', 'esp_idf_svc::hal::prelude', 'esp_idf_svc::hal::ledc', 'esp_idf_svc::hal::ledc::config', 'esp_idf_svc::hal::i2c', 'esp_idf_svc::hal::i2c::config', 'esp_idf_svc::hal::units']);
     return out;
   }
   const MACRO_IMPORTS = new Set(['log::info', 'log::warn', 'log::error', 'log::debug', 'anyhow::anyhow', 'anyhow::bail']);
-  const crateBoard = p => (p.startsWith('rppal') || p.startsWith('ssd1306') || p.startsWith('embedded_graphics') ? 'pi' : p.startsWith('esp_idf_svc') || p.startsWith('esp_idf_hal') ? 'esp32' : null);
+  const crateBoard = p => (p.startsWith('rppal') ? 'pi' : p.startsWith('esp_idf_svc') || p.startsWith('esp_idf_hal') ? 'esp32' : null);
   const normPath = p => p.replace(/^esp_idf_hal::/, 'esp_idf_svc::hal::').replace(/^esp_idf_hal$/, 'esp_idf_svc::hal').replace(/^esp_idf_sys::/, 'esp_idf_svc::sys::');
 
   // ------------------------------------------------------------ τύποι (ως κείμενο)
@@ -135,6 +135,8 @@
     Vec: new Set(['push', 'pop', 'clear', 'insert', 'remove', 'sort', 'sort_unstable', 'reverse', 'truncate', 'swap', 'iter_mut', 'retain', 'dedup']),
     OutputPin: new Set(['set_high', 'set_low', 'toggle', 'write', 'set_pwm', 'set_pwm_frequency', 'clear_pwm']),
     PinDriver: new Set(['set_high', 'set_low', 'toggle', 'set_level', 'set_pull']),
+    LedcDriver: new Set(['set_duty', 'enable', 'disable']),
+    LedcTimerDriver: new Set(['set_frequency']),
     Option: new Set(['take', 'insert', 'replace'])
   };
   const SELF_METHODS = new Set(['into_output', 'into_output_low', 'into_output_high', 'into_input', 'into_input_pullup', 'into_input_pulldown', 'unwrap', 'expect', 'unwrap_or', 'unwrap_or_default', 'into_iter', 'ok', 'err', 'ok_or', 'into']);
@@ -147,7 +149,7 @@
       if (isIntish(t) || isFloatish(t) || ['bool', 'char', '()', 'Duration', 'Instant', 'Level', '&str', '!'].includes(t)) return true;
       if (t.startsWith('&mut ')) return false;
       if (t.startsWith('&')) return true;
-      if (t === 'String' || t.startsWith('Vec<') || /^(OutputPin|InputPin|Pin|Gpio\d*|PinDriver|Peripherals|Pins|Box)/.test(t)) return false;
+      if (t === 'String' || t.startsWith('Vec<') || /^(OutputPin|InputPin|Pin|Gpio\d*|PinDriver|Peripherals|Pins|Box|LedcDriver|LedcTimerDriver|I2cDriver)/.test(t)) return false;
       const opt = generic(t, 'Option');
       if (opt) return this.isCopyTy(opt[0]);
       const res = generic(t, 'Result');
@@ -476,7 +478,7 @@
                 r.used = true;
                 r.partial = r.partial || new Map();
                 if (r.partial.has(fp.key)) throw rerr('E0382', `use of moved value: \`${fp.key}\``, e.line, `Το ${fp.key} το έχεις ήδη δώσει (move) στη γραμμή ${r.partial.get(fp.key)}. Κάθε pin μπορεί να έχει έναν μόνο ιδιοκτήτη: φτιάξε έναν driver και χρησιμοποίησέ τον παντού.`);
-                if (/^gpio\d+$/.test(e.name) || r.ty && !this.isCopyTy(this.fieldTy(r.ty, e.name))) r.partial.set(fp.key, e.line);
+                if (/^(gpio\d+|timer\d|channel\d|i2c\d)$/.test(e.name) || r.ty && !this.isCopyTy(this.fieldTy(r.ty, e.name))) r.partial.set(fp.key, e.line);
                 return this.fieldTy(r.ty, e.name);
               }
             }
@@ -967,6 +969,8 @@
     'std::thread::sleep': '()', 'String::new': 'String', 'String::from': 'String', 'String::with_capacity': 'String', 'Vec::new': 'Vec<_>', 'Vec::with_capacity': 'Vec<_>',
     'rppal::gpio::Gpio::new': 'Result<Gpio, rppal::gpio::Error>', 'rppal::i2c::I2c::new': 'Result<I2c, rppal::i2c::Error>',
     'esp_idf_svc::hal::peripherals::Peripherals::take': 'Result<Peripherals, EspError>',
+    'esp_idf_svc::hal::ledc::LedcDriver::new': 'Result<LedcDriver, EspError>', 'esp_idf_svc::hal::ledc::LedcTimerDriver::new': 'Result<LedcTimerDriver, EspError>',
+    'esp_idf_svc::hal::i2c::I2cDriver::new': 'Result<I2cDriver, EspError>',
     'esp_idf_svc::hal::gpio::PinDriver::output': 'Result<PinDriver<Output>, EspError>', 'esp_idf_svc::hal::gpio::PinDriver::input': 'Result<PinDriver<Input>, EspError>',
     'esp_idf_svc::hal::delay::FreeRtos::delay_ms': '()', 'esp_idf_svc::hal::delay::Ets::delay_us': '()', 'esp_idf_svc::sys::link_patches': '()'
   };
@@ -984,6 +988,8 @@
     if ((base === 'OutputPin' || base === 'InputPin') && (name.startsWith('is_'))) return 'bool';
     if (base === 'OutputPin') return ['set_pwm', 'set_pwm_frequency', 'clear_pwm'].includes(name) ? 'Result<(), rppal::gpio::Error>' : '()';
     if (base === 'InputPin' && name === 'read') return 'Level';
+    if (base === 'LedcDriver') return name === 'get_max_duty' || name === 'get_duty' ? 'u32' : 'Result<(), EspError>';
+    if (base === 'LedcTimerDriver') return name === 'set_frequency' ? 'Result<(), EspError>' : null;
     if (base.startsWith('PinDriver')) return name.startsWith('is_') ? 'bool' : name === 'get_level' ? 'Level' : 'Result<(), EspError>';
     if (base === 'Instant') return name === 'elapsed' || name === 'duration_since' ? 'Duration' : null;
     if (base === 'Duration') return { as_millis: 'u128', as_micros: 'u128', as_secs: 'u64', as_secs_f32: 'f32', as_secs_f64: 'f64', subsec_millis: 'u32' }[name] || null;

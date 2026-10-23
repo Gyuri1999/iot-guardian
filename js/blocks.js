@@ -29,9 +29,9 @@
   const caps = track => CAPS[track] || CAPS['cpp-esp32'];
   // Python στο Pi (gpiozero): το εικονικό Pi δεν έχει φανάρι για την Python
   const hasTraffic = track => track !== 'py-pi';
-  // buzzer, servo, LED RGB, OLED: παντού εκτός από τη Rust του ESP32
+  // buzzer, servo, LED RGB, OLED: σε όλες τις διαδρομές
   const NEWP = ['buzzer', 'servo', 'rgb', 'oled'];
-  const hasNew = track => track !== 'rs-esp32';
+  const hasNew = () => true;
   // f64 της Rust: 1 → 1.0
   const f64 = x => (Number.isInteger(x) ? x + '.0' : String(x));
   const frac = v => Math.round((v / 255) * 100) / 100;
@@ -251,10 +251,18 @@
           L.push(`${p}}`); break;
         }
         case 'repeat': L.push(`${p}for _ in 0..${b.n} {`); body(b.body, ind + 4, d + 1); L.push(`${p}}`); break;
-        case 'tone': L.push(`${p}buzzer.set_pwm_frequency(${f64(b.f)}, 0.5)?;`); if (b.ms) L.push(`${p}thread::sleep(Duration::from_millis(${b.ms}));`, `${p}buzzer.clear_pwm()?;`); break;
-        case 'quiet': L.push(`${p}buzzer.clear_pwm()?;`); break;
-        case 'servo': L.push(`${p}servo.set_pwm(Duration::from_millis(20), Duration::from_micros(${Math.round(500 + (b.a * 2000) / 180)}))?;   // ${b.a}°`); break;
-        case 'rgb': L.push(`${p}red.set_pwm_frequency(100.0, ${f64(frac(b.r))})?;`, `${p}green.set_pwm_frequency(100.0, ${f64(frac(b.g))})?;`, `${p}blue.set_pwm_frequency(100.0, ${f64(frac(b.b))})?;`); break;
+        case 'tone':
+          if (pi) { L.push(`${p}buzzer.set_pwm_frequency(${f64(b.f)}, 0.5)?;`); if (b.ms) L.push(`${p}thread::sleep(Duration::from_millis(${b.ms}));`, `${p}buzzer.clear_pwm()?;`); break; }
+          L.push(`${p}buzz_timer.set_frequency(Hertz(${b.f}))?;`, `${p}buzzer.set_duty(buzzer.get_max_duty() / 2)?;`); if (b.ms) L.push(`${p}FreeRtos::delay_ms(${b.ms});`, `${p}buzzer.set_duty(0)?;`); break;
+        case 'quiet': L.push(pi ? `${p}buzzer.clear_pwm()?;` : `${p}buzzer.set_duty(0)?;`); break;
+        case 'servo':
+          if (pi) L.push(`${p}servo.set_pwm(Duration::from_millis(20), Duration::from_micros(${Math.round(500 + (b.a * 2000) / 180)}))?;   // ${b.a}°`);
+          else L.push(`${p}servo.set_duty(servo.get_max_duty() * ${Math.round(500 + (b.a * 2000) / 180)} / 20000)?;   // ${b.a}°`);
+          break;
+        case 'rgb':
+          if (pi) L.push(`${p}red.set_pwm_frequency(100.0, ${f64(frac(b.r))})?;`, `${p}green.set_pwm_frequency(100.0, ${f64(frac(b.g))})?;`, `${p}blue.set_pwm_frequency(100.0, ${f64(frac(b.b))})?;`);
+          else L.push(`${p}red.set_duty(${b.r})?;`, `${p}green.set_duty(${b.g})?;`, `${p}blue.set_duty(${b.b})?;`);
+          break;
         case 'oled':
         case 'oledv': {
           const what = b.t === 'oled' ? `"${b.text}"` : '&format!("{}", count)';
@@ -277,11 +285,23 @@
       if (u.rgb) L.push('    let mut red = gpio.get(5)?.into_output();', '    let mut green = gpio.get(6)?.into_output();', '    let mut blue = gpio.get(13)?.into_output();');
       if (u.oled) L.push('    let i2c = I2c::new()?;', '    let interface = I2CDisplayInterface::new(i2c);', '    let mut display = Ssd1306::new(interface, DisplaySize128x64, DisplayRotation::Rotate0)', '        .into_buffered_graphics_mode();', '    display.init().unwrap();', '    let style = MonoTextStyleBuilder::new().font(&FONT_6X10).text_color(BinaryColor::On).build();');
     } else {
-      L.push('use esp_idf_svc::hal::delay::FreeRtos;', 'use esp_idf_svc::hal::gpio::PinDriver;', 'use esp_idf_svc::hal::peripherals::Peripherals;', '', 'fn main() -> anyhow::Result<()> {', '    esp_idf_svc::sys::link_patches();', '    let peripherals = Peripherals::take()?;');
+      const pwm = u.buzzer || u.servo || u.rgb;
+      L.push('use esp_idf_svc::hal::delay::FreeRtos;', 'use esp_idf_svc::hal::gpio::PinDriver;');
+      if (u.oled) L.push('use esp_idf_svc::hal::i2c::{I2cConfig, I2cDriver};');
+      if (pwm) L.push(`use esp_idf_svc::hal::ledc::{config::TimerConfig, LedcDriver, LedcTimerDriver${u.servo ? ', Resolution' : ''}};`);
+      L.push('use esp_idf_svc::hal::peripherals::Peripherals;');
+      if (pwm || u.oled) L.push('use esp_idf_svc::hal::units::Hertz;');
+      if (u.oled) L.push('use ssd1306::{prelude::*, I2CDisplayInterface, Ssd1306};', 'use embedded_graphics::{', '    mono_font::{ascii::FONT_6X10, MonoTextStyleBuilder},', '    pixelcolor::BinaryColor,', '    prelude::*,', '    text::{Baseline, Text},', '};');
+      L.push('', 'fn main() -> anyhow::Result<()> {', '    esp_idf_svc::sys::link_patches();', '    let peripherals = Peripherals::take()?;');
       if (u.led) L.push('    let mut led = PinDriver::output(peripherals.pins.gpio2)?;');
       for (const c of Object.keys(u.light)) L.push(`    let mut ${VAR[c]} = PinDriver::output(peripherals.pins.gpio${LIGHT_PIN.rsesp[c]})?;`);
       if (u.button) L.push('    let button = PinDriver::input(peripherals.pins.gpio15)?;');
       if (u.pir) L.push('    let pir = PinDriver::input(peripherals.pins.gpio4)?;');
+      // κάθε εξάρτημα με PWM: δικός του timer και κανάλι LEDC
+      if (u.buzzer) L.push('    let mut buzz_timer = LedcTimerDriver::new(peripherals.ledc.timer0, &TimerConfig::new().frequency(Hertz(440)))?;', '    let mut buzzer = LedcDriver::new(peripherals.ledc.channel0, &buzz_timer, peripherals.pins.gpio23)?;');
+      if (u.servo) L.push('    let servo_timer = LedcTimerDriver::new(peripherals.ledc.timer1, &TimerConfig::new().frequency(Hertz(50)).resolution(Resolution::Bits14))?;', '    let mut servo = LedcDriver::new(peripherals.ledc.channel1, &servo_timer, peripherals.pins.gpio19)?;');
+      if (u.rgb) L.push('    let rgb_timer = LedcTimerDriver::new(peripherals.ledc.timer2, &TimerConfig::new())?;', '    let mut red = LedcDriver::new(peripherals.ledc.channel2, &rgb_timer, peripherals.pins.gpio32)?;', '    let mut green = LedcDriver::new(peripherals.ledc.channel3, &rgb_timer, peripherals.pins.gpio33)?;', '    let mut blue = LedcDriver::new(peripherals.ledc.channel4, &rgb_timer, peripherals.pins.gpio14)?;');
+      if (u.oled) L.push('    let i2c = I2cDriver::new(peripherals.i2c0, peripherals.pins.gpio21, peripherals.pins.gpio22, &I2cConfig::new().baudrate(Hertz(400_000)))?;', '    let interface = I2CDisplayInterface::new(i2c);', '    let mut display = Ssd1306::new(interface, DisplaySize128x64, DisplayRotation::Rotate0)', '        .into_buffered_graphics_mode();', '    display.init().unwrap();', '    let style = MonoTextStyleBuilder::new().font(&FONT_6X10).text_color(BinaryColor::On).build();');
     }
     if (u.count) L.push(`    let ${u.countSet ? 'mut ' : ''}count: i32 = 0;   // ο μετρητής`);
     body(m.setup, 4, 0);
