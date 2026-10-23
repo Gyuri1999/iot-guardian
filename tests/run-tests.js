@@ -721,5 +721,24 @@ test('ανάγνωση: ο κώδικας πάει στην αγγλική φω�
   assert(sctx.IoTSpeak.pieces('pinMode(LED_PIN, OUTPUT);').every(x => !x.en));
 });
 
+test('μπλοκ: buzzer, servo, LED RGB και οθόνη σε C++ και MicroPython', () => {
+  const m = { setup: [{ t: 'oled', text: 'Hi!' }], loop: [{ t: 'if', c: 'button', then: [{ t: 'tone', f: 880, ms: 0 }, { t: 'servo', a: 90 }, { t: 'rgb', r: 255, g: 128, b: 0 }, { t: 'oledv', v: 'temp' }], else: [{ t: 'quiet' }, { t: 'servo', a: 0 }] }, { t: 'wait', ms: 50 }] };
+  for (const [tr, lang] of [['cpp-esp32', 'cpp'], ['py-esp32', 'python']]) {
+    const r = new IoTValidator.Runner(IoTBlocks.generate(m, tr), { board: 'esp32', temp: 21.5 }, { button: true }, lang);
+    r.runSetup();
+    r.runLoops(2);
+    const b = r.board;
+    eq(b.buzzerFreq(), 880, tr + ' buzzer');
+    eq(b.servo.angle, 90, tr + ' servo');
+    assert(Math.abs(b.rgb()[0] - 255) <= 2 && b.rgb()[1] === 128, tr + ' rgb ' + b.rgb());
+    assert(b.oledText().includes('21.5'), tr + ' oled ' + b.oledText());
+  }
+});
+test('MicroPython: PWM servo από duty και προειδοποίηση για λάθος συχνότητα', () => {
+  const r = new IoTValidator.Runner('from machine import Pin, PWM\nservo = PWM(Pin(19), freq=100)\nservo.duty(128)\n', { board: 'esp32' }, {}, 'python');
+  r.runSetup();
+  assert(r.board.warnings.some(w => /50 Hz/.test(w.text)), 'περίμενα προειδοποίηση για τα 50 Hz');
+});
+
 console.log(`\n${passed} πέρασαν, ${failed} απέτυχαν\n`);
 process.exit(failed ? 1 : 0);

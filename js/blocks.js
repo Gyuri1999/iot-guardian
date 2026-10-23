@@ -29,9 +29,9 @@
   const caps = track => CAPS[track] || CAPS['cpp-esp32'];
   // Python στο Pi (gpiozero): το εικονικό Pi δεν έχει φανάρι για την Python
   const hasTraffic = track => track !== 'py-pi';
-  // buzzer, servo, LED RGB, OLED: προς το παρόν μόνο στη C++ του ESP32
+  // buzzer, servo, LED RGB, OLED: στη C++ και στη MicroPython του ESP32
   const NEWP = ['buzzer', 'servo', 'rgb', 'oled'];
-  const hasNew = track => track === 'cpp-esp32';
+  const hasNew = track => track === 'cpp-esp32' || track === 'py-esp32';
 
   // ------------------------------------------------------------ μοντέλο
 
@@ -172,6 +172,16 @@
             break;
           }
           case 'repeat': L.push(`${p}for ${'ijkmn'[d] || 'r'} in range(${b.n}):`); body(b.body, ind + 4, d + 1); break;
+          case 'tone': L.push(`${p}buzzer.freq(${b.f})`, `${p}buzzer.duty_u16(32768)`); if (b.ms) L.push(`${p}time.sleep_ms(${b.ms})`, `${p}buzzer.duty_u16(0)`); break;
+          case 'quiet': L.push(`${p}buzzer.duty_u16(0)`); break;
+          case 'servo': L.push(`${p}angle(${b.a})`); break;
+          case 'rgb': L.push(`${p}color(${b.r}, ${b.g}, ${b.b})`); break;
+          case 'oled':
+          case 'oledv': {
+            const what = b.t === 'oled' ? `"${b.text}"` : b.v === 'count' ? 'str(count)' : b.v === 'temp' ? 'str(temperature())' : 'str(round(distance_cm(), 1))';
+            L.push(`${p}oled.fill(0)`, `${p}oled.text(${what}, 0, 0)`, `${p}oled.show()`);
+            break;
+          }
         }
       });
     };
@@ -185,13 +195,18 @@
       if (u.button) L.push('button = Button(27)');
       if (u.pir) L.push('pir = MotionSensor(4)');
     } else {
-      L.push(`from machine import Pin${u.dist ? ', time_pulse_us' : ''}`);
+      L.push(`from machine import Pin${u.buzzer || u.servo || u.rgb ? ', PWM' : ''}${u.oled ? ', I2C' : ''}${u.dist ? ', time_pulse_us' : ''}`);
       if (u.temp) L.push('import dht');
+      if (u.oled) L.push('import ssd1306');
       L.push('import time', '');
       if (u.led) L.push('led = Pin(2, Pin.OUT)');
       for (const c of Object.keys(u.light)) L.push(`${VAR[c]} = Pin(${LIGHT_PIN.pyesp[c]}, Pin.OUT)`);
       if (u.button) L.push('button = Pin(15, Pin.IN)');
       if (u.pir) L.push('pir = Pin(4, Pin.IN)');
+      if (u.buzzer) L.push('buzzer = PWM(Pin(23))', 'buzzer.duty_u16(0)');
+      if (u.servo) L.push('servo = PWM(Pin(19), freq=50)', '', 'def angle(a):', '    servo.duty(int(26 + a * 102 / 180))');
+      if (u.rgb) L.push('rgb_r = PWM(Pin(32), freq=1000)', 'rgb_g = PWM(Pin(33), freq=1000)', 'rgb_b = PWM(Pin(14), freq=1000)', '', 'def color(r, g, b):', '    rgb_r.duty(r * 4)', '    rgb_g.duty(g * 4)', '    rgb_b.duty(b * 4)');
+      if (u.oled) L.push('i2c = I2C(0, scl=Pin(22), sda=Pin(21))', 'oled = ssd1306.SSD1306_I2C(128, 64, i2c)');
       if (u.temp) L.push('sensor = dht.DHT22(Pin(13))', '', 'def temperature():', '    sensor.measure()', '    return sensor.temperature()');
       if (u.dist) L.push('trig = Pin(5, Pin.OUT)', 'echo = Pin(18, Pin.IN)', '', 'def distance_cm():', '    trig.off()', '    time.sleep_us(2)', '    trig.on()', '    time.sleep_us(10)', '    trig.off()', '    us = time_pulse_us(echo, 1, 30000)', '    return us / 58.3');
     }

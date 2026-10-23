@@ -17,7 +17,7 @@
   const PINS = (root.IoTDevice && root.IoTDevice.PINS) || { LED: 2, BUTTON: 15, PIR: 4, TRIG: 5, ECHO: 18, RED: 25, YELLOW: 26, GREEN: 27 };
 
   // modules ανά πλακέτα
-  const ESP_ONLY = new Set(['machine', 'network', 'umqtt', 'umqtt.simple', 'dht', 'esp32']);
+  const ESP_ONLY = new Set(['machine', 'network', 'umqtt', 'umqtt.simple', 'dht', 'esp32', 'ssd1306']);
   const PI_ONLY = new Set(['gpiozero', 'signal', 'paho', 'paho.mqtt', 'paho.mqtt.client', 'flask', 'sqlite3', 'markupsafe']);
   const proto = PyM.Machine.prototype;
   const moduleOrig = proto.module;
@@ -39,7 +39,7 @@
 
   Object.assign(EXC_PARENT, { MQTTException: 'Exception' });
   NOT_BUILTIN.add('MQTTException');
-  HIGHLIGHT.builtins.push('machine', 'Pin', 'network', 'WLAN', 'MQTTClient', 'dht', 'umqtt', 'time_pulse_us');
+  HIGHLIGHT.builtins.push('machine', 'Pin', 'network', 'WLAN', 'MQTTClient', 'dht', 'umqtt', 'time_pulse_us', 'PWM', 'I2C', 'SoftI2C', 'ssd1306');
 
   // ------------------------------------------------------------ time (MicroPython)
   function microTime(m) {
@@ -61,7 +61,7 @@
   }
 
   // ------------------------------------------------------------ machine
-  const NAMES = { 13: 'αισθητήρας DHT22', [PINS.LED]: 'LED', [PINS.BUTTON]: 'κουμπί', [PINS.PIR]: 'PIR', [PINS.TRIG]: 'TRIG', [PINS.ECHO]: 'ECHO', [PINS.RED]: 'κόκκινο φως', [PINS.YELLOW]: 'κίτρινο φως', [PINS.GREEN]: 'πράσινο φως' };
+  const NAMES = { 23: 'buzzer', 19: 'servo', 32: 'κόκκινο του LED RGB', 33: 'πράσινο του LED RGB', 14: 'μπλε του LED RGB', 21: 'SDA της οθόνης', 22: 'SCL της οθόνης', 13: 'αισθητήρας DHT22', [PINS.LED]: 'LED', [PINS.BUTTON]: 'κουμπί', [PINS.PIR]: 'PIR', [PINS.TRIG]: 'TRIG', [PINS.ECHO]: 'ECHO', [PINS.RED]: 'κόκκινο φως', [PINS.YELLOW]: 'κίτρινο φως', [PINS.GREEN]: 'πράσινο φως' };
   const INPUTS = new Set([PINS.BUTTON, PINS.PIR, PINS.ECHO]);
   const OUT = 3; const IN = 1; const PULL_UP = 2; const PULL_DOWN = 1;
 
@@ -73,7 +73,7 @@
     const b = m.board;
     let mode = a[1] ? numOf(a[1]) : kw.mode ? numOf(kw.mode) : -1;
     const pull = a[2] ? numOf(a[2]) : kw.pull ? numOf(kw.pull) : -1;
-    if (!NAMES[n]) b.warnOnce('mpnc' + n, line, `Στο GPIO ${n} δεν είναι συνδεδεμένο τίποτα στην εικονική πλακέτα.`, 'LED = 2, κουμπί = 15, PIR = 4, TRIG = 5, ECHO = 18, φανάρι = 25 / 26 / 27.');
+    if (!NAMES[n]) b.warnOnce('mpnc' + n, line, `Στο GPIO ${n} δεν είναι συνδεδεμένο τίποτα στην εικονική πλακέτα.`, 'LED = 2, κουμπί = 15, PIR = 4, TRIG = 5, ECHO = 18, φανάρι = 25 / 26 / 27, buzzer = 23, servo = 19, LED RGB = 32 / 33 / 14, οθόνη SDA 21 / SCL 22.');
     const setMode = md => {
       mode = md;
       if (md === OUT) {
@@ -121,6 +121,108 @@
     repr: () => "<class 'Pin'>"
   };
 
+  // ------------------------------------------------------------ PWM: buzzer, servo, LED RGB
+  // Το ίδιο εικονικό μοντέλο με τη C++: ο buzzer ακούγεται, το servo γυρίζει, το LED RGB αλλάζει χρώμα.
+  const SERVO_PIN = 19; const BUZZER_PIN = 23; const RGB = [32, 33, 14];
+  function makePWM(m, a, kw, line) {
+    const p = a[0] || kw.pin;
+    if (!p || p.cls !== 'Pin') raise('TypeError', 'expecting a Pin', 'Γράψε π.χ. PWM(Pin(23)).', line);
+    const n = p.pin;
+    const b = m.board;
+    let freq = a[1] ? numOf(a[1]) : kw.freq ? numOf(kw.freq) : n === SERVO_PIN ? 50 : 5000;
+    let duty16 = kw.duty_u16 ? numOf(kw.duty_u16) : kw.duty ? numOf(kw.duty) * 64 : a[2] ? numOf(a[2]) * 64 : 0;
+    if (n !== BUZZER_PIN && n !== SERVO_PIN && n !== PINS.LED && !RGB.includes(n)) b.warnOnce('pwmnc' + n, line, `Στο GPIO ${n} δεν υπάρχει κάτι που να δέχεται PWM.`, 'buzzer = 23, servo = 19, LED RGB = 32 / 33 / 14.');
+    const apply = ln => {
+      const level = Math.max(0, Math.min(65535, duty16));
+      if (n === BUZZER_PIN) {
+        const f = level > 0 ? Math.round(freq) : 0;
+        if (f && f !== b.buzzer.freq) b.buzzer.tones.push({ t: b.micros, f, ms: null });
+        b.buzzer.freq = f;
+        b.buzzer.until = null;
+      } else if (n === SERVO_PIN) {
+        if (Math.round(freq) !== 50) b.warnOnce('servofreq', ln, `Το servo θέλει PWM στα 50 Hz· έβαλες ${Math.round(freq)} Hz.`, 'Γράψε PWM(Pin(19), freq=50).');
+        const pulse = (level / 65535) * (1e6 / freq);   // μήκος παλμού σε µs
+        if (level > 0) {
+          b.servo.attached = true;
+          const ang = ((pulse - 500) / 2000) * 180;
+          if (ang < -2 || ang > 182) b.warnOnce('servorange', ln, `Ο παλμός ${Math.round(pulse)} µs είναι έξω από τα όρια του servo (500–2500 µs).`, 'Για 0°–180° χρησιμοποίησε duty από 26 έως 128 (ή duty_u16 από 1638 έως 8192).');
+          b.servo.angle = Math.max(0, Math.min(180, Math.round(ang)));
+          b.servo.moves.push({ t: b.micros, angle: b.servo.angle });
+        }
+      } else {
+        b.pwm[n] = Math.round((level / 65535) * 255);
+        if (n === PINS.LED) { b.modes[n] = 3; b.outputs[n] = level > 0 ? 1 : 0; }
+      }
+    };
+    apply(line);
+    const o = {
+      t: 'object', cls: 'PWM', pin: n,
+      attr(name, ln) {
+        switch (name) {
+          case 'freq': return builtin('freq', (m2, args) => { if (args.length) { freq = Math.max(1, numOf(args[0])); apply(ln); return NONE; } return I(Math.round(freq)); });
+          case 'duty': return builtin('duty', (m2, args, kk, l2) => { if (args.length) { const d = numOf(args[0]); if (d < 0 || d > 1023) b.warnOnce('dutyrange', l2, `Το duty() δέχεται 0 έως 1023· έδωσες ${d}.`, '0 = σβηστό, 1023 = όλη την ώρα αναμμένο.'); duty16 = Math.max(0, Math.min(1023, d)) * 64; apply(l2); return NONE; } return I(Math.round(duty16 / 64)); });
+          case 'duty_u16': return builtin('duty_u16', (m2, args, kk, l2) => { if (args.length) { const d = numOf(args[0]); if (d < 0 || d > 65535) b.warnOnce('dutyrange16', l2, `Το duty_u16() δέχεται 0 έως 65535· έδωσες ${d}.`, '0 = σβηστό, 65535 = όλη την ώρα αναμμένο, 32768 = μισό.'); duty16 = Math.max(0, Math.min(65535, d)); apply(l2); return NONE; } return I(Math.round(duty16)); });
+          case 'duty_ns': return builtin('duty_ns', (m2, args, kk, l2) => { if (args.length) { duty16 = Math.round((numOf(args[0]) / (1e9 / freq)) * 65535); apply(l2); return NONE; } return I(Math.round((duty16 / 65535) * (1e9 / freq))); });
+          case 'deinit': return builtin('deinit', () => { duty16 = 0; apply(ln); return NONE; });
+        }
+        return undefined;
+      },
+      short: () => `PWM(Pin(${n})) · ${Math.round(freq)} Hz · duty ${Math.round(duty16 / 64)}/1023`,
+      repr: () => `PWM(Pin(${n}), freq=${Math.round(freq)}, duty=${Math.round(duty16 / 64)})`
+    };
+    return o;
+  }
+
+  // ------------------------------------------------------------ I2C και οθόνη SSD1306
+  function makeI2C(m, a, kw, line, kind) {
+    const scl = kw.scl;
+    const sda = kw.sda;
+    if (!scl || !sda || scl.cls !== 'Pin' || sda.cls !== 'Pin') raise('TypeError', 'missing scl / sda', `Γράψε ${kind}(0, scl=Pin(22), sda=Pin(21)).`, line);
+    const ok = scl.pin === 22 && sda.pin === 21;
+    if (!ok) m.board.warnOnce('i2cpins', line, `Η οθόνη είναι στα SDA 21 και SCL 22· έδωσες sda=Pin(${sda.pin}), scl=Pin(${scl.pin}).`, `Γράψε ${kind}(0, scl=Pin(22), sda=Pin(21)).`);
+    return {
+      t: 'object', cls: 'I2C', ok,
+      attr(name) { if (name === 'scan') return builtin('scan', () => K.L ? K.L(ok ? [I(60)] : []) : NONE); return undefined; },
+      short: () => `I2C · SDA ${sda.pin} · SCL ${scl.pin}${ok ? '' : ' (λάθος pins)'}`,
+      repr: () => `I2C(0, scl=Pin(${scl.pin}), sda=Pin(${sda.pin}))`
+    };
+  }
+  MODULES.ssd1306 = m => ({
+    SSD1306_I2C: builtin('SSD1306_I2C', (m2, a, kw, line) => {
+      const w = a[0] ? numOf(a[0]) : 128;
+      const h = a[1] ? numOf(a[1]) : 64;
+      const bus = a[2] || kw.i2c;
+      if (!bus || bus.cls !== 'I2C') raise('TypeError', 'expecting an I2C object', 'Γράψε oled = ssd1306.SSD1306_I2C(128, 64, i2c).', line);
+      const b = m.board;
+      if (w !== 128 || h !== 64) b.warnOnce('oledsize', line, `Η οθόνη μας είναι 128 × 64· έγραψες ${w} × ${h}.`, 'Γράψε SSD1306_I2C(128, 64, i2c).');
+      b.oled.begun = !!bus.ok;
+      return {
+        t: 'object', cls: 'SSD1306_I2C',
+        attr(name, ln) {
+          switch (name) {
+            case 'fill': return builtin('fill', (m3, args) => { b.oled.buf = []; b.oled.pending = true; return NONE; });
+            case 'text': return builtin('text', (m3, args, kk, l2) => {
+              const txt = args[0] ? (args[0].t === 'str' ? args[0].v : pyStr(args[0])) : '';
+              const x = args[1] ? numOf(args[1]) : 0;
+              const y = args[2] ? numOf(args[2]) : 0;
+              if (y > 56) b.warnOnce('oledfull', l2, `Το y=${y} είναι κάτω από την οθόνη (ύψος 64, κάθε γραμμή 8).`, 'Γραμμές: y = 0, 10, 20, 30, 40, 50.');
+              b.oled.buf.push({ x, y, size: 1, text: String(txt) });
+              b.oled.pending = true;
+              return NONE;
+            });
+            case 'show': return builtin('show', () => { if (b.oled.begun) { b.oled.shown = b.oled.buf.slice(); b.oled.updates++; b.oled.pending = false; } return NONE; });
+            case 'poweroff': case 'poweron': case 'contrast': case 'invert': return builtin(name, () => NONE);
+            case 'width': return I(w);
+            case 'height': return I(h);
+          }
+          return undefined;
+        },
+        short: () => `SSD1306 · ${b.oled.shown.map(t => t.text).join(' / ') || 'κενή'}`,
+        repr: () => '<SSD1306_I2C>'
+      };
+    })
+  });
+
   MODULES.machine = m => {
     const Pin = builtin('Pin', (m2, a, kw, line) => makePin(m, a, kw, line));
     // Τα Pin.OUT κ.λπ. διαβάζονται ως πεδία του ίδιου του Pin
@@ -128,6 +230,9 @@
     Pin.attr = n => (PinType.attr(n) !== undefined ? PinType.attr(n) : attr ? attr(n) : undefined);
     return {
       Pin,
+      PWM: builtin('PWM', (m2, a, kw, line) => makePWM(m, a, kw, line)),
+      I2C: builtin('I2C', (m2, a, kw, line) => makeI2C(m, a, kw, line, 'I2C')),
+      SoftI2C: builtin('SoftI2C', (m2, a, kw, line) => makeI2C(m, a, kw, line, 'SoftI2C')),
       time_pulse_us: builtin('time_pulse_us', (m2, a, kw, line) => {
         const p = a[0];
         if (!p || p.cls !== 'Pin') raise('TypeError', 'expecting a Pin', 'Γράψε time_pulse_us(echo, 1, 30000).', line);
