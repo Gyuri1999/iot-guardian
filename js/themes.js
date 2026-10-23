@@ -181,7 +181,7 @@
     // ρολόι στον αριστερό τοίχο: millis() και delay()
     s += discB(-10, 20, 6, 'rm-clock');
     const c = P(U0, -10, 20);
-    s += `<path d="M${pt(c)} l0,-5 M${pt(c)} l4,1" class="rm-hands"/>`;
+    s += `<g transform="translate(${pt(c)})"><path d="M0,0 l0,-5 M0,0 l4,1" class="rm-hands"/><g class="rm-sec"><path d="M0,1.5 L0,-6"/></g><circle r="0.9" class="rm-hub"/></g>`;
     // πάγκος στον πίσω τοίχο, με λάμπα εργασίας από πάνω
     s += block(72, V0 + 1, 0, 60, 10, 12, 'rm-bench');
     s += block(80, V0 + 2, 12, 10, 6, 5, 'rm-crate') + block(94, V0 + 2, 12, 8, 6, 3, 'rm-crate b');
@@ -207,7 +207,7 @@
     for (let u = 16; u < 128; u += 14) {
       const g = P(u, V0 + 5, 7);
       s += `<path d="M${(g[0] - 4).toFixed(1)},${(g[1] - 8).toFixed(1)} L${(g[0] + 4).toFixed(1)},${(g[1] - 8).toFixed(1)} L${(g[0] + 3).toFixed(1)},${g[1].toFixed(1)} L${(g[0] - 3).toFixed(1)},${g[1].toFixed(1)} Z" class="rm-pot"/>`;
-      s += `<path d="M${g[0].toFixed(1)},${(g[1] - 8).toFixed(1)} q-8,-8 -3,-17 M${g[0].toFixed(1)},${(g[1] - 8).toFixed(1)} q6,-7 2,-16" class="rm-leaf thin"/>`;
+      s += `<g transform="translate(${g[0].toFixed(1)},${(g[1] - 8).toFixed(1)})"><g class="sway" style="animation-delay:-${(u % 7) * 0.4}s"><path d="M0,0 q-8,-8 -3,-17 M0,0 q6,-7 2,-16" class="rm-leaf thin"/></g></g>`;
     }
     // μεγάλο θερμόμετρο στον αριστερό τοίχο: γεμίζει κόκκινο όταν ανάβει ο συναγερμός (LED)
     s += wallB(-14, -8, 6, 28, 'rm-thermo');
@@ -215,7 +215,7 @@
     s += discB(-11, 7, 3, 'rm-thermo-bulb');
     // ανεμιστήρας στη γωνία
     const f = P(U0 + 4, 20, 14);
-    s += `<g class="rm-fan" transform="translate(${f[0].toFixed(1)},${f[1].toFixed(1)})"><circle r="9"/><path d="M0,0 L0,-8 M0,0 L7,4 M0,0 L-7,4"/></g>`;
+    s += `<g class="rm-fan" transform="translate(${f[0].toFixed(1)},${f[1].toFixed(1)})"><circle r="9"/><g class="fan-blades"><path d="M0,0 L0,-8 M0,0 L7,4 M0,0 L-7,4"/></g></g>`;
     // λάμπα ανάπτυξης πάνω από το ράφι
     const top = P(70, V0 + 4, WH - 2);
     s += `<path d="M${pt(P(30, V0 + 4, WH - 2))} L${pt(P(110, V0 + 4, WH - 2))}" class="grow-bar"/>`;
@@ -288,13 +288,23 @@
     return s;
   }
 
+  // Σημεία του δωματίου που πατιούνται (μπαίνουν στην κύρια SVG για να δέχονται κλικ).
+  function hotBell() { const P = SC().P; return [{ key: 'bell', label: 'Κουδούνι: πάτα για να χτυπήσει', pts: [P(70, V0, 9), P(78, V0, 9), P(78, V0, 18), P(70, V0, 18)] }]; }
+  function hotThermo() {
+    const P = SC().P;
+    return [
+      { key: 'heat', label: 'Θερμόμετρο: πάτα για να ζεστάνει το θερμοκήπιο κατά 3 βαθμούς', pts: [P(U0, -16, 3), P(U0, -6, 3), P(U0, -6, 30), P(U0, -16, 30)] },
+      { key: 'cool', label: 'Ανεμιστήρας: πάτα για να δροσίσει το θερμοκήπιο κατά 3 βαθμούς', circle: [P(U0 + 4, 20, 14), 11] }
+    ];
+  }
+
   // Ιστορία και στόχος κάθε σκηνικού (οι στόχοι-τικ έρχονται από τους ελέγχους του μαθήματος).
   const THEMES = {
     desk: { bg: desk, story: 'Το γραφείο της Μαρίας είναι σκοτεινό. Το ESP32 θα ανάψει το φωτιστικό της, με κώδικα που γράφεις εσύ.' },
-    entrance: { bg: entrance, story: 'Κάποιος χτυπά το κουδούνι της εισόδου! Το κουμπί είναι το κουδούνι και το LED το φως της εισόδου.' },
+    entrance: { bg: entrance, hot: hotBell, story: 'Κάποιος χτυπά το κουδούνι της εισόδου! Το κουμπί είναι το κουδούνι και το LED το φως της εισόδου.' },
     hallway: { bg: hallway, story: 'Η γιαγιά περπατά στον διάδρομο τη νύχτα. Σύρε την μπροστά στον αισθητήρα: το φως πρέπει να ανάβει μόλις τη δει.', actor: true },
     workshop: { bg: workshop, story: 'Στο εργαστήρι του θείου Νίκου όλα έχουν τη θέση τους. Φτιάξε κι εσύ τα δικά σου «εργαλεία»: συναρτήσεις που κάνουν μία δουλειά, σωστά και στην ώρα τους.' },
-    greenhouse: { bg: greenhouse, story: 'Τα φυτά στο θερμοκήπιο δεν αντέχουν πολλή ζέστη. Διάβασε σωστά τον αισθητήρα και δώσε προειδοποίηση μόνο όταν πρέπει.' },
+    greenhouse: { bg: greenhouse, hot: hotThermo, story: 'Τα φυτά στο θερμοκήπιο δεν αντέχουν πολλή ζέστη. Διάβασε σωστά τον αισθητήρα και δώσε προειδοποίηση μόνο όταν πρέπει.' },
     livingroom: { bg: livingroom, story: 'Στο σαλόνι όλα είναι συνδεδεμένα: το router, η λάμπα, το tablet. Κάνε τη συσκευή να συνδέεται σωστά και να ακούει μόνο τις σωστές εντολές.' },
     serverroom: { bg: serverroom, story: 'Το μικρό δωμάτιο με τα servers του σπιτιού. Εδώ ζουν ο broker και τα δεδομένα: φρόντισε να μπαίνει μόνο όποιος πρέπει.' },
     garage: { bg: garage, story: 'Το αυτοκίνητο μπαίνει στο γκαράζ. Μέτρησε την απόσταση και δείξε με το φανάρι πότε πρέπει να σταματήσει, πριν ακουμπήσει τον τοίχο.' }
@@ -332,6 +342,23 @@
     const mo = new MutationObserver(() => bg.setAttribute('viewBox', svg.getAttribute('viewBox')));
     mo.observe(svg, { attributes: true, attributeFilter: ['viewBox'] });
     let actor = null;
+    let walk = null;
+    const live = () => svg.isConnected;
+    // πατήσιμα σημεία του δωματίου
+    if (theme.hot && opts.onHot) {
+      const hl = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+      hl.setAttribute('class', 'sc-hot');
+      hl.innerHTML = theme.hot().map(h => {
+        const a = `class="hot" data-hot="${h.key}" tabindex="0" role="button" aria-label="${h.label}"`;
+        if (h.circle) return `<circle ${a} cx="${h.circle[0][0].toFixed(1)}" cy="${h.circle[0][1].toFixed(1)}" r="${h.circle[1]}"><title>${h.label}</title></circle>`;
+        return `<polygon ${a} points="${h.pts.map(pt).join(' ')}"><title>${h.label}</title></polygon>`;
+      }).join('');
+      svg.appendChild(hl);
+      const fire = e => { const t = e.target.closest('[data-hot]'); if (!t) return; e.stopPropagation(); opts.onHot(t.dataset.hot); };
+      hl.addEventListener('pointerdown', e => e.stopPropagation());
+      hl.addEventListener('click', fire);
+      hl.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); fire(e); } });
+    }
     // η γιαγιά μόνο όταν στη σκηνή υπάρχει αισθητήρας κίνησης
     if (theme.actor && svg.querySelector('[data-part="pir"]')) {
       const layer = document.createElementNS('http://www.w3.org/2000/svg', 'g');
@@ -371,8 +398,39 @@
       });
       layer.addEventListener('click', e => e.stopPropagation());
       if (opts.onPir && inZone(u) !== !!opts.pir) opts.onPir(inZone(u));
+      // Βόλτα μόνη της: πηγαίνει ως το τέλος του διαδρόμου, σταματά λίγο και γυρίζει.
+      let timer = null;
+      walk = () => {
+        if (timer) { clearInterval(timer); timer = null; layer.classList.remove('walking'); return false; }
+        let dir = u > 100 ? -1 : 1;
+        let pause = 0;
+        layer.classList.add('walking');
+        timer = setInterval(() => {
+          if (!live()) { clearInterval(timer); timer = null; return; }
+          if (drag) return;
+          if (pause > 0) { pause--; return; }
+          let nu = u + dir * 1.1;
+          if (nu >= 136) { nu = 136; dir = -1; pause = 30; }
+          if (nu <= -8) { nu = -8; dir = 1; pause = 30; }
+          setU(nu);
+        }, 50);
+        return true;
+      };
     }
-    return { bg, update: st => { bg.classList.toggle('led-on', !!st.led); bg.classList.toggle('btn-on', !!st.button); bg.classList.toggle('pir-on', !!st.pir); }, hide: h => { bg.style.visibility = h ? 'hidden' : ''; }, actor: () => actor };
+    return {
+      bg,
+      key: theme.key,
+      update: st => {
+        bg.classList.toggle('led-on', !!st.led);
+        bg.classList.toggle('btn-on', !!st.button);
+        bg.classList.toggle('pir-on', !!st.pir);
+        bg.classList.toggle('running', !!st.running);
+        bg.classList.toggle('hot', typeof st.temp === 'number' && st.temp >= 30);
+      },
+      hide: h => { bg.style.visibility = h ? 'hidden' : ''; },
+      actor: () => actor,
+      walk: () => (walk ? walk() : false)
+    };
   }
 
   root.IoTThemes = { themeOf, mount, THEMES };

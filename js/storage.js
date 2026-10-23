@@ -24,7 +24,7 @@
       current: null,
       track: null,
       stories: {},
-      settings: { theme: 'system', fontScale: 1, lineSpacing: 'normal', reducedMotion: false }
+      settings: { theme: 'system', fontScale: 1, lineSpacing: 'normal', reducedMotion: false, sound: true }
     };
   }
 
@@ -54,6 +54,7 @@
     if (typeof s.fontScale === 'number' && s.fontScale >= 0.85 && s.fontScale <= 1.6) out.settings.fontScale = s.fontScale;
     if (['normal', 'relaxed', 'loose'].includes(s.lineSpacing)) out.settings.lineSpacing = s.lineSpacing;
     if (typeof s.reducedMotion === 'boolean') out.settings.reducedMotion = s.reducedMotion;
+    if (typeof s.sound === 'boolean') out.settings.sound = s.sound;
     return { ok: true, data: out };
   }
 

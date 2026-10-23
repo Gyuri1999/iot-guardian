@@ -375,6 +375,29 @@
 @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .scene-bg .room.glass { --rm-wall-a: #2f4a4a; --rm-wall-b: #284040; --rm-floor: #3e3a33; } :root:not([data-theme="light"]) .scene-bg .room.concrete { --rm-wall-a: #3c4150; --rm-wall-b: #333846; --rm-floor: #4a4a4c; --rm-plank: #3d3d40; } }
 :root[data-theme="dark"] .scene-bg .room.glass { --rm-wall-a: #2f4a4a; --rm-wall-b: #284040; --rm-floor: #3e3a33; }
 :root[data-theme="dark"] .scene-bg .room.concrete { --rm-wall-a: #3c4150; --rm-wall-b: #333846; --rm-floor: #4a4a4c; --rm-plank: #3d3d40; }
+/* ζωντανά δωμάτια: ρολόι που χτυπά όσο τρέχει ο κώδικας, ανεμιστήρας, φυτά που λικνίζονται */
+.rm-sec path { stroke: #c0392b; stroke-width: 0.8; stroke-linecap: round; }
+.rm-hub { fill: #1c2130; }
+.scene-bg.running .rm-sec { animation: rm-tick 12s steps(60) infinite; }
+@keyframes rm-tick { to { transform: rotate(360deg); } }
+.scene-bg.led-on .fan-blades, .scene-bg.hot .fan-blades { animation: rm-spin 0.5s linear infinite; }
+@keyframes rm-spin { to { transform: rotate(360deg); } }
+.sway { animation: rm-sway 3.6s ease-in-out infinite alternate; }
+@keyframes rm-sway { from { transform: rotate(-5deg); } to { transform: rotate(5deg); } }
+.scene-bg.hot .rm-thermo-hot { fill: #d9534f; }
+.scene-bg.hot .rm-leaf.thin { stroke: #8f9a3f; }
+@media (prefers-reduced-motion: reduce) { .sway, .scene-bg.running .rm-sec, .fan-blades { animation: none !important; } }
+:root[data-reduced-motion="true"] .sway { animation: none; }
+/* πατήσιμα σημεία του δωματίου */
+.sc-hot .hot { fill: transparent; stroke: transparent; cursor: pointer; pointer-events: all; }
+.sc-hot .hot:hover, .sc-hot .hot:focus-visible { fill: rgba(226, 181, 45, 0.18); stroke: #e2b52d; stroke-width: 1.2; stroke-dasharray: 3 2; outline: none; }
+.sc-actors.walking .actor-tip { display: none; }
+.sc-actors.walking .actor { animation: rm-bob 0.5s ease-in-out infinite alternate; }
+@keyframes rm-bob { to { transform: translateY(-1.5px); } }
+/* γιορτή στο τέλος της άσκησης */
+.confetti { position: absolute; inset: 0; pointer-events: none; overflow: hidden; z-index: 5; }
+.confetti i { position: absolute; top: -12px; width: 8px; height: 12px; border-radius: 2px; animation: conf-fall 2.1s cubic-bezier(.25,.6,.4,1) forwards; }
+@keyframes conf-fall { 0% { top: -12px; transform: translateX(0) rotate(0); opacity: 1; } 80% { opacity: 1; } 100% { top: 100%; transform: translateX(var(--dx)) rotate(var(--r)); opacity: 0; } }
 /* η γιαγιά του διαδρόμου (σέρνεται) */
 .sc-actors { cursor: grab; }
 .sc-actors.dragging { cursor: grabbing; }

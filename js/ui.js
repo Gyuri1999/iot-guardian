@@ -105,7 +105,11 @@
     html.style.setProperty('--font-scale', String(s.fontScale));
     html.setAttribute('data-spacing', s.lineSpacing);
     html.setAttribute('data-reduced-motion', s.reducedMotion ? 'true' : 'false');
+    if (window.IoTSfx) window.IoTSfx.setEnabled(s.sound !== false);
   }
+  const motionOK = () => !P.settings.reducedMotion && !matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const sfx = n => { if (window.IoTSfx) window.IoTSfx.play(n); };
+
 
   // ------------------------------------------------------------ Πρόοδος
 
@@ -255,7 +259,7 @@
     S.scene = svg;
     S.theme = null;
     const theme = S.task && modeOf(S.task) === 'code' && window.IoTThemes ? window.IoTThemes.themeOf(S.task) : null;
-    if (theme) S.theme = window.IoTThemes.mount(wrap, svg, theme, { pir: S.inputs.pir, onPir: v => { if (!!S.inputs.pir !== v) toggleInput('pir'); } });
+    if (theme) S.theme = window.IoTThemes.mount(wrap, svg, theme, { pir: S.inputs.pir, onPir: v => { if (!!S.inputs.pir !== v) toggleInput('pir'); }, onHot: hotAction });
     bindParts(wrap, svg);
     const motion = !P.settings.reducedMotion && !matchMedia('(prefers-reduced-motion: reduce)').matches;
     // 3D εξαρτήματα (Three.js) κάτω από την SVG· χωρίς WebGL μένει η επίπεδη σκηνή.
@@ -376,6 +380,10 @@
     }
     if (hw.includes('router')) rows.push(sw('router-toggle', 'Router', I.router, 'Ενεργό', 'Σβηστό'));
     if (hw.includes('ultrasonic')) rows.push(`<div class="in-row"><label class="in-l" for="dist-range">Εμπόδιο <output id="dist-out">${Math.round(I.distance)} cm</output></label><input type="range" id="dist-range" min="2" max="200" step="1" value="${I.distance}"></div>`);
+    // βοηθοί δοκιμής: η γιαγιά περπατά μόνη της, το αυτοκίνητο παρκάρει μόνο του
+    const th = S.task && window.IoTThemes ? window.IoTThemes.themeOf(S.task) : null;
+    if (hw.includes('pir') && th && th.actor) rows.push(`<div class="in-row"><span class="in-l">Γιαγιά</span><button class="toggle" id="walk-toggle" aria-pressed="false"><span class="value">▶ Βόλτα μόνη της</span></button></div>`);
+    if (hw.includes('ultrasonic')) rows.push(`<div class="in-row"><span class="in-l">Αυτοκίνητο</span><button class="toggle" id="park-toggle" aria-pressed="false"><span class="value">▶ Παρκάρει μόνο του</span></button></div>`);
     const netInfo = hw.includes('router') || hw.includes('broker') || world.broker || world.wifi;
     if (netInfo) rows.push(`<div class="in-status"><div id="wifi-text">WiFi: —</div><div id="mqtt-text">MQTT: —</div></div>`);
     if (hw.includes('broker')) rows.push(`<div class="btn-row"><button class="btn sm" id="broker-restart">Επανεκκίνηση broker</button><button class="btn sm" id="broker-dup" title="Ο broker ξαναστέλνει στη συσκευή το τελευταίο μήνυμα, όπως μπορεί να γίνει με QoS 1">Διπλή παράδοση</button></div>`);
@@ -1059,12 +1067,83 @@
     }).join('');
   }
 
+  // Αντικείμενα του δωματίου που πατιούνται: το κουδούνι πατά το κουμπί, το θερμόμετρο ζεσταίνει.
+  function hotAction(key) {
+    if (key === 'bell') {
+      if (!S.inputs.button) toggleInput('button');
+      clearTimeout(S.bellT);
+      S.bellT = setTimeout(() => { if (S.inputs.button) toggleInput('button'); }, 700);
+    } else if (key === 'heat' || key === 'cool') {
+      const tr = $('#temp-range');
+      if (!tr) return;
+      tr.value = String(Math.max(-10, Math.min(50, Number(tr.value) + (key === 'heat' ? 3 : -3))));
+      tr.dispatchEvent(new Event('input', { bubbles: true }));
+      sfx('click');
+      announce(`Θερμοκρασία ${S.inputs.temp.toFixed(1)} βαθμοί.`);
+    }
+  }
+
+  function toggleWalk() {
+    if (!S.theme || !S.theme.walk) return;
+    const on = S.theme.walk();
+    const b = $('#walk-toggle');
+    if (b) { b.setAttribute('aria-pressed', String(on)); b.querySelector('.value').textContent = on ? '■ Σταμάτα τη βόλτα' : '▶ Βόλτα μόνη της'; }
+    sfx('click');
+  }
+
+  // Το αυτοκίνητο πλησιάζει αργά ως τα 5 cm, περιμένει και ξαναφεύγει, ώσπου να το σταματήσεις.
+  function toggleAutopark() {
+    const b = $('#park-toggle');
+    if (S.parkT) { clearInterval(S.parkT); S.parkT = null; }
+    else {
+      let dir = -1;
+      let wait = 0;
+      S.parkT = setInterval(() => {
+        if (!$('#park-toggle')) { clearInterval(S.parkT); S.parkT = null; return; }
+        if (wait > 0) { wait--; return; }
+        let d = S.inputs.distance + dir * (S.inputs.distance > 40 ? 3 : 1);
+        if (d <= 5) { d = 5; dir = 1; wait = 25; }
+        if (d >= 120) { d = 120; dir = -1; wait = 10; }
+        setDistance(d);
+      }, 60);
+    }
+    if (b) { b.setAttribute('aria-pressed', String(!!S.parkT)); b.querySelector('.value').textContent = S.parkT ? '■ Σταμάτα το αυτοκίνητο' : '▶ Παρκάρει μόνο του'; }
+    sfx('click');
+  }
+
+  // Γιορτή όταν τελειώνει μια άσκηση: κομφετί πάνω στη σκηνή, σφραγίδα στην αποστολή, ήχος.
+  function celebrate() {
+    sfx('win');
+    const ms = $('#mission');
+    if (ms) { ms.classList.remove('won'); void ms.offsetWidth; ms.classList.add('won'); }
+    const wrap = $('#scene');
+    if (!wrap || !motionOK()) return;
+    const box = document.createElement('div');
+    box.className = 'confetti';
+    box.setAttribute('aria-hidden', 'true');
+    const colors = ['#ff5a3c', '#13857f', '#e2b52d', '#5b7fa6', '#3f8f5a', '#c25a22'];
+    for (let i = 0; i < 46; i++) {
+      const c = document.createElement('i');
+      c.style.left = (5 + Math.random() * 90) + '%';
+      c.style.background = colors[i % colors.length];
+      c.style.setProperty('--dx', (Math.random() * 160 - 80).toFixed(0) + 'px');
+      c.style.setProperty('--r', (Math.random() * 720 - 360).toFixed(0) + 'deg');
+      c.style.animationDelay = (Math.random() * 0.35).toFixed(2) + 's';
+      if (i % 3 === 0) c.style.borderRadius = '50%';
+      box.appendChild(c);
+    }
+    wrap.appendChild(box);
+    setTimeout(() => box.remove(), 2600);
+  }
+
   function bindBoard() {
     const on = (id, fn) => { const el = $('#' + id); if (el) el.onclick = fn; };
     on('btn-toggle', () => toggleInput('button'));
     on('pir-toggle', () => toggleInput('pir'));
     on('fault-toggle', () => toggleInput('sensorFault'));
     on('router-toggle', () => toggleInput('router'));
+    on('walk-toggle', toggleWalk);
+    on('park-toggle', toggleAutopark);
     // Πάτημα πάνω στα αντικείμενα της σκηνής (και Enter / Space με το πληκτρολόγιο).
     const sceneToggle = (id, key) => {
       const el = $('#' + id);
@@ -1137,6 +1216,7 @@
 
   function toggleInput(key) {
     S.inputs[key] = !S.inputs[key];
+    sfx(key === 'button' && S.inputs.button && S.theme && S.theme.key === 'entrance' ? 'bell' : 'click');
     if (S.board) {
       if (key === 'router') S.board.setRouter(S.inputs.router);
       else S.board.inputs[key] = S.inputs[key];
@@ -1419,13 +1499,15 @@
     let res = null;
     try { res = VAL.runTests(ta.value, S.task.validationTests, S.task); } catch (e) { res = null; }
     let n = 0;
+    let ticked = false;
     el.querySelectorAll('li').forEach((li, i) => {
       const ok = !!(res && res[i] && res[i].pass);
-      if (ok && !li.classList.contains('done') && S.msPrev) li.classList.add('just');
+      if (ok && !li.classList.contains('done') && S.msPrev) { li.classList.add('just'); ticked = true; }
       li.classList.toggle('done', ok);
       li.querySelector('.ms-sr').textContent = ok ? ' · έγινε' : ' · δεν έχει γίνει ακόμα';
       if (ok) n++;
     });
+    if (ticked) sfx('tick');
     S.msPrev = true;
     const total = el.querySelectorAll('li').length;
     $('#ms-count').textContent = `${n}/${total}`;
@@ -1665,6 +1747,7 @@
     S.gen = null;
     S.error = e;
     S.runState = 'error';
+    sfx('err');
     updateAll();
     announce(`Σφάλμα${e.line ? ' στη γραμμή ' + e.line : ''}: ${e.message}`);
   }
@@ -1844,6 +1927,7 @@
     const quizOk = !l.quiz || P.quizzes[l.id];
     if (S.results && S.results.allPass && quizOk && !P.completed[l.id]) {
       P.completed[l.id] = true;
+      celebrate();
       // Τέλος κεφαλαίου: νέα κάρτα ιστορίας και σήμα (μία φορά)
       const n = l.chapter;
       if (chapterDone(n) && window.IoTStories && window.IoTStories[n] && !P.stories[n]) {
@@ -2129,7 +2213,7 @@
     // σκηνή
     if (sc && modeOf(S.task) === 'code') {
       cls('#sc-led', 'on', ledOn);
-      if (S.theme) S.theme.update({ led: ledOn, button: S.inputs.button, pir: S.inputs.pir });
+      if (S.theme) S.theme.update({ led: ledOn, button: S.inputs.button, pir: S.inputs.pir, running: S.runState === 'running', temp: S.inputs.temp });
       cls('#sc-led-halo', 'on', ledOn);
       cls('#sc-d2', 'on', pin2);
       cls('#sc-d2-halo', 'on', pin2);
@@ -2524,6 +2608,7 @@
         <div class="field"><label for="set-spacing">Διάστιχο</label>
           <select id="set-spacing"><option value="normal">Κανονικό</option><option value="relaxed">Άνετο</option><option value="loose">Πολύ άνετο</option></select></div>
         <label class="check"><input type="checkbox" id="set-motion"> Μειωμένη κίνηση (χωρίς εφέ και κινούμενες μεταβάσεις)</label>
+        <label class="check"><input type="checkbox" id="set-sound"> Ήχοι του παιχνιδιού (κλικ, κουδούνι, επιτυχία)</label>
       </div>
     </dialog>
     <dialog id="dlg-glossary" aria-labelledby="dlg-glossary-title">
@@ -2564,6 +2649,7 @@
     $('#set-font').oninput = e => { P.settings.fontScale = Number(e.target.value); $('#set-font-out').textContent = Math.round(P.settings.fontScale * 100) + '%'; applySettings(); save(); };
     $('#set-spacing').onchange = e => { P.settings.lineSpacing = e.target.value; applySettings(); save(); };
     $('#set-motion').onchange = e => { P.settings.reducedMotion = e.target.checked; applySettings(); save(); };
+    $('#set-sound').onchange = e => { P.settings.sound = e.target.checked; applySettings(); save(); sfx('tick'); };
 
     const sorted = GLOSSARY.slice().sort((a, b) => a.term.localeCompare(b.term, 'el'));
     const renderGl = q => {
@@ -2617,6 +2703,7 @@
         $('#set-font-out').textContent = Math.round(P.settings.fontScale * 100) + '%';
         $('#set-spacing').value = P.settings.lineSpacing;
         $('#set-motion').checked = P.settings.reducedMotion;
+        $('#set-sound').checked = P.settings.sound !== false;
       }
       if (which === 'data') {
         $('#exp-text').value = window.IoTStorage.exportJson(P);

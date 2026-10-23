@@ -518,6 +518,11 @@ dialog::backdrop { background: rgba(15, 24, 40, 0.55); }
 /* ---------- αποστολή του μαθήματος: ιστορία και στόχοι με τικ */
 .mission { border: 1px solid var(--line); border-left: 4px solid var(--accent); border-radius: 10px; background: var(--surface); padding: 0.55rem 0.8rem; display: grid; gap: 0.35rem; }
 .mission.all { border-left-color: var(--ok); }
+.mission { position: relative; }
+.mission.won::after { content: "✓ Αποστολή εξετελέσθη"; position: absolute; right: 0.8rem; top: 50%; padding: 0.2rem 0.6rem; border: 2.5px solid var(--ok); border-radius: 6px; color: var(--ok); background: var(--surface); font-family: var(--font-label); font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase; transform: translateY(-50%) rotate(-6deg); animation: ms-stamp 0.45s cubic-bezier(.2,1.6,.4,1) both; pointer-events: none; }
+@keyframes ms-stamp { from { transform: translateY(-50%) rotate(-6deg) scale(2.2); opacity: 0; } }
+@media (prefers-reduced-motion: reduce) { .mission.won::after { animation: none; } }
+:root[data-reduced-motion="true"] .mission.won::after { animation: none; }
 .ms-head { display: flex; align-items: center; gap: 0.4rem; font-family: var(--font-label); font-size: 0.78rem; letter-spacing: 0.1em; text-transform: uppercase; color: var(--accent); }
 .mission.all .ms-head { color: var(--ok); }
 .ms-head .ic { width: 1rem; height: 1rem; }
@@ -532,3 +537,10 @@ dialog::backdrop { background: rgba(15, 24, 40, 0.55); }
 .ms-goals li.just { animation: ms-pop 0.6s ease-out; }
 @keyframes ms-pop { 30% { transform: scale(1.08); } }
 @media (prefers-reduced-motion: reduce) { .ms-goals li.just { animation: none; } }
+
+/* λογότυπο: το LED αναπνέει, και οι κάρτες σηκώνονται λίγο στο πέρασμα */
+.hdr-mark .lg-halo { animation: lg-breathe 2.4s ease-in-out infinite; transform-origin: 32px 33px; }
+@keyframes lg-breathe { 50% { stroke-opacity: 0.08; transform: scale(1.25); } }
+.strip-card:not(:disabled) { transition: transform 0.15s ease, box-shadow 0.15s ease; }
+.strip-card:not(:disabled):hover { transform: translateY(-2px); box-shadow: 0 6px 0 -2px color-mix(in srgb, var(--ink) 18%, transparent); }
+@media (prefers-reduced-motion: reduce) { .hdr-mark .lg-halo { animation: none; } .strip-card:not(:disabled):hover { transform: none; } }
