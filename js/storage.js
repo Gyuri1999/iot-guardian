@@ -63,13 +63,13 @@
     const sb = obj.sandbox;
     if (sb && typeof sb === 'object') {
       const TR = /^(cpp|py|rs)-(esp32|pi)$/;
-      const HW = ['led', 'button', 'pir', 'sensor', 'router', 'ultrasonic', 'traffic'];
+      const HW = ['led', 'button', 'pir', 'sensor', 'router', 'ultrasonic', 'traffic', 'buzzer', 'servo', 'rgb', 'oled'];
       if (sb.hw && typeof sb.hw === 'object') for (const [k, v] of Object.entries(sb.hw)) if (TR.test(k) && Array.isArray(v)) out.sandbox.hw[k] = v.filter(h => HW.includes(h));
       if (sb.code && typeof sb.code === 'object') for (const [k, v] of Object.entries(sb.code)) if (TR.test(k) && typeof v === 'string' && v.length <= MAX_DRAFT) out.sandbox.code[k] = v;
     }
     const ROOMS = ['desk', 'entrance', 'hallway', 'workshop', 'greenhouse', 'livingroom', 'serverroom', 'garage'];
     if (obj.challenges && typeof obj.challenges === 'object') for (const [k, v] of Object.entries(obj.challenges)) if (ROOMS.includes(k) && v && Number.isInteger(v.n) && v.n > 0 && Number.isInteger(v.best) && v.best >= 0) out.challenges[k] = { n: v.n, best: v.best };
-    if (obj.wired && typeof obj.wired === 'object') for (const [k, v] of Object.entries(obj.wired)) if (/^w-[a-z]{3,4}$/.test(k) && v === true) out.wired[k] = true;
+    if (obj.wired && typeof obj.wired === 'object') for (const [k, v] of Object.entries(obj.wired)) if (/^w-[a-z]{3,5}$/.test(k) && v === true) out.wired[k] = true;
     const day = /^\d{4}-\d{2}-\d{2}$/;
     if (obj.review && typeof obj.review === 'object') {
       for (const [k, v] of Object.entries(obj.review)) if (ids.has(k) && v && Number.isInteger(v.box) && v.box >= 1 && v.box <= 5 && day.test(v.due)) out.review[k] = { box: v.box, due: v.due };

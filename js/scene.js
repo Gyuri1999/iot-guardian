@@ -520,6 +520,78 @@
     return poly(hull(back.concat(front)), 'cyl-side') + poly(front, 'cyl-face') + poly(ring(cv + len + 0.01, r * 0.7), 'cyl-mesh') + poly(ring(cv + len + 0.02, r * 0.25), 'cyl-core');
   }
 
+  // ------------------------------------------------------------ buzzer, LED RGB, servo, OLED
+  const BUZ = { u: 112, v: 22 };
+  const RGBL = { u: 94, v: 22 };
+  const SERVO = { u: 104, v: -15 };
+  const OLED = { u: 134, v: 14 };
+  // όρθιος κύλινδρος σε 2D (σώμα + πάνω έλλειψη)
+  function vcyl(u, v, h0, h1, r, cls) {
+    const a = P(u, v, h0), b = P(u, v, h1);
+    const rx = r * K * 1.22, ry = rx * 0.58;
+    return `<path d="M${(a[0] - rx).toFixed(1)},${a[1].toFixed(1)} L${(b[0] - rx).toFixed(1)},${b[1].toFixed(1)} L${(b[0] + rx).toFixed(1)},${b[1].toFixed(1)} L${(a[0] + rx).toFixed(1)},${a[1].toFixed(1)} A${rx.toFixed(1)},${ry.toFixed(1)} 0 0 1 ${(a[0] - rx).toFixed(1)},${a[1].toFixed(1)} Z" class="${cls}"/><ellipse cx="${b[0].toFixed(1)}" cy="${b[1].toFixed(1)}" rx="${rx.toFixed(1)}" ry="${ry.toFixed(1)}" class="${cls} top"/>`;
+  }
+  function buzzer() {
+    const { u, v } = BUZ;
+    rec({ t: 'buzzer', u, v });
+    const top = P(u, v, 7.6);
+    let s = '<g id="sc-buzzer" class="sc-buzzer" data-part="buzzer">';
+    s += `<path d="M${pt(P(u - 1.27, v, 2.4))} L${pt(P(u - 1.27, v, 3.6))} M${pt(P(u + 1.27, v, 2.4))} L${pt(P(u + 1.27, v, 3.6))}" class="legs"/>`;
+    s += vcyl(u, v, 3.4, 7.6, 3.1, 'bz-body');
+    s += `<ellipse cx="${top[0].toFixed(1)}" cy="${top[1].toFixed(1)}" rx="2.2" ry="1.3" class="bz-hole"/>`;
+    s += `<g id="sc-buzz-waves" class="bz-waves" transform="translate(${top[0].toFixed(1)},${(top[1] - 4).toFixed(1)})"><path d="M-6,-4 q6,-7 12,0"/><path d="M-10,-9 q10,-11 20,0"/><path d="M-14,-14 q14,-15 28,0"/></g>`;
+    return s + '</g>';
+  }
+  const buzPin = () => ({ u: BUZ.u - 1.27, v: BUZ.v + 2.54, h: 2.4 });
+  function rgbLed() {
+    const { u, v } = RGBL;
+    rec({ t: 'rgb', u, v });
+    const top = P(u, v, 14);
+    const base = P(u, v, 2.4);
+    let s = '<g id="sc-rgb" class="sc-rgb" data-part="rgb">';
+    s += `<path d="M${[-1.9, -0.63, 0.63, 1.9].map(d => `M${pt(P(u + d, v, 2.4))} L${pt(P(u + d, v, 6.2))}`).join(' ').slice(1)}" class="legs"/>`;
+    s += `<circle cx="${top[0].toFixed(1)}" cy="${top[1].toFixed(1)}" r="34" class="rgb-halo" id="sc-rgb-halo"/>`;
+    s += `<rect x="${(top[0] - 7).toFixed(1)}" y="${top[1].toFixed(1)}" width="14" height="${(base[1] - top[1] - 12).toFixed(1)}" class="rgb-body" id="sc-rgb-body"/>`;
+    s += `<ellipse cx="${top[0].toFixed(1)}" cy="${(base[1] - 12).toFixed(1)}" rx="8.4" ry="3.6" class="led-rim"/>`;
+    s += `<path d="M${(top[0] - 7).toFixed(1)},${top[1].toFixed(1)} a7,7 0 0 1 14,0 z" class="rgb-body" id="sc-rgb-dome"/>`;
+    s += `<ellipse cx="${(top[0] - 2.4).toFixed(1)}" cy="${(top[1] + 3).toFixed(1)}" rx="1.8" ry="3.6" class="led-shine"/>`;
+    return s + '</g>';
+  }
+  const rgbPin = i => ({ u: RGBL.u - 1.9 + [0, 2.54, 3.8][i], v: RGBL.v + 2.54, h: 2.4 });
+  // Μπράτσο του servo: γωνία 0–180° στο πάνω επίπεδο, γύρω από τον άξονα
+  function servoHorn(angle) {
+    const cu = SERVO.u + 3.2, cv = SERVO.v + 3, h = 11.2;
+    const t = ((180 - angle) * Math.PI) / 180;
+    const tip = P(cu + Math.cos(t) * 6, cv - Math.sin(t) * 6, h);
+    const back = P(cu - Math.cos(t) * 1.6, cv + Math.sin(t) * 1.6, h);
+    return `M${pt(back)} L${pt(tip)}`;
+  }
+  function servoMotor() {
+    const { u, v } = SERVO;
+    rec({ t: 'servo', u, v });
+    let s = '<g id="sc-servo" class="sc-servo" data-part="servo">';
+    s += box(u - 2, v + 1.5, 6.5, 16, 3, 1, 'srv-tab');
+    s += box(u, v, 0, 12, 6, 10, 'srv-body');
+    s += vcyl(u + 3.2, v + 3, 10, 11, 1.4, 'srv-shaft');
+    s += `<path d="${servoHorn(90)}" class="srv-horn" id="sc-servo-horn"/>`;
+    return s + '</g>';
+  }
+  function oledScreen() {
+    const { u, v } = OLED;
+    rec({ t: 'oled', u, v });
+    let s = '<g id="sc-oled" class="sc-oled" data-part="oled">';
+    s += box(u - 1, v - 2, 0, 28, 5, 1.2, 'oled-stand');
+    s += box(u, v, 1.2, 26, 1.2, 17, 'oled-pcb');
+    s += `<g transform="${planeUH(v + 1.2)}"><rect x="${u + 1.5}" y="${-(1.2 + 16)}" width="23" height="12.5" class="oled-glass"/><g id="sc-oled-text" transform="translate(${u + 2},${-(1.2 + 15.6)}) scale(${(22 / 128).toFixed(4)})"></g></g>`;
+    for (let i = 0; i < 4; i++) s += box(u + 9 + i * 2.54 - 0.3, v + 0.3, 18.2, 0.6, 0.6, 1.8, 'pin');
+    return s + '</g>';
+  }
+  const oledPin = i => ({ u: OLED.u + 9 + (i + 2) * 2.54, v: OLED.v + 0.6, h: 20 });
+  // Κείμενο της οθόνης (στοιχεία 128×64) → SVG
+  function oledSVG(items) {
+    return (items || []).map(t => `<text x="${t.x}" y="${t.y + 7 * t.size}" font-size="${8 * t.size}" class="oled-t">${String(t.text).replace(/[&<>]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c]))}</text>`).join('');
+  }
+
   // Αισθητήρας απόστασης HC-SR04: όρθια μπλε πλακέτα στο breadboard, «μάτια» προς τον θεατή (+v).
   const US = { u: 98, v: 9, w: 20 };
   function ultrasonic() {
@@ -780,6 +852,30 @@
       wires.push(wire(espPinUV('D27'), tlPinUV(2), 'w-grn', 74, 'sc-w-grn'));
       labels.push(callout(P(TL.u, TL.v + 1.6, 22), 40, -60, 'ΦΑΝΑΡΙ · 25 · 26 · 27', null, 'traffic'));
     }
+    if (hw.includes('buzzer')) {
+      front += buzzer();
+      wires.push(wire(espPinUV('D23'), buzPin(), 'w-buz', 36, 'sc-w-buz'));
+      labels.push(callout(P(BUZ.u, BUZ.v, 8), -70, 56, 'BUZZER · GPIO 23', null, 'buzzer'));
+    }
+    if (hw.includes('rgb')) {
+      front += rgbLed();
+      // τρία καλώδια από την πίσω σειρά, μαζί σαν κορδέλα
+      wires.push(wire(espPinUV('D32'), rgbPin(0), 'w-rgbr', 70, 'sc-w-rgbr'));
+      wires.push(wire(espPinUV('D33'), rgbPin(1), 'w-rgbg', 70, 'sc-w-rgbg'));
+      wires.push(wire(espPinUV('D14'), rgbPin(2), 'w-rgbb', 70, 'sc-w-rgbb'));
+      labels.push(callout(P(RGBL.u, RGBL.v, 14), -40, 80, 'LED RGB · 32 · 33 · 14', null, 'rgb'));
+    }
+    if (hw.includes('servo')) {
+      mid += servoMotor();
+      wires.push(wire(espPinUV('D19'), { u: SERVO.u + 0.5, v: SERVO.v + 4.5, h: 4 }, 'w-servo', 46, 'sc-w-servo'));
+      labels.push(callout(P(SERVO.u + 6, SERVO.v, 11), 40, -60, 'SERVO · GPIO 19', null, 'servo'));
+    }
+    if (hw.includes('oled')) {
+      mid += oledScreen();
+      wires.push(wire(espPinUV('D21'), oledPin(0), 'w-sda', 58, 'sc-w-sda'));
+      wires.push(wire(espPinUV('D22'), oledPin(1), 'w-scl', 62, 'sc-w-scl'));
+      labels.push(callout(P(OLED.u + 26, OLED.v, 10), 50, 34, 'OLED · SDA 21 · SCL 22', null, 'oled'));
+    }
     let links = '';
     if (wifi) links += `<path id="sc-link-wifi" d="M${pt(P(-5, -30, 4))} Q${pt(P(-4, -12, 30))} ${pt(P(3, 14, PCB_TOP + 1))}" class="link"/>`;
     if (net) {
@@ -788,6 +884,8 @@
     }
     const inner = `<g class="sc-back">${back}</g><g class="sc-links">${links}</g><g class="sc-mid">${mid}</g><g class="sc-wires">${wires.join('')}</g><g class="sc-front">${front}</g><g class="sc-labels">${labels.join('')}</g><g id="sc-packets"></g>`;
     const b = net ? [-260, -330, 600, 230] : wifi ? [-250, -250, 560, 220] : [-140, -150, 450, 210];
+    // servo / OLED κάθονται δεξιά του breadboard: η σκηνή φαρδαίνει
+    if (hw.includes('servo') || hw.includes('oled')) { b[2] += 150; b[1] -= 30; }
     return fit(inner, b, 'lab', 'Ισομετρική σκηνή εργαστηρίου: πλακέτα ESP32, breadboard και εξαρτήματα');
   }
 
@@ -1014,5 +1112,5 @@
     });
   }
 
-  root.IoTScene = { RIGHT_ROW, LEFT_ROW, PI_ODD, PI_EVEN, K, ESP, PCB_TOP, PIN_U, PI_T, PI_PIN_L, PI_PIN_TOP, BB, TL, manifest: null, buildIn, carOffset, carV, dragToCm, CAR, US, P, labScene, piScene, homeScene, piHomeScene, netScene, attachPanZoom, animatePacket, NET_NODES };
+  root.IoTScene = { servoHorn, oledSVG, BUZ, RGBL, SERVO, OLED, RIGHT_ROW, LEFT_ROW, PI_ODD, PI_EVEN, K, ESP, PCB_TOP, PIN_U, PI_T, PI_PIN_L, PI_PIN_TOP, BB, TL, manifest: null, buildIn, carOffset, carV, dragToCm, CAR, US, P, labScene, piScene, homeScene, piHomeScene, netScene, attachPanZoom, animatePacket, NET_NODES };
 })(typeof window !== 'undefined' ? window : globalThis);

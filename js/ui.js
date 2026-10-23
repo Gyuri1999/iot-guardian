@@ -1399,7 +1399,7 @@
   // ------------------------------------------------------------ Ελεύθερο εργαστήριο
   function sandboxLesson(tr) {
     const SB = window.IoTSandbox;
-    const allowed = SB.ALLOWED[tr.board] || SB.ALLOWED.esp32;
+    const allowed = SB.allowed(tr.id, tr.board);
     const saved = P.sandbox.hw[tr.id];
     const hw = (saved || ['led', 'button']).filter(h => allowed.includes(h));
     const first = trackChapters(tr.id)[0];
@@ -1442,7 +1442,7 @@
   function benchHTML(l) {
     const tr = curTrack();
     const SB = window.IoTSandbox;
-    const allowed = SB.ALLOWED[tr.board] || SB.ALLOWED.esp32;
+    const allowed = SB.allowed(tr.id, tr.board);
     const tpl = sandboxTemplates(tr);
     return `<section class="bench" id="bench" aria-label="Ο πάγκος σου">
       <div class="bench-head">${icon('tool')}<b>Ο πάγκος σου</b><span class="muted">διάλεξε εξαρτήματα</span></div>
@@ -1477,7 +1477,7 @@
       const src = id ? byId[id] : null;
       const prev = $('#code').value;
       P.sandbox.code[tr.id] = src ? src.solution : SB.BLANK[tr.id];
-      if (src) P.sandbox.hw[tr.id] = hardwareOf(src).filter(h => (SB.ALLOWED[tr.board] || []).includes(h)).concat(hardwareOf(src).includes('led') || !hardwareOf(src).some(h => h === 'ultrasonic' || h === 'traffic') ? ['led'] : []);
+      if (src) P.sandbox.hw[tr.id] = hardwareOf(src).filter(h => SB.allowed(tr.id, tr.board).includes(h)).concat(hardwareOf(src).includes('led') || !hardwareOf(src).some(h => h === 'ultrasonic' || h === 'traffic') ? ['led'] : []);
       save();
       reopen();
       gardi(src ? `Φόρτωσα τη λύση σου από «${src.title}». Άλλαξέ τη όπως θέλεις!` : 'Ξεκινάμε από ένα απλό αναβόσβημα.', 'happy', [{ label: 'Αναίρεση', run: () => { P.sandbox.code[tr.id] = prev; save(); openSandbox(); } }], { force: true });
@@ -1737,7 +1737,8 @@
     echo: { pin: 18, label: 'ECHO', pi: 24, esp: 18, hw: 'ultrasonic' },
     red: { pin: 25, label: 'Κόκκινο', pi: 16, esp: 25, hw: 'traffic' },
     yel: { pin: 26, label: 'Κίτρινο', pi: 20, esp: 26, hw: 'traffic' },
-    grn: { pin: 27, label: 'Πράσινο', pi: 21, esp: 27, hw: 'traffic' }
+    grn: { pin: 27, label: 'Πράσινο', pi: 21, esp: 27, hw: 'traffic' },
+    buz: { pin: 23, label: 'Buzzer', pi: 23, esp: 23, hw: 'buzzer' }
   };
   function scopeSignals(l) {
     const hw = hardwareOf(l);
@@ -2562,6 +2563,7 @@
   // ------------------------------------------------------------ Εκτέλεση
 
   function stopMachine() {
+    if (window.IoTSfx && window.IoTSfx.buzzer) window.IoTSfx.buzzer(0);
     if (S.raf) clearTimeout(S.raf);
     S.raf = null;
     S.gen = null;
@@ -3133,6 +3135,29 @@
         const on = !!(b && b.light(pin)) && wiredCls({ 25: 'w-red', 26: 'w-yel', 27: 'w-grn' }[pin]);
         cls('#sc-tl-' + k, 'on', on);
         cls('#sc-tl-' + k + '-halo', 'on', on);
+      }
+      // buzzer, servo, LED RGB, OLED (το καθένα «δουλεύει» μόνο αν είναι συνδεδεμένα τα καλώδιά του)
+      if (sc.querySelector('#sc-buzzer') || sc.querySelector('#sc-servo') || sc.querySelector('#sc-rgb') || sc.querySelector('#sc-oled')) {
+        const running = S.runState === 'running';
+        const f = b && b.buzzerFreq && wiredCls('w-buz') ? b.buzzerFreq() : 0;
+        cls('#sc-buzzer', 'on', f > 0);
+        cls('#sc-w-buz', 'on', f > 0);
+        if (window.IoTSfx) window.IoTSfx.buzzer(running ? f : 0);
+        const ang = b && b.servo && wiredCls('w-servo') ? b.servo.angle : 90;
+        const horn = sc.querySelector('#sc-servo-horn');
+        if (horn) horn.setAttribute('d', window.IoTScene.servoHorn(ang));
+        const rgbOk = wiredCls('w-rgbr') && wiredCls('w-rgbg') && wiredCls('w-rgbb');
+        const [rr, gg, bb] = b && b.rgb && rgbOk ? b.rgb() : [0, 0, 0];
+        const lit = rr + gg + bb > 0;
+        const col = lit ? `rgb(${Math.max(40, rr)},${Math.max(40, gg)},${Math.max(40, bb)})` : '';
+        ['#sc-rgb-dome', '#sc-rgb-body'].forEach(sel => { const el = sc.querySelector(sel); if (el) el.style.fill = col; });
+        const halo = sc.querySelector('#sc-rgb-halo');
+        if (halo) { halo.style.fill = lit ? `rgb(${rr},${gg},${bb})` : 'transparent'; halo.style.opacity = lit ? String(Math.min(0.55, (rr + gg + bb) / 900 + 0.15)) : '0'; }
+        const items = b && b.oled && wiredCls('w-sda') && wiredCls('w-scl') ? b.oled.shown : [];
+        const ot = sc.querySelector('#sc-oled-text');
+        const sig = JSON.stringify(items);
+        if (ot && ot.dataset.sig !== sig) { ot.dataset.sig = sig; ot.innerHTML = window.IoTScene.oledSVG(items); }
+        if (window.IoTScene3D && window.IoTScene3D.parts) window.IoTScene3D.parts({ buzz: f > 0, servo: ang, rgb: [rr, gg, bb], oled: items });
       }
       const move = sc.querySelector('#sc-car-move');
       if (move) {

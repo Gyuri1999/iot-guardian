@@ -6,9 +6,9 @@
 (function (root) {
   'use strict';
 
-  const PINS = { LED: 2, BUTTON: 15, PIR: 4, TRIG: 5, ECHO: 18, RED: 25, YELLOW: 26, GREEN: 27 };
+  const PINS = { LED: 2, BUTTON: 15, PIR: 4, TRIG: 5, ECHO: 18, RED: 25, YELLOW: 26, GREEN: 27, BUZZER: 23, SERVO: 19, RGB_R: 32, RGB_G: 33, RGB_B: 14 };
   const MODE_NAMES = { 1: 'INPUT', 3: 'OUTPUT', 5: 'INPUT_PULLUP' };
-  const PIN_LABELS = { 2: 'LED (GPIO 2)', 15: 'κουμπί (GPIO 15)', 4: 'PIR (GPIO 4)', 5: 'TRIG του HC-SR04 (GPIO 5)', 18: 'ECHO του HC-SR04 (GPIO 18)', 25: 'κόκκινο φως (GPIO 25)', 26: 'κίτρινο φως (GPIO 26)', 27: 'πράσινο φως (GPIO 27)' };
+  const PIN_LABELS = { 23: 'buzzer (GPIO 23)', 19: 'servo (GPIO 19)', 32: 'κόκκινο του LED RGB (GPIO 32)', 33: 'πράσινο του LED RGB (GPIO 33)', 14: 'μπλε του LED RGB (GPIO 14)', 2: 'LED (GPIO 2)', 15: 'κουμπί (GPIO 15)', 4: 'PIR (GPIO 4)', 5: 'TRIG του HC-SR04 (GPIO 5)', 18: 'ECHO του HC-SR04 (GPIO 18)', 25: 'κόκκινο φως (GPIO 25)', 26: 'κίτρινο φως (GPIO 26)', 27: 'πράσινο φως (GPIO 27)' };
   const INPUT_PINS = new Set([15, 4, 18]);
   // Ενδεικτικό ρεύμα του ESP32 σε κάθε κατάσταση (mA). Πραγματικές τιμές διαφέρουν ανά πλακέτα.
   const POWER_MA = { active: 40, wifi: 120, light: 0.8, deep: 0.01 };
@@ -100,6 +100,7 @@
       this.mqtt.current = null;
       if (this.net) this.net.dropClient('device', 'reboot');
       this.wake = { timerUs: null, ext0: null };
+      this.initParts();
     }
 
     warnOnce(key, line, text, hint) {
@@ -124,6 +125,8 @@
 
     digitalWrite(pin, value, line) {
       const v = value ? 1 : 0;
+      // buzzer με digitalWrite: απλό «μπιπ» στα 2 kHz, όπως ένα ενεργό buzzer
+      if (pin === PINS.BUZZER) { this.buzzer.freq = v ? 2000 : 0; this.buzzer.until = null; if (v) this.buzzer.tones.push({ t: this.micros, f: 2000, ms: null }); }
       if (pin === PINS.LED && this.modes[pin] !== 3) {
         this.warnOnce('ledMode', line, 'Γράφεις στο LED_PIN χωρίς να το έχεις ρυθμίσει ως OUTPUT. Στην εικονική πλακέτα το LED μένει σβηστό.', 'Πρόσθεσε pinMode(LED_PIN, OUTPUT); μέσα στο setup(), πριν από το digitalWrite.');
       }
@@ -260,6 +263,59 @@
       this.dbSeed = world.db || null;
       this.db = {};
       this.http = { queue: [], log: [], server: null, nextId: 1 };
+      this.initParts();
+    }
+
+    // ------------------------------------------------ buzzer, servo, LED RGB, OLED
+    initParts() {
+      this.buzzer = { freq: 0, until: null, tones: [] };
+      this.servo = { attached: false, angle: 90, moves: [] };
+      this.pwm = {};
+      this.oled = { begun: false, buf: [], shown: [], x: 0, y: 0, size: 1, updates: 0, pending: false };
+    }
+    // Συχνότητα που ακούγεται τώρα (0 = σιωπή). Ένα tone(…, ms) σταματά μόνο του.
+    buzzerFreq() {
+      const z = this.buzzer;
+      if (z.freq && z.until !== null && this.micros >= z.until) { z.freq = 0; z.until = null; }
+      return z.freq;
+    }
+    rgb() { return [this.pwm[32] || 0, this.pwm[33] || 0, this.pwm[14] || 0]; }
+    oledText() { return this.oled.shown.map(t => t.text).join(' '); }
+    tone(pin, freq, ms, line) {
+      if (pin !== PINS.BUZZER) this.warnOnce('tonepin' + pin, line, `Το tone() πάει στο GPIO ${pin}, αλλά το buzzer είναι στο BUZZER_PIN (GPIO 23).`, 'Γράψε tone(BUZZER_PIN, 440);');
+      const f = Math.max(0, Math.round(freq));
+      if (f > 0 && (f < 30 || f > 20000)) this.warnOnce('tonefreq', line, `Τα ${f} Hz δεν ακούγονται καλά από ένα buzzer.`, 'Δοκίμασε συχνότητες από 200 έως 4000 Hz (π.χ. 440 = λα).');
+      this.buzzer.freq = pin === PINS.BUZZER ? f : 0;
+      this.buzzer.until = ms ? this.micros + Math.round(ms) * 1000 : null;
+      if (pin === PINS.BUZZER && f) this.buzzer.tones.push({ t: this.micros, f, ms: ms || null });
+    }
+    noTone(pin) { if (pin === PINS.BUZZER) { this.buzzer.freq = 0; this.buzzer.until = null; } }
+    analogWrite(pin, val, line) {
+      const v = Math.round(val);
+      if (v < 0 || v > 255) this.warnOnce('pwmrange', line, `Το analogWrite δέχεται τιμές από 0 έως 255· έδωσες ${v}.`, '0 = σβηστό, 255 = όσο πιο φωτεινό γίνεται.');
+      const c = Math.max(0, Math.min(255, v));
+      if (![32, 33, 14, PINS.LED].includes(pin)) this.warnOnce('pwmpin' + pin, line, `Στο GPIO ${pin} δεν είναι συνδεδεμένο τίποτα που να δέχεται analogWrite.`, 'Το LED RGB είναι στα RGB_RED_PIN, RGB_GREEN_PIN και RGB_BLUE_PIN.');
+      this.pwm[pin] = c;
+      if (pin === PINS.LED) { this.modes[pin] = 3; this.outputs[pin] = c > 0 ? 1 : 0; }
+    }
+    servoWrite(angle, line) {
+      if (!this.servo.attached) this.warnOnce('servoattach', line, 'Το servo δεν κινείται: δεν έχει γίνει servo.attach(SERVO_PIN).', 'Πρόσθεσε servo.attach(SERVO_PIN); στο setup().');
+      const a = Math.round(angle);
+      if (a < 0 || a > 180) this.warnOnce('servorange', line, `Το servo γυρίζει από 0 έως 180 μοίρες· έδωσες ${a}.`, 'Οι τιμές έξω από τα όρια κόβονται στο 0 ή στο 180.');
+      if (!this.servo.attached) return;
+      this.servo.angle = Math.max(0, Math.min(180, a));
+      this.servo.moves.push({ t: this.micros, angle: this.servo.angle });
+    }
+    // OLED 128×64: γράμματα 6×8 εικονοστοιχεία επί το μέγεθος. Ό,τι γράφεις φαίνεται μόνο μετά το display.display().
+    oledWrite(text, newline, line) {
+      const o = this.oled;
+      if (!o.begun) this.warnOnce('oledbegin', line, 'Γράφεις στην οθόνη πριν από το display.begin().', 'Πρόσθεσε display.begin(); στο setup().');
+      const t = String(text);
+      if (t) o.buf.push({ x: o.x, y: o.y, size: o.size, text: t });
+      o.x += t.length * 6 * o.size;
+      if (newline) { o.x = 0; o.y += 8 * o.size; }
+      if (o.y >= 64) this.warnOnce('oledfull', line, 'Το κείμενο βγήκε κάτω από την οθόνη (64 εικονοστοιχεία ύψος).', 'Κάλεσε display.clearDisplay(); και display.setCursor(0, 0); πριν ξαναγράψεις.');
+      o.pending = true;
     }
 
     setRouter(up) {
@@ -307,6 +363,30 @@
         case 'pulseIn': return V('int', this.pulseIn(a[0], a[1], a[2], line));
         case 'readTemperature': return V('float', this.inputs.sensorFault ? NaN : this.inputs.temp);
         case 'readHumidity': return V('float', this.inputs.sensorFault ? NaN : this.inputs.humidity);
+        case 'tone': this.tone(a[0], a[1], a[2], line); return VOID;
+        case 'noTone': this.noTone(a[0]); return VOID;
+        case 'analogWrite': this.analogWrite(a[0], a[1], line); return VOID;
+        case 'servo.attach':
+          if (a[0] !== 19) this.warnOnce('servopin', line, `Το servo είναι στο SERVO_PIN (GPIO 19), όχι στο GPIO ${a[0]}.`, 'Γράψε servo.attach(SERVO_PIN);');
+          this.servo.attached = a[0] === 19;
+          return VOID;
+        case 'servo.write': this.servoWrite(a[0], line); return VOID;
+        case 'servo.read': return V('int', this.servo.angle);
+        case 'display.begin': this.oled.begun = true; return VOID;
+        case 'display.clearDisplay': this.oled.buf = []; this.oled.x = 0; this.oled.y = 0; this.oled.pending = true; return VOID;
+        case 'display.setCursor': this.oled.x = Math.max(0, Math.round(a[0])); this.oled.y = Math.max(0, Math.round(a[1])); return VOID;
+        case 'display.setTextSize': this.oled.size = Math.max(1, Math.min(4, Math.round(a[0]))); return VOID;
+        case 'display.print':
+        case 'display.println': {
+          const ty = h.argTypes[0];
+          const txt = a.length ? (ty === 'String' ? a[0] : ty === 'float' || ty === 'double' ? Number(a[0]).toFixed(2) : ty === 'bool' ? (a[0] ? 'true' : 'false') : String(Math.trunc(a[0]))) : '';
+          this.oledWrite(txt, name === 'display.println', line);
+          return VOID;
+        }
+        case 'display.display':
+          if (!this.oled.begun) this.warnOnce('oledbegin', line, 'Η οθόνη δεν έχει ξεκινήσει: λείπει το display.begin().', 'Πρόσθεσε display.begin(); στο setup().');
+          if (this.oled.begun) { this.oled.shown = this.oled.buf.slice(); this.oled.updates++; this.oled.pending = false; }
+          return VOID;
         case 'jsonValid': return B(root.IoTNet.jsonValid(String(a[0])));
         case 'jsonHas': return B(root.IoTNet.jsonHas(String(a[0]), String(a[1])));
         case 'jsonGet': return S(root.IoTNet.jsonGet(String(a[0]), String(a[1])));

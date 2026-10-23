@@ -12,13 +12,20 @@
     { id: 'sensor', label: 'Θερμόμετρο / υγρασία' },
     { id: 'router', label: 'Router WiFi' },
     { id: 'ultrasonic', label: 'Αισθητήρας απόστασης + αυτοκίνητο' },
-    { id: 'traffic', label: 'Φανάρι' }
+    { id: 'traffic', label: 'Φανάρι' },
+    { id: 'buzzer', label: 'Buzzer (ήχος)' },
+    { id: 'servo', label: 'Servo (κίνηση)' },
+    { id: 'rgb', label: 'LED RGB (χρώμα)' },
+    { id: 'oled', label: 'Οθόνη OLED' }
   ];
   // Ποια εξαρτήματα έχει κάθε πλακέτα στο παιχνίδι (το Pi δεν έχει WiFi router στη σκηνή του).
   const ALLOWED = { esp32: ['led', 'button', 'pir', 'sensor', 'router', 'ultrasonic', 'traffic'], pi: ['led', 'button', 'pir', 'ultrasonic', 'traffic'] };
+  // buzzer, servo, LED RGB και OLED υπάρχουν προς το παρόν μόνο στη C++ του ESP32
+  const NEW_PARTS = ['buzzer', 'servo', 'rgb', 'oled'];
+  const allowed = (track, board) => (ALLOWED[board] || ALLOWED.esp32).concat(track === 'cpp-esp32' ? NEW_PARTS : []);
 
   const PINS = {
-    esp32: [['LED', 'GPIO 2 (LED_PIN)'], ['Κουμπί', 'GPIO 15 (BUTTON_PIN)'], ['PIR', 'GPIO 4 (PIR_PIN)'], ['TRIG / ECHO', 'GPIO 5 / GPIO 18'], ['Φανάρι κόκκινο / κίτρινο / πράσινο', 'GPIO 25 / 26 / 27'], ['Θερμόμετρο', 'readTemperature() · readHumidity()']],
+    esp32: [['LED', 'GPIO 2 (LED_PIN)'], ['Κουμπί', 'GPIO 15 (BUTTON_PIN)'], ['PIR', 'GPIO 4 (PIR_PIN)'], ['TRIG / ECHO', 'GPIO 5 / GPIO 18'], ['Φανάρι κόκκινο / κίτρινο / πράσινο', 'GPIO 25 / 26 / 27'], ['Θερμόμετρο', 'readTemperature() · readHumidity()'], ['Buzzer', 'GPIO 23 (BUZZER_PIN)'], ['Servo', 'GPIO 19 (SERVO_PIN)'], ['LED RGB', 'GPIO 32 / 33 / 14'], ['Οθόνη OLED (I2C)', 'SDA 21 · SCL 22']],
     pi: [['LED', 'GPIO 17'], ['Κουμπί', 'GPIO 27'], ['PIR', 'GPIO 4'], ['TRIG / ECHO', 'GPIO 23 / GPIO 24'], ['Φανάρι κόκκινο / κίτρινο / πράσινο', 'GPIO 16 / 20 / 21']]
   };
 
@@ -103,7 +110,7 @@ fn main() -> anyhow::Result<()> {
   };
 
   const CHEAT = {
-    'cpp-esp32': [['pinMode(LED_PIN, OUTPUT);', 'το pin γίνεται έξοδος'], ['digitalWrite(LED_PIN, HIGH);', 'ανάβει (LOW: σβήνει)'], ['digitalRead(BUTTON_PIN)', 'HIGH ή LOW'], ['delay(500);', 'περίμενε 500 ms'], ['millis()', 'ms από την εκκίνηση'], ['Serial.println("…");', 'μήνυμα στο Serial Monitor'], ['readTemperature()', 'θερμοκρασία σε °C'], ['pulseIn(ECHO_PIN, HIGH)', 'διάρκεια ηχούς σε µs']],
+    'cpp-esp32': [['pinMode(LED_PIN, OUTPUT);', 'το pin γίνεται έξοδος'], ['digitalWrite(LED_PIN, HIGH);', 'ανάβει (LOW: σβήνει)'], ['digitalRead(BUTTON_PIN)', 'HIGH ή LOW'], ['delay(500);', 'περίμενε 500 ms'], ['millis()', 'ms από την εκκίνηση'], ['Serial.println("…");', 'μήνυμα στο Serial Monitor'], ['readTemperature()', 'θερμοκρασία σε °C'], ['pulseIn(ECHO_PIN, HIGH)', 'διάρκεια ηχούς σε µs'], ['tone(BUZZER_PIN, 440)', 'ήχος 440 Hz (noTone: σιωπή)'], ['servo.attach(SERVO_PIN); servo.write(90);', 'servo στις 90°'], ['analogWrite(RGB_RED_PIN, 255)', 'χρώμα 0–255 σε κάθε κανάλι'], ['display.println("…"); display.display();', 'κείμενο στην οθόνη']],
     'py-pi': [['led = LED(17)', 'LED στο GPIO 17'], ['led.on() / led.off()', 'ανάβει / σβήνει'], ['btn = Button(27)', 'κουμπί στο GPIO 27'], ['btn.is_pressed', 'True όσο είναι πατημένο'], ['pir = MotionSensor(4)', 'αισθητήρας κίνησης'], ['pir.motion_detected', 'True όταν βλέπει κίνηση'], ['time.sleep(0.5)', 'περίμενε μισό δευτερόλεπτο'], ['print(f"…{x}")', 'μήνυμα στο τερματικό']],
     'py-esp32': [['led = Pin(2, Pin.OUT)', 'LED ως έξοδος'], ['led.on() / led.value(0)', 'ανάβει / σβήνει'], ['btn = Pin(15, Pin.IN)', 'κουμπί ως είσοδος'], ['btn.value()', '1 ή 0'], ['time.sleep_ms(500)', 'περίμενε 500 ms'], ['time.ticks_ms()', 'ms από την εκκίνηση'], ['time_pulse_us(echo, 1)', 'διάρκεια ηχούς σε µs'], ['print("…")', 'μήνυμα στο τερματικό']],
     'rs-pi': [['let gpio = Gpio::new()?;', 'πρόσβαση στα GPIO'], ['gpio.get(17)?.into_output()', 'LED ως έξοδος'], ['led.set_high() / set_low()', 'ανάβει / σβήνει'], ['gpio.get(27)?.into_input()', 'κουμπί ως είσοδος'], ['button.is_high()', 'true όσο είναι πατημένο'], ['thread::sleep(Duration::from_millis(500))', 'περίμενε 500 ms'], ['println!("{x}")', 'μήνυμα στο τερματικό']],
@@ -117,10 +124,14 @@ fn main() -> anyhow::Result<()> {
     sensor: ['Τύπωσε τη θερμοκρασία κάθε δευτερόλεπτο.', 'Άναψε το LED όταν η θερμοκρασία ξεπεράσει τους 28 °C.'],
     router: ['Σύνδεσου στο WiFi και τύπωσε τη διεύθυνση IP.', 'Αν χαθεί το WiFi, άναψε το LED ως προειδοποίηση.'],
     ultrasonic: ['Τύπωσε την απόσταση σε εκατοστά δύο φορές το δευτερόλεπτο.', 'Όσο πλησιάζει το αυτοκίνητο, τόσο πιο γρήγορα να αναβοσβήνει κάτι.'],
+    buzzer: ['Παίξε μια μικρή μελωδία όταν πατηθεί το κουμπί.', 'Κάνε σειρήνα: η συχνότητα να ανεβοκατεβαίνει.'],
+    servo: ['Κάνε το servo να «σκουπίζει» αργά από 0° σε 180° και πίσω.', 'Ανοίξε την πόρτα όταν ο PIR δει κίνηση.'],
+    rgb: ['Φτιάξε ουράνιο τόξο: κόκκινο, πορτοκαλί, κίτρινο, πράσινο, μπλε.', 'Κάνε το χρώμα να «αναπνέει» σιγά σιγά.'],
+    oled: ['Δείξε στην οθόνη πόσες φορές πατήθηκε το κουμπί.', 'Φτιάξε ρολόι: δευτερόλεπτα από την εκκίνηση με millis().'],
     traffic: ['Φτιάξε κανονικό φανάρι: πράσινο 3 δ, κίτρινο 1 δ, κόκκινο 3 δ.', 'Φανάρι με τέσσερις ζώνες απόστασης, με κόκκινο που αναβοσβήνει πολύ κοντά.']
   };
 
   const EXT = { cpp: 'ino', python: 'py', rust: 'rs' };
 
-  root.IoTSandbox = { COMPONENTS, ALLOWED, PINS, BLANK, CHEAT, IDEAS, EXT };
+  root.IoTSandbox = { allowed, NEW_PARTS, COMPONENTS, ALLOWED, PINS, BLANK, CHEAT, IDEAS, EXT };
 })(typeof window !== 'undefined' ? window : globalThis);

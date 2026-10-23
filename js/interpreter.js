@@ -25,6 +25,7 @@
     INPUT: 1, OUTPUT: 3, INPUT_PULLUP: 5,
     LED_PIN: 2, LED_BUILTIN: 2, BUTTON_PIN: 15, PIR_PIN: 4,
     TRIG_PIN: 5, ECHO_PIN: 18, RED_PIN: 25, YELLOW_PIN: 26, GREEN_PIN: 27,
+    BUZZER_PIN: 23, SERVO_PIN: 19, RGB_RED_PIN: 32, RGB_GREEN_PIN: 33, RGB_BLUE_PIN: 14,
     WL_IDLE_STATUS: 0, WL_NO_SSID_AVAIL: 1, WL_CONNECTED: 3, WL_CONNECT_FAILED: 4, WL_DISCONNECTED: 6,
     WIFI_SSID: 'SmartHome-Lab', WIFI_PASSWORD: 'lab-pass-123',
     MQTT_HOST: 'broker.home.lan', HOME_CA: 'Home Lab CA',
@@ -48,17 +49,24 @@
     jsonValid: [1], jsonHas: [2], jsonGet: [2],
     'WiFi.mode': [1],
     esp_sleep_enable_timer_wakeup: [1], esp_sleep_enable_ext0_wakeup: [2],
-    esp_light_sleep_start: [0], esp_deep_sleep_start: [0], esp_sleep_get_wakeup_cause: [0]
+    esp_light_sleep_start: [0], esp_deep_sleep_start: [0], esp_sleep_get_wakeup_cause: [0],
+    // ήχος, κίνηση, χρώμα, οθόνη: buzzer, servo (έτοιμο αντικείμενο servo), LED RGB, OLED (έτοιμο αντικείμενο display)
+    tone: [2, 3], noTone: [1], analogWrite: [2],
+    'servo.attach': [1], 'servo.write': [1], 'servo.read': [0],
+    'display.begin': [0], 'display.clearDisplay': [0], 'display.setCursor': [2], 'display.setTextSize': [1],
+    'display.print': [1], 'display.println': [0, 1], 'display.display': [0]
   };
   const DEEP_SLEEP = { deepSleep: true }; // σήμα (όχι σφάλμα): η πλακέτα μπαίνει σε deep sleep
   const CORE = new Set(['pinMode', 'digitalWrite', 'digitalRead', 'delay', 'millis', 'delayMicroseconds', 'micros', 'Serial.begin', 'Serial.print', 'Serial.println', 'abs', 'min', 'max', 'isnan', 'toInt', 'toFloat']);
-  const BUILTIN_RETURNS = { digitalRead: 'int', millis: 'int', micros: 'int', pulseIn: 'int' };
+  const BUILTIN_RETURNS = { digitalRead: 'int', millis: 'int', micros: 'int', pulseIn: 'int', 'servo.read': 'int' };
   const EXAMPLES = {
     pinMode: 'pinMode(LED_PIN, OUTPUT)', digitalWrite: 'digitalWrite(LED_PIN, HIGH)', digitalRead: 'digitalRead(BUTTON_PIN)',
     delay: 'delay(1000)', millis: 'millis()', delayMicroseconds: 'delayMicroseconds(10)', pulseIn: 'pulseIn(ECHO_PIN, HIGH)', 'WiFi.begin': 'WiFi.begin(WIFI_SSID, WIFI_PASSWORD)',
     'mqtt.connect': 'mqtt.connect("esp32-pir") ή mqtt.connect("esp32-pir", MQTT_USER, MQTT_PASS)',
     'mqtt.publish': 'mqtt.publish("home/motion", payload) ή mqtt.publish("home/temperature", payload, true)',
-    'mqtt.setServer': 'mqtt.setServer(MQTT_HOST, 1883)', jsonGet: 'jsonGet(msg, "cmd")', jsonHas: 'jsonHas(msg, "id")'
+    'mqtt.setServer': 'mqtt.setServer(MQTT_HOST, 1883)', jsonGet: 'jsonGet(msg, "cmd")', jsonHas: 'jsonHas(msg, "id")',
+    tone: 'tone(BUZZER_PIN, 440) ή tone(BUZZER_PIN, 440, 200)', noTone: 'noTone(BUZZER_PIN)', analogWrite: 'analogWrite(RGB_RED_PIN, 255)',
+    'servo.attach': 'servo.attach(SERVO_PIN)', 'servo.write': 'servo.write(90)', 'display.setCursor': 'display.setCursor(0, 0)', 'display.setTextSize': 'display.setTextSize(2)'
   };
 
   const TYPE_MAP = {
@@ -637,7 +645,7 @@
             return;
           }
           const dot = e.name.indexOf('.');
-          if (dot > 0 && ['Serial', 'WiFi', 'mqtt'].includes(e.name.slice(0, dot))) {
+          if (dot > 0 && ['Serial', 'WiFi', 'mqtt', 'servo', 'display'].includes(e.name.slice(0, dot))) {
             const obj = e.name.slice(0, dot);
             const s = suggest(e.name, Object.keys(BUILTINS));
             const list = Object.keys(BUILTINS).filter(k => k.startsWith(obj + '.')).join(', ');

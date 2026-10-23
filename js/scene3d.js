@@ -16,7 +16,7 @@
   const C30 = Math.cos(Math.PI / 6);
   const INK = 0x1c2130;
   const FONT = '"JetBrains Mono", ui-monospace, Menlo, monospace';
-  const WIRE_COLORS = { 'w-led': 0xe8892f, 'w-btn': 0x18a196, 'w-pir': 0xe2b52d, 'w-gnd': 0x34383f, 'w-trig': 0x3fae55, 'w-echo': 0xf2c230, 'w-red': 0xe0503f, 'w-yel': 0xf2c230, 'w-grn': 0x3fae55, 'w-vcc': 0xe0503f };
+  const WIRE_COLORS = { 'w-led': 0xe8892f, 'w-btn': 0x18a196, 'w-pir': 0xe2b52d, 'w-gnd': 0x34383f, 'w-trig': 0x3fae55, 'w-echo': 0xf2c230, 'w-red': 0xe0503f, 'w-yel': 0xf2c230, 'w-grn': 0x3fae55, 'w-vcc': 0xe0503f, 'w-buz': 0x8e5bd0, 'w-rgbr': 0xe0503f, 'w-rgbg': 0x3fae55, 'w-rgbb': 0x3d8fd6, 'w-servo': 0xc25a22, 'w-sda': 0x18a196, 'w-scl': 0xd4a417 };
 
   let renderer = null;
   let cur = null; // η τρέχουσα σκηνή
@@ -546,6 +546,73 @@
     return g;
   }
 
+  // ------------------------------------------------------------ buzzer, LED RGB, servo, OLED
+  function buzzer3d(k, M, o) {
+    const g = k.group(k.scene, 'buzzer');
+    const { u, v } = o;
+    k.cylH(g, u - 1.27, v, 2.4, 0.22, 1.4, M.pin, { ol: false, seg: 8 });
+    k.cylH(g, u + 1.27, v, 2.4, 0.22, 1.4, M.pin, { ol: false, seg: 8 });
+    const body = k.mat(0x1d1f24, { r: 0.55, unique: true });
+    k.cylH(g, u, v, 3.4, 3.1, 4.2, body, { seg: 32 });
+    k.cylH(g, u, v, 7.6, 0.9, 0.05, k.mat(0x050507, { r: 0.9 }), { ol: false, seg: 20 });
+    g.userData.body = body;
+    return g;
+  }
+  function rgb3d(k, M, o) {
+    const g = k.group(k.scene, 'rgb');
+    const { u, v } = o;
+    for (const d of [-1.9, -0.63, 0.63, 1.9]) k.cylH(g, u + d, v, 2.4, 0.22, 3.8, M.pin, { ol: false, seg: 8 });
+    const lens = k.mat(0xe8eef2, { r: 0.18, op: 0.92, unique: true });
+    k.cylH(g, u, v, 5.8, 2.15, 0.6, lens);
+    k.cylH(g, u, v, 6.4, 1.8, 5.8, lens);
+    const dome = k.mesh(g, k.keep(new THREE.SphereGeometry(1.8, 24, 12, 0, Math.PI * 2, 0, Math.PI / 2)), lens);
+    dome.position.set(u, 12.2, v);
+    g.userData.lens = lens;
+    return g;
+  }
+  function servo3d(k, M, o) {
+    const g = k.group(k.scene, 'servo');
+    const { u, v } = o;
+    const blue = k.mat(0x2f6fd0, { r: 0.45 });
+    k.B(g, u, v, 0, 12, 6, 10, blue, { r: 0.5 });
+    k.B(g, u - 2, v + 1.5, 6.5, 16, 3, 1, blue, { r: 0.3 });
+    k.cylH(g, u + 3.2, v + 3, 10, 1.4, 1, k.mat(0xf2f2f2, { r: 0.5 }), { seg: 20 });
+    // το μπράτσο γυρίζει γύρω από τον άξονα (κάθετος άξονας y του three.js)
+    const arm = new THREE.Group();
+    arm.position.set(u + 3.2, 11.1, v + 3);
+    g.add(arm);
+    k.B(arm, -1.6, -0.6, 0, 7.6, 1.2, 0.6, k.mat(0xffffff, { r: 0.5 }), { r: 0.3 });
+    g.userData.arm = arm;
+    return g;
+  }
+  function oled3d(k, M, o) {
+    const g = k.group(k.scene, 'oled');
+    const { u, v } = o;
+    k.B(g, u - 1, v - 2, 0, 28, 5, 1.2, M.dark, { r: 0.4 });
+    k.B(g, u, v, 1.2, 26, 1.2, 17, k.mat(0x1b3f8a, { r: 0.5 }), { r: 0.2 });
+    for (let i = 0; i < 4; i++) k.B(g, u + 9 + i * 2.54 - 0.3, v + 0.3, 18.2, 0.6, 0.6, 1.8, M.pin, { ol: false });
+    // οθόνη: καμβάς 256×128 (2× τα 128×64 εικονοστοιχεία του SSD1306)
+    const cv = document.createElement('canvas');
+    cv.width = 256;
+    cv.height = 128;
+    const tex = k.keep(new THREE.CanvasTexture(cv));
+    tex.encoding = THREE.sRGBEncoding;
+    const scr = new THREE.Mesh(k.keep(new THREE.PlaneGeometry(23, 12.5)), k.keep(new THREE.MeshBasicMaterial({ map: tex })));
+    scr.position.set(u + 1.5 + 11.5, 1.2 + 16 - 6.25, v + 1.2 + 0.02);
+    g.add(scr);
+    g.userData.draw = items => {
+      const c = cv.getContext('2d');
+      c.fillStyle = '#05070c';
+      c.fillRect(0, 0, 256, 128);
+      c.fillStyle = '#9fe7ff';
+      c.textBaseline = 'alphabetic';
+      for (const t of items || []) { c.font = `${16 * t.size}px "JetBrains Mono", monospace`; c.fillText(String(t.text), t.x * 2, (t.y + 7 * t.size) * 2); }
+      tex.needsUpdate = true;
+    };
+    g.userData.draw([]);
+    return g;
+  }
+
   function trafficLight(k, M, S) {
     const g = k.group(k.scene, 'traffic');
     const { u, v } = S.TL;
@@ -695,6 +762,10 @@
         case 'ultrasonic': g = ultrasonic(k, M, S); break;
         case 'traffic': g = objs.traffic = trafficLight(k, M, S); break;
         case 'car': g = objs.car = car(k, M, S); break;
+      case 'buzzer': g = objs.buzzer = buzzer3d(k, M, o); break;
+      case 'rgb': g = objs.rgb = rgb3d(k, M, o); break;
+      case 'servo': g = objs.servo = servo3d(k, M, o); break;
+      case 'oled': g = objs.oled = oled3d(k, M, o); break;
         case 'wire': g = wire(k, M, o, S.K); objs.wires.push(g); break;
       }
       if (g) g.userData.top = true;
@@ -1057,8 +1128,26 @@
     requestRender();
   }
 
+  // Κατάσταση των νέων εξαρτημάτων από το ui.js: { buzz, servo: γωνία, rgb: [r,g,b], oled: [κείμενα] }
+  function parts(st) {
+    if (!cur) return;
+    const o = cur.objs;
+    if (o.buzzer) o.buzzer.userData.body.emissive.setHex(st.buzz ? 0x3a2a66 : 0);
+    if (o.servo && typeof st.servo === 'number') o.servo.userData.arm.rotation.y = ((st.servo - 90) * Math.PI) / 180;
+    if (o.rgb && st.rgb) {
+      const [r, gg, b] = st.rgb;
+      const lit = r + gg + b > 0;
+      const m = o.rgb.userData.lens;
+      m.color.setRGB(lit ? Math.max(0.25, r / 255) : 0.9, lit ? Math.max(0.25, gg / 255) : 0.93, lit ? Math.max(0.25, b / 255) : 0.95);
+      m.emissive.setRGB(r / 255, gg / 255, b / 255);
+      m.emissiveIntensity = lit ? 1.2 : 0;
+    }
+    if (o.oled && st.oled) { const sig = JSON.stringify(st.oled); if (sig !== o.oled.userData.sig) { o.oled.userData.sig = sig; o.oled.userData.draw(st.oled); } }
+    requestRender();
+  }
+
   root.IoTScene3D = {
-    mount, unmount, requestRender, capture, orbit, wireVisible,
+    mount, unmount, requestRender, capture, orbit, wireVisible, parts,
     orbiting: () => !!(cur && cur.orbit && !(cur.orbit.tr && cur.orbit.tr.done)),
     spinning: () => !!(cur && cur.orbit && cur.orbit.auto),
     onState: f => { if (cur) cur.onState = f; }, info: () => cur && { W: cur.W, H: cur.H, live: cur.svg.isConnected, anim: !!cur.anim, orbit: cur.orbit && { yaw: +cur.orbit.yaw.toFixed(3), pitch: +cur.orbit.pitch.toFixed(3), tr: !!cur.orbit.tr, renders: cur.renders || 0 } } };

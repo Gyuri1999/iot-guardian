@@ -29,6 +29,9 @@
   const caps = track => CAPS[track] || CAPS['cpp-esp32'];
   // Python στο Pi (gpiozero): το εικονικό Pi δεν έχει φανάρι για την Python
   const hasTraffic = track => track !== 'py-pi';
+  // buzzer, servo, LED RGB, OLED: προς το παρόν μόνο στη C++ του ESP32
+  const NEWP = ['buzzer', 'servo', 'rgb', 'oled'];
+  const hasNew = track => track === 'cpp-esp32';
 
   // ------------------------------------------------------------ μοντέλο
 
@@ -42,6 +45,12 @@
       case 'wait': return { t: 'wait', ms: num(b.ms, 500, 1, 60000) };
       case 'print': return { t: 'print', text: txt(b.text) };
       case 'printv': return { t: 'printv', v: ['count', 'temp', 'dist'].includes(b.v) ? b.v : 'count' };
+      case 'tone': return { t: 'tone', f: num(b.f, 440, 30, 8000), ms: num(b.ms, 0, 0, 10000) };
+      case 'quiet': return { t: 'quiet' };
+      case 'servo': return { t: 'servo', a: num(b.a, 90, 0, 180) };
+      case 'rgb': return { t: 'rgb', r: num(b.r, 255, 0, 255), g: num(b.g, 0, 0, 255), b: num(b.b, 0, 0, 255) };
+      case 'oled': return { t: 'oled', text: txt(b.text) };
+      case 'oledv': return { t: 'oledv', v: ['count', 'temp', 'dist'].includes(b.v) ? b.v : 'count' };
       case 'set': return { t: 'set', n: num(b.n, 0, -9999, 9999) };
       case 'change': return { t: 'change', n: num(b.n, 1, -9999, 9999) };
       case 'if':
@@ -60,11 +69,15 @@
   }
   // Τι χρησιμοποιεί το πρόγραμμα (για να δηλωθούν μόνο τα pins που χρειάζονται)
   function uses(m) {
-    const u = { led: false, light: {}, button: false, pir: false, temp: false, dist: false, count: false, countSet: false };
+    const u = { led: false, light: {}, button: false, pir: false, temp: false, dist: false, count: false, countSet: false, buzzer: false, servo: false, rgb: false, oled: false };
     const walk = list => list.forEach(b => {
       if (b.t === 'led') u.led = true;
       if (b.t === 'light') u.light[b.c] = true;
-      if (b.t === 'printv') u[b.v] = true;
+      if (b.t === 'printv' || b.t === 'oledv') u[b.v] = true;
+      if (b.t === 'tone' || b.t === 'quiet') u.buzzer = true;
+      if (b.t === 'servo') u.servo = true;
+      if (b.t === 'rgb') u.rgb = true;
+      if (b.t === 'oled' || b.t === 'oledv') u.oled = true;
       if (b.t === 'set' || b.t === 'change') { u.count = true; u.countSet = true; }
       if (b.t === 'if') { u[b.c] = true; walk(b.then); if (b.else) walk(b.else); }
       if (b.t === 'repeat') walk(b.body);
@@ -94,6 +107,16 @@
         case 'wait': L.push(`${p}delay(${b.ms});`); break;
         case 'print': L.push(`${p}Serial.println("${b.text}");`); break;
         case 'printv': L.push(`${p}Serial.println(${b.v === 'count' ? 'count' : b.v === 'temp' ? 'readTemperature()' : 'distanceCm()'});`); break;
+        case 'tone': L.push(b.ms ? `${p}tone(BUZZER_PIN, ${b.f}, ${b.ms});` : `${p}tone(BUZZER_PIN, ${b.f});`); break;
+        case 'quiet': L.push(`${p}noTone(BUZZER_PIN);`); break;
+        case 'servo': L.push(`${p}servo.write(${b.a});`); break;
+        case 'rgb': L.push(`${p}analogWrite(RGB_RED_PIN, ${b.r});`, `${p}analogWrite(RGB_GREEN_PIN, ${b.g});`, `${p}analogWrite(RGB_BLUE_PIN, ${b.b});`); break;
+        case 'oled':
+        case 'oledv': {
+          const what = b.t === 'oled' ? `"${b.text}"` : b.v === 'count' ? 'count' : b.v === 'temp' ? 'readTemperature()' : 'distanceCm()';
+          L.push(`${p}display.clearDisplay();`, `${p}display.setCursor(0, 0);`, `${p}display.println(${what});`, `${p}display.display();`);
+          break;
+        }
         case 'set': L.push(`${p}count = ${b.n};`); break;
         case 'change': L.push(`${p}count = count + ${b.n};`); break;
         case 'if': {
@@ -114,6 +137,9 @@
     if (u.button) L.push('  pinMode(BUTTON_PIN, INPUT);');
     if (u.pir) L.push('  pinMode(PIR_PIN, INPUT);');
     if (u.dist) L.push('  pinMode(TRIG_PIN, OUTPUT);', '  pinMode(ECHO_PIN, INPUT);');
+    if (u.buzzer) L.push('  pinMode(BUZZER_PIN, OUTPUT);');
+    if (u.servo) L.push('  servo.attach(SERVO_PIN);');
+    if (u.oled) L.push('  display.begin();', '  display.setTextSize(2);');
     body(m.setup, 2, 0);
     L.push('}', '', 'void loop() {');
     body(m.loop, 2, 0);
@@ -244,10 +270,16 @@
     { t: 'printv', icon: '🔢', label: 'Τύπωσε τιμή', make: () => ({ t: 'printv', v: 'count' }) },
     { t: 'if', icon: '❓', label: 'Αν … τότε', make: () => ({ t: 'if', c: 'button', n: 30, then: [], else: null }) },
     { t: 'repeat', icon: '🔁', label: 'Επανάλαβε', make: () => ({ t: 'repeat', n: 3, body: [] }) },
+    { t: 'tone', icon: '🔔', label: 'Ήχος', make: () => ({ t: 'tone', f: 440, ms: 200 }), hw: 'buzzer' },
+    { t: 'quiet', icon: '🔕', label: 'Σιωπή', make: () => ({ t: 'quiet' }), hw: 'buzzer' },
+    { t: 'servo', icon: '⚙️', label: 'Servo', make: () => ({ t: 'servo', a: 90 }), hw: 'servo' },
+    { t: 'rgb', icon: '🌈', label: 'Χρώμα RGB', make: () => ({ t: 'rgb', r: 255, g: 0, b: 255 }), hw: 'rgb' },
+    { t: 'oled', icon: '🖥', label: 'Γράψε στην οθόνη', make: () => ({ t: 'oled', text: 'Γεια!' }), hw: 'oled' },
+    { t: 'oledv', icon: '🖥', label: 'Δείξε τιμή στην οθόνη', make: () => ({ t: 'oledv', v: 'count' }), hw: 'oled' },
     { t: 'set', icon: '🔢', label: 'Όρισε μετρητή', make: () => ({ t: 'set', n: 0 }) },
     { t: 'change', icon: '➕', label: 'Άλλαξε μετρητή', make: () => ({ t: 'change', n: 1 }) }
   ];
-  const CAT = { led: 'out', light: 'out', wait: 'time', print: 'say', printv: 'say', if: 'ctl', repeat: 'ctl', set: 'var', change: 'var' };
+  const CAT = { tone: 'out', quiet: 'out', servo: 'out', rgb: 'out', oled: 'say', oledv: 'say', led: 'out', light: 'out', wait: 'time', print: 'say', printv: 'say', if: 'ctl', repeat: 'ctl', set: 'var', change: 'var' };
 
   function mount(el, model, opts) {
     let m = normalize(model);
@@ -289,6 +321,12 @@
           break;
         }
         case 'repeat': inner = `🔁 Επανάλαβε ${numIn('n', b.n, 3.5)} φορές`; break;
+        case 'tone': inner = `🔔 Ήχος ${numIn('f', b.f, 4.6)} Hz για ${numIn('ms', b.ms, 4.6)} ms <small>(0 = συνέχεια)</small>`; break;
+        case 'quiet': inner = '🔕 Σιωπή'; break;
+        case 'servo': inner = `⚙️ Servo στις ${numIn('a', b.a, 3.6)}°`; break;
+        case 'rgb': { const hex = '#' + [b.r, b.g, b.b].map(x => x.toString(16).padStart(2, '0')).join(''); inner = `🌈 Χρώμα <input type="color" data-k="hex" value="${hex}" aria-label="Χρώμα"> <small>R ${b.r} · G ${b.g} · B ${b.b}</small>`; break; }
+        case 'oled': inner = `🖥 Γράψε στην οθόνη <input type="text" data-k="text" value="${esc(b.text)}" maxlength="20" style="width:7rem">`; break;
+        case 'oledv': { const o = { count: 'τον μετρητή', temp: 'τη θερμοκρασία', dist: 'την απόσταση' }; Object.keys(o).forEach(k => { if (!valOk(k)) delete o[k]; }); inner = `🖥 Δείξε στην οθόνη ${sel('v', b.v, o)}`; break; }
       }
       const tools = `<span class="bk-tools"><button type="button" data-act="up" aria-label="Πάνω">▲</button><button type="button" data-act="down" aria-label="Κάτω">▼</button><button type="button" data-act="del" aria-label="Διαγραφή">✕</button></span>`;
       let kids = '';
@@ -302,7 +340,7 @@
         <div class="bk-drop end" data-drop="${path}" data-i="${list.length}">${list.length ? '' : 'σύρε ή πάτα ένα μπλοκ'}</div></div>`;
     }
     function render() {
-      const pal = PALETTE.filter(p => !p.hw || (hw.includes(p.hw) && (p.hw !== 'traffic' || hasTraffic(opts.track))));
+      const pal = PALETTE.filter(p => !p.hw || (hw.includes(p.hw) && (p.hw !== 'traffic' || hasTraffic(opts.track)) && (!NEWP.includes(p.hw) || hasNew(opts.track))));
       el.innerHTML = `<div class="bk-pal" role="group" aria-label="Μπλοκ">${pal.map(p => `<button type="button" class="bk-p bk-${CAT[p.t]}" data-new="${p.t}" draggable="true">${p.icon} ${esc(p.label)}</button>`).join('')}</div>
         <p class="bk-hint">Πάτα ένα μπλοκ για να μπει στο κομμάτι με το κίτρινο περίγραμμα, ή σύρε το όπου θέλεις.</p>
         <div class="bk-prog">
@@ -337,9 +375,10 @@
       const b = blockAt(e.target.closest('.bk').dataset.path);
       if (k === 'else') { b.else = e.target.checked ? (b.else || []) : null; render(); }
       else if (k === 'on') b.on = e.target.value === '1';
+      else if (k === 'hex') { const h = e.target.value.replace('#', ''); b.r = parseInt(h.slice(0, 2), 16); b.g = parseInt(h.slice(2, 4), 16); b.b = parseInt(h.slice(4, 6), 16); render(); }
       else if (k === 'text') b.text = txt(e.target.value);
       else if (k === 'c' || k === 'v') { b[k] = e.target.value; if (b.t === 'if') render(); }
-      else b[k] = num(e.target.value, b[k], k === 'ms' ? 1 : -9999, k === 'ms' ? 60000 : 9999);
+      else b[k] = num(e.target.value, b[k], b.t === 'tone' && k === 'ms' ? 0 : k === 'ms' ? 1 : k === 'f' ? 30 : k === 'a' ? 0 : -9999, b.t === 'tone' && k === 'ms' ? 10000 : k === 'ms' ? 60000 : k === 'f' ? 8000 : k === 'a' ? 180 : 9999);
       changed();
     };
     el.addEventListener('change', onEdit);

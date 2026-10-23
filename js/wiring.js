@@ -17,7 +17,14 @@
     'w-echo': { label: 'HC-SR04 · ECHO', role: 'in', what: 'το ECHO' },
     'w-red': { label: 'Φανάρι · κόκκινο', role: 'out', what: 'το κόκκινο φως' },
     'w-yel': { label: 'Φανάρι · κίτρινο', role: 'out', what: 'το κίτρινο φως' },
-    'w-grn': { label: 'Φανάρι · πράσινο', role: 'out', what: 'το πράσινο φως' }
+    'w-grn': { label: 'Φανάρι · πράσινο', role: 'out', what: 'το πράσινο φως' },
+    'w-buz': { label: 'Buzzer', role: 'out', what: 'το buzzer' },
+    'w-servo': { label: 'Servo · σήμα', role: 'out', what: 'το servo' },
+    'w-rgbr': { label: 'LED RGB · κόκκινο', role: 'out', what: 'το κόκκινο του LED RGB' },
+    'w-rgbg': { label: 'LED RGB · πράσινο', role: 'out', what: 'το πράσινο του LED RGB' },
+    'w-rgbb': { label: 'LED RGB · μπλε', role: 'out', what: 'το μπλε του LED RGB' },
+    'w-sda': { label: 'OLED · SDA (δεδομένα)', role: 'out', what: 'το SDA της οθόνης' },
+    'w-scl': { label: 'OLED · SCL (ρολόι)', role: 'out', what: 'το SCL της οθόνης' }
   };
   const CLASSES = Object.keys(WIRES);
 

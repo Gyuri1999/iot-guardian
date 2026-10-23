@@ -53,5 +53,28 @@
     try { SOUNDS[name](a); } catch (e) { /* ο ήχος δεν είναι κρίσιμος */ }
   }
 
-  root.IoTSfx = { play, setEnabled: on => { enabled = !!on; }, enabled: () => enabled };
+  // Ο ήχος του buzzer όσο τρέχει το πρόγραμμα: συνεχής τόνος που αλλάζει συχνότητα (0 = σιωπή).
+  let buzz = null;
+  function buzzer(freq) {
+    const f = Math.round(freq || 0);
+    if (!f || !enabled) {
+      if (buzz) { try { buzz.g.gain.setTargetAtTime(0.0001, buzz.a.currentTime, 0.01); buzz.o.stop(buzz.a.currentTime + 0.05); } catch (e) { /* ήδη σταματημένο */ } buzz = null; }
+      return;
+    }
+    const a = ac();
+    if (!a) return;
+    if (!buzz) {
+      const o = a.createOscillator();
+      const g = a.createGain();
+      o.type = 'square';
+      g.gain.setValueAtTime(0.0001, a.currentTime);
+      g.gain.exponentialRampToValueAtTime(VOL * 0.35, a.currentTime + 0.02);
+      o.connect(g).connect(a.destination);
+      o.start();
+      buzz = { a, o, g, f: 0 };
+    }
+    if (buzz.f !== f) { buzz.o.frequency.setValueAtTime(Math.max(30, Math.min(8000, f)), buzz.a.currentTime); buzz.f = f; }
+  }
+
+  root.IoTSfx = { buzzer, play, setEnabled: on => { enabled = !!on; }, enabled: () => enabled };
 })(typeof window !== 'undefined' ? window : globalThis);

@@ -173,6 +173,35 @@
       const on = Object.keys(now).filter(k => now[k]).map(k => gr[k]);
       return { pass, vars: { v: on.length ? on.join(' + ') : 'όλα σβηστά' } };
     },
+    // Buzzer: { check: 'buzzer', is: true, freq: 440 } (το freq είναι προαιρετικό)
+    buzzer(b, c) {
+      const f = b.buzzerFreq ? b.buzzerFreq() : 0;
+      const pass = (f > 0) === c.is && (c.freq === undefined || !c.is || Math.abs(f - c.freq) <= 1);
+      return { pass, vars: { v: f ? `${f} Hz` : 'σιωπή' } };
+    },
+    // Πόσες νότες ξεκίνησαν (tone) από την αρχή: { check: 'tones', min: 3, freqs: [262, 330] }
+    tones(b, c) {
+      const t = b.buzzer ? b.buzzer.tones : [];
+      const okF = !c.freqs || c.freqs.every(f => t.some(x => Math.abs(x.f - f) <= 1));
+      return { pass: t.length >= (c.min || 1) && okF, vars: { n: t.length, v: t.slice(-6).map(x => x.f + ' Hz').join(', ') || 'καμία νότα' } };
+    },
+    // Servo: { check: 'servo', angle: 90 }
+    servo(b, c) {
+      const s = b.servo || { attached: false, angle: 90 };
+      return { pass: s.attached && Math.abs(s.angle - c.angle) <= (c.tol || 2), vars: { v: s.attached ? `${s.angle}°` : 'χωρίς servo.attach' } };
+    },
+    // LED RGB: { check: 'rgb', r: 255, g: 0, b: 0 } (όποιο λείπει δεν ελέγχεται)
+    rgb(b, c) {
+      const [r, g, bl] = b.rgb ? b.rgb() : [0, 0, 0];
+      const near = (x, y) => y === undefined || Math.abs(x - y) <= (c.tol || 12);
+      return { pass: near(r, c.r) && near(g, c.g) && near(bl, c.b), vars: { v: `R ${r}, G ${g}, B ${bl}` } };
+    },
+    // OLED: { check: 'oled', has: '24.5' } ή { check: 'oled', empty: false }
+    oled(b, c) {
+      const t = b.oledText ? b.oledText() : '';
+      const pass = c.has !== undefined ? t.includes(c.has) : c.empty !== undefined ? (t === '') === c.empty : t !== '';
+      return { pass, vars: { v: t ? `«${t}»` : (b.oled && b.oled.pending ? 'τίποτα (λείπει το display.display())' : 'τίποτα') } };
+    },
     ledOutput(b) { return { pass: b.modes[PINS.LED] === 3, vars: { v: b.modeName(PINS.LED) || 'δεν ορίστηκε' } }; },
     count(b, c) {
       const n = countOf(b, c.text);

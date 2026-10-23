@@ -902,3 +902,4 @@ code .gl-term { font-family: var(--font-code); }
 .tour-acts { display: flex; align-items: center; gap: 0.35rem; flex-wrap: wrap; }
 .tour-acts .spacer { flex: 1; }
 @media (prefers-reduced-motion: reduce) { .tour-hole { transition: none; } }
+.w-buz .wr-dot { background: #8e5bd0; } .w-rgbr .wr-dot { background: #e0503f; } .w-rgbg .wr-dot { background: #3fae55; } .w-rgbb .wr-dot { background: #3d8fd6; } .w-servo .wr-dot { background: #c25a22; } .w-sda .wr-dot { background: #18a196; } .w-scl .wr-dot { background: #d4a417; }

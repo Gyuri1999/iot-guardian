@@ -427,3 +427,24 @@
 
 /* καλώδιο που δεν έχει συνδεθεί ακόμα από τον μαθητή */
 .scene .unwired { display: none; }
+
+/* ---------- buzzer, LED RGB, servo, OLED */
+.bz-body { fill: #22252c; stroke: var(--ink-line); stroke-width: 0.8; } .bz-body.top { fill: #31353e; }
+.bz-hole { fill: #07080b; }
+.bz-waves path { fill: none; stroke: #8e5bd0; stroke-width: 2; stroke-linecap: round; opacity: 0; }
+.sc-buzzer.on .bz-waves path { opacity: 1; animation: bz-wave 0.6s ease-out infinite; }
+.sc-buzzer.on .bz-waves path:nth-child(2) { animation-delay: 0.15s; } .sc-buzzer.on .bz-waves path:nth-child(3) { animation-delay: 0.3s; }
+@keyframes bz-wave { 0% { opacity: 0.9; } 100% { opacity: 0.1; } }
+.rgb-body { fill: #e6ecf0; stroke: var(--ink-line); stroke-width: 0.8; opacity: 0.95; transition: fill 0.1s; }
+.rgb-halo { fill: transparent; opacity: 0; pointer-events: none; }
+.srv-body .f-t, .srv-tab .f-t { fill: #3d7fe0; } .srv-body .f-l, .srv-tab .f-l { fill: #2c64b8; } .srv-body .f-r, .srv-tab .f-r { fill: #24539a; }
+.srv-shaft { fill: #f2f2f2; stroke: var(--ink-line); stroke-width: 0.6; }
+.srv-horn { stroke: #ffffff; stroke-width: 5; stroke-linecap: round; fill: none; filter: drop-shadow(0 1px 0 rgba(0,0,0,0.5)); }
+.oled-stand .f-t, .oled-stand .f-l, .oled-stand .f-r { fill: #2b2f3a; }
+.oled-pcb .f-t { fill: #2a5bc0; } .oled-pcb .f-l { fill: #1b3f8a; } .oled-pcb .f-r { fill: #163572; }
+.oled-glass { fill: #05070c; stroke: #0d1220; stroke-width: 0.2; }
+.oled-t { fill: #9fe7ff; font-family: var(--font-code); }
+.w-buz { stroke: #8e5bd0; } .w-rgbr { stroke: #e0503f; } .w-rgbg { stroke: #3fae55; } .w-rgbb { stroke: #3d8fd6; } .w-servo { stroke: #c25a22; } .w-sda { stroke: #18a196; } .w-scl { stroke: #d4a417; }
+.pintag.w-buz { --wc: #8e5bd0; } .pintag.w-rgbr { --wc: #e0503f; } .pintag.w-rgbg { --wc: #3fae55; } .pintag.w-rgbb { --wc: #3d8fd6; } .pintag.w-servo { --wc: #c25a22; } .pintag.w-sda { --wc: #18a196; } .pintag.w-scl { --wc: #d4a417; }
+.sg-buz { stroke: #8e5bd0; }
+@media (prefers-reduced-motion: reduce) { .sc-buzzer.on .bz-waves path { animation: none; } }
