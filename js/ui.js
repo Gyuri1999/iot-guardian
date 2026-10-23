@@ -106,6 +106,7 @@
     html.setAttribute('data-spacing', s.lineSpacing);
     html.setAttribute('data-reduced-motion', s.reducedMotion ? 'true' : 'false');
     if (window.IoTSfx) window.IoTSfx.setEnabled(s.sound !== false);
+    if (window.IoTGardi) { window.IoTGardi.setEnabled(s.gardi !== false); window.IoTGardi.setVoice(!!s.gardiVoice); }
     if (window.IoTSpeak) window.IoTSpeak.setRate(s.readRate || 0.9);
     html.setAttribute('data-font', s.font || 'noto');
     html.setAttribute('data-letters', s.letters || 'normal');
@@ -709,6 +710,7 @@
     mountHomeBoard(homeBoard(tr));
     bindHouse(tr);
     if ($('#start-review')) $('#start-review').onclick = () => openReview(tr);
+    gardiHome(tr, nxt);
     bindRail();
     $('#continue').onclick = () => openTask((nxt || mine[0]).id);
     $('#change-track').onclick = renderPicker;
@@ -1164,6 +1166,7 @@
     renderHints();
     if (window.IoTLearn) window.IoTLearn.linkTerms($('#info-lesson .theory'), l.glossary, GLOSSARY);
     bindExplain(l);
+    gardiLesson(l);
     updateAll();
     window.scrollTo(0, 0);
   }
@@ -1310,6 +1313,58 @@
     }).join('');
   }
 
+  // ------------------------------------------------------------ Γκάρντι, ο βοηθός
+  function gardi(text, mood, actions, o) {
+    if (!window.IoTGardi || P.settings.gardi === false) return;
+    window.IoTGardi.say(text, mood, Object.assign({ actions: actions || [] }, o || {}));
+  }
+  function gardiHome(tr, nxt) {
+    if (!window.IoTLearn) return;
+    const today = todayStr();
+    const mine = new Set(trackLessons(tr.id).map(l => l.id));
+    const due = window.IoTLearn.dueIds(P.review, today).filter(id => mine.has(id)).length;
+    const dv = window.IoTLearn.dailyView(P.daily, today);
+    const first = !S.gardiHello;
+    S.gardiHello = true;
+    const hello = first ? (dv.streak > 1 ? `Γεια! Σερί ${dv.streak} ημερών 🔥. ` : 'Γεια! Είμαι ο Γκάρντι. ') : '';
+    if (due) gardi(`${hello}Σε περιμένουν ${due} ερωτήσεις επανάληψης. Λίγα λεπτά τη μέρα και δεν ξεχνάς τίποτα.`, 'happy', [{ label: 'Ξεκίνα την επανάληψη', run: () => openReview(tr) }]);
+    else if (nxt) {
+      const room = window.IoTThemes && window.IoTThemes.BY_CHAPTER[nxt.chapter];
+      const rn = room && window.IoTHouse ? window.IoTHouse.ROOMS[room].name : '';
+      gardi(`${hello}Επόμενη στάση${rn ? `: ${rn}` : ''} · «${nxt.title}».`, 'happy', [{ label: 'Πάμε!', run: () => openTask(nxt.id) }]);
+    } else if (first) gardi(`${hello}Τελείωσες όλη τη διαδρομή! Δοκίμασε άλλη γλώσσα ή κάνε επανάληψη.`, 'party');
+  }
+  function gardiLesson(l) {
+    S.gardiStep = 0;
+    clearTimeout(S.gardiIdle);
+    if (S.wiring) gardi('Πρώτα σύνδεσε τα καλώδια! Διάλεξε καλώδιο και πάτα το σωστό pin της πλακέτας.', 'think');
+    else if (!P.completed[l.id] && l.objectives && l.objectives.length) gardi(`Σε αυτή την άσκηση: ${l.objectives[0].replace(/^Να /, 'θα ').replace(/\.$/, '')}. Πάτα με για το πρώτο βήμα.`, 'happy');
+    // αν περάσουν 90 δευτερόλεπτα χωρίς πρόοδο, προσφέρεται βοήθεια
+    const id = l.id;
+    S.gardiIdle = setTimeout(() => { if (S.task && S.task.id === id && !P.completed[id]) gardi('Κόλλησες λίγο; Δεν πειράζει, έτσι μαθαίνουμε. Πάτα με για συμβουλή.', 'think'); }, 90000);
+  }
+  // Πατάς τον Γκάρντι: στο μάθημα λέει το επόμενο βήμα, στην αρχική μια χρήσιμη ιδέα.
+  const HOME_TIPS = [
+    'Πάτα ένα δωμάτιο στο σπίτι για να δεις τα κεφάλαιά του.',
+    'Στην καρτέλα «Η πλακέτα» πατάς κάθε κομμάτι του ESP32 ή του Raspberry Pi και βλέπεις τι είναι.',
+    'Οι υπογραμμισμένες λέξεις στο μάθημα εξηγούνται αν τις πατήσεις.',
+    'Στις Ρυθμίσεις υπάρχουν γραμματοσειρές για δυσλεξία και χάρακας ανάγνωσης.',
+    'Το κουμπί «Άκουσε» διαβάζει φωναχτά το μάθημα, την αποστολή και τα σφάλματα.',
+    'Στον «Λογικό αναλυτή» βλέπεις πότε κάθε pin γίνεται HIGH και LOW.'
+  ];
+  function gardiTip() {
+    const l = S.task;
+    if (!l) { S.gardiHome = ((S.gardiHome || 0) + 1) % HOME_TIPS.length; gardi(HOME_TIPS[S.gardiHome], 'happy', null, { force: true }); return; }
+    if (S.wiring) { const t = S.wiring.tasks[S.wiring.sel]; gardi(t ? `Τώρα: ${t.label}. Κοίτα τη σταθερά στην αρχή του κώδικα για τον αριθμό του pin.` : 'Όλα συνδέθηκαν!', 'think', null, { force: true }); return; }
+    const steps = l.steps || [];
+    if (S.gardiStep < steps.length) {
+      const i = S.gardiStep++;
+      gardi(`Βήμα ${i + 1} από ${steps.length}: ${steps[i]}`, 'think', i + 1 < steps.length ? [{ label: 'Επόμενο βήμα', run: gardiTip }] : null, { force: true });
+    } else {
+      gardi('Αυτά ήταν τα βήματα. Θες μια βοήθεια πιο συγκεκριμένη;', 'think', [{ label: 'Ναι, δείξε βοήθεια', run: () => { showNextHint(); showInfo('help'); } }, { label: 'Από την αρχή', run: () => { S.gardiStep = 0; gardiTip(); } }], { force: true });
+    }
+  }
+
   // ------------------------------------------------------------ Σύνδεσε μόνος σου τα καλώδια
   // S.wiring: { tasks, done: Set(i), sel, wrong: {i: n} }. Χωρίς παζλ όλα τα καλώδια θεωρούνται συνδεδεμένα.
   function wiredCls(cls) {
@@ -1381,6 +1436,7 @@
     if (!t || W.done.has(t.i)) return;
     const r = window.IoTWiring.judge(t, p, W.board);
     if (r.ok) {
+      if (window.IoTGardi) window.IoTGardi.mood('happy', 1400);
       W.done.add(t.i);
       setWireShown(t.i, true, true);
       sfx('tick');
@@ -1390,6 +1446,8 @@
     } else {
       W.wrong[t.i] = (W.wrong[t.i] || 0) + 1;
       sfx('err');
+      if (window.IoTGardi) window.IoTGardi.mood('worried', 1600);
+      if (W.wrong[t.i] === 2) gardi('Σε βοηθώ: φώτισα με κίτρινο το σωστό pin.', 'think');
     }
     renderWiring(r.msg, r.ok);
     announce(r.msg);
@@ -1400,6 +1458,7 @@
     W.tasks.forEach(t => { P.wired[t.cls] = true; });
     save();
     renderWiring(msg ? `${msg} Όλα τα καλώδια μπήκαν!` : 'Όλα τα καλώδια μπήκαν!', true);
+    gardi('Τέλεια σύνδεση! Τώρα το κύκλωμα είναι έτοιμο για τον κώδικά σου.', 'happy');
     sfx('win');
     updateBoard();
     setTimeout(() => { if (S.wiring === W) { S.wiring = null; const sl = $('#wiring-slot'); if (sl) sl.innerHTML = ''; } }, 4500);
@@ -2033,7 +2092,11 @@
       li.querySelector('.ms-sr').textContent = ok ? ' · έγινε' : ' · δεν έχει γίνει ακόμα';
       if (ok) n++;
     });
-    if (ticked) sfx('tick');
+    if (ticked) {
+      sfx('tick');
+      const left = el.querySelectorAll('li').length - el.querySelectorAll('li.done').length;
+      gardi(left ? `Μπράβο! Ένας στόχος έγινε. Μένουν ${left}.` : 'Όλοι οι στόχοι της αποστολής έγιναν! Πάτα «Έλεγχος λύσης» για να το επιβεβαιώσεις.', left ? 'happy' : 'party');
+    }
     S.msPrev = true;
     const total = el.querySelectorAll('li').length;
     $('#ms-count').textContent = `${n}/${total}`;
@@ -2275,6 +2338,7 @@
     S.error = e;
     S.runState = 'error';
     sfx('err');
+    gardi(e.line ? `Κάτι δεν πάει καλά στη γραμμή ${e.line}. Διάβασε το κόκκινο κουτί κάτω από τον κώδικα: λέει τι βρέθηκε και τι να κάνεις.` : 'Κάτι δεν πάει καλά. Διάβασε το κόκκινο κουτί κάτω από τον κώδικα.', 'worried', e.line ? [{ label: `Πήγαινε στη γραμμή ${e.line}`, run: () => gotoLine(e.line) }] : null);
     updateAll();
     announce(`Σφάλμα${e.line ? ' στη γραμμή ' + e.line : ''}: ${e.message}`);
   }
@@ -2445,6 +2509,7 @@
     renderResults();
     const passCount = res.filter(r => r.pass).length;
     announce(allPass ? 'Όλοι οι έλεγχοι πέρασαν.' : `Πέρασαν ${passCount} από ${res.length} ελέγχους.`);
+    if (!allPass) gardi(`Πέρασαν ${passCount} από ${res.length} ελέγχους. Κοίτα ποιος έμεινε με ✗: γράφει τι περίμενε και τι βρήκε.`, 'think', [{ label: 'Μια βοήθεια', run: () => { showNextHint(); showInfo('help'); } }]);
     const slot = $('#results-slot');
     if (slot && slot.firstElementChild) slot.firstElementChild.focus();
   }
@@ -2454,6 +2519,7 @@
     const quizOk = !l.quiz || P.quizzes[l.id];
     if (S.results && S.results.allPass && quizOk && !P.completed[l.id]) {
       P.completed[l.id] = true;
+      setTimeout(() => gardi('Αποστολή εξετελέσθη! Τα κατάφερες. 🎉', 'party', null, { force: true }), 400);
       if (window.IoTLearn) {
         const today = window.IoTLearn.dayStr(new Date());
         window.IoTLearn.enroll(P.review, l.id, today);
@@ -3149,6 +3215,8 @@
         <div class="field"><label for="set-ruler">Χάρακας ανάγνωσης</label>
           <select id="set-ruler"><option value="off">Κλειστός</option><option value="line">Λωρίδα που ακολουθεί το ποντίκι</option><option value="focus">Λωρίδα και σκίαση στο υπόλοιπο κείμενο</option></select></div>
         <label class="check"><input type="checkbox" id="set-motion"> Μειωμένη κίνηση (χωρίς εφέ και κινούμενες μεταβάσεις)</label>
+        <label class="check"><input type="checkbox" id="set-gardi"> Ο Γκάρντι, το ρομποτάκι-βοηθός στη γωνία</label>
+        <label class="check"><input type="checkbox" id="set-gardi-voice"> Ο Γκάρντι μιλά και φωναχτά</label>
         <label class="check"><input type="checkbox" id="set-sound"> Ήχοι του παιχνιδιού (κλικ, κουδούνι, επιτυχία)</label>
       </div>
     </dialog>
@@ -3194,6 +3262,7 @@
     <div id="live" class="sr-only" aria-live="polite"></div>`;
     document.body.appendChild(host);
     applySettings(); // ο χάρακας ανάγνωσης υπάρχει μόνο από εδώ και πέρα
+    if (window.IoTGardi) { window.IoTGardi.mount(); window.IoTGardi.onClick(gardiTip); applySettings(); }
 
     host.querySelectorAll('[data-close]').forEach(b => { b.onclick = () => b.closest('dialog').close(); });
 
@@ -3202,6 +3271,8 @@
     $('#set-spacing').onchange = e => { P.settings.lineSpacing = e.target.value; applySettings(); save(); };
     $('#set-motion').onchange = e => { P.settings.reducedMotion = e.target.checked; applySettings(); save(); };
     $('#set-sound').onchange = e => { P.settings.sound = e.target.checked; applySettings(); save(); sfx('tick'); };
+    $('#set-gardi').onchange = e => { P.settings.gardi = e.target.checked; applySettings(); save(); if (e.target.checked) gardi('Γεια! Είμαι ξανά εδώ. Πάτα με όποτε θες μια συμβουλή.', 'happy'); };
+    $('#set-gardi-voice').onchange = e => { P.settings.gardiVoice = e.target.checked; applySettings(); save(); };
     $('#set-ffont').onchange = e => { P.settings.font = e.target.value; applySettings(); save(); };
     $('#set-ruler').onchange = e => { P.settings.ruler = e.target.value; applySettings(); save(); };
     $('#set-letters').onchange = e => { P.settings.letters = e.target.value; applySettings(); save(); };
@@ -3315,6 +3386,8 @@
         $('#set-motion').checked = P.settings.reducedMotion;
         $('#set-sound').checked = P.settings.sound !== false;
         $('#set-ffont').value = P.settings.font || 'noto';
+        $('#set-gardi').checked = P.settings.gardi !== false;
+        $('#set-gardi-voice').checked = !!P.settings.gardiVoice;
         $('#set-ruler').value = P.settings.ruler || 'off';
         $('#set-letters').value = P.settings.letters || 'normal';
         $('#set-rate').value = String(P.settings.readRate || 0.9);

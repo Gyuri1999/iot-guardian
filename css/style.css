@@ -748,3 +748,48 @@ code .gl-term { font-family: var(--font-code); }
 .scope-read { margin: 0.2rem 0 0; font-size: 0.9rem; }
 .scope-read .hi { color: var(--ok); } .scope-read .lo { color: var(--muted); }
 .linklike { background: none; border: 0; padding: 0; color: var(--teal); text-decoration: underline; font: inherit; cursor: pointer; }
+
+/* ---------- ο Γκάρντι, το ρομποτάκι-βοηθός */
+.gardi { position: fixed; right: 1rem; bottom: 1rem; z-index: 55; display: flex; align-items: flex-end; gap: 0.5rem; pointer-events: none; }
+.gardi[hidden] { display: none; }
+.gardi > * { pointer-events: auto; }
+.gd-btn { width: 4.4rem; height: 5.2rem; padding: 0; border: 0; background: none; cursor: pointer; filter: drop-shadow(0 4px 0 color-mix(in srgb, var(--ink) 18%, transparent)); }
+.gd-btn:focus-visible { outline: 3px solid var(--teal); outline-offset: 3px; border-radius: 12px; }
+.gd-bot { width: 100%; height: 100%; overflow: visible; animation: gd-bob 3.2s ease-in-out infinite; }
+@keyframes gd-bob { 50% { transform: translateY(-3px); } }
+.gd-head { fill: var(--surface); stroke: var(--ink); stroke-width: 3.5; }
+.gd-ant, .gd-ear { stroke: var(--ink); stroke-width: 3; stroke-linecap: round; fill: none; }
+.gd-ant-led { fill: #ff5a3c; stroke: var(--ink); stroke-width: 1.2; }
+.gd-body { fill: var(--surface); stroke: var(--ink); stroke-width: 3; stroke-linejoin: round; }
+.gd-chip { fill: var(--ink); } .gd-heart { fill: #ff5a3c; }
+.gd-eyes rect { fill: var(--ink); } .gd-eyes path { stroke: var(--ink); stroke-width: 3; stroke-linecap: round; fill: none; }
+.gd-mouth { stroke: #13857f; stroke-width: 2.8; stroke-linecap: round; fill: none; }
+.gd-m-open { fill: #13857f; }
+.gd-eyes, .gd-mouth { display: none; }
+.m-idle .gd-e-normal, .m-idle .gd-m-smile { display: inline; }
+.m-happy .gd-e-happy, .m-happy .gd-m-open, .m-party .gd-e-happy, .m-party .gd-m-open { display: inline; }
+.m-worried .gd-e-worried, .m-worried .gd-m-flat { display: inline; }
+.m-think .gd-e-think, .m-think .gd-m-flat { display: inline; }
+.m-sleep .gd-e-sleep, .m-sleep .gd-m-flat { display: inline; }
+.gd-e-normal rect { transform-box: fill-box; transform-origin: center; animation: gd-blink 4.5s infinite; }
+@keyframes gd-blink { 0%, 94%, 100% { transform: scaleY(1); } 97% { transform: scaleY(0.1); } }
+.m-happy .gd-bot { animation: gd-hop 0.6s ease-out 2; }
+.m-party .gd-bot { animation: gd-party 0.5s ease-in-out 4; }
+.m-worried .gd-bot { animation: gd-shake 0.4s ease-in-out 2; }
+.m-party .gd-ant-led, .talking .gd-ant-led { animation: gd-led 0.5s steps(2) infinite; }
+@keyframes gd-hop { 40% { transform: translateY(-10px); } }
+@keyframes gd-party { 25% { transform: translateY(-8px) rotate(-8deg); } 75% { transform: translateY(-8px) rotate(8deg); } }
+@keyframes gd-shake { 25% { transform: translateX(-4px); } 75% { transform: translateX(4px); } }
+@keyframes gd-led { 50% { fill: #ffd27a; } }
+.talking .gd-m-smile, .talking .gd-m-flat { animation: gd-talk 0.25s steps(2) infinite; }
+@keyframes gd-talk { 50% { transform: scaleY(1.8); } }
+.gd-bubble { position: relative; max-width: min(21rem, calc(100vw - 7.5rem)); margin-bottom: 2.4rem; padding: 0.6rem 2rem 0.65rem 0.85rem; background: var(--surface); border: 2px solid var(--ink); border-radius: 14px; box-shadow: 0 5px 0 -1px color-mix(in srgb, var(--ink) 20%, transparent); }
+.gd-bubble[hidden] { display: none; }
+.gd-bubble::after { content: ""; position: absolute; right: -10px; bottom: 14px; border: 8px solid transparent; border-left-color: var(--ink); }
+.gd-text { margin: 0; font-size: 0.95rem; line-height: 1.45; }
+.gd-x { position: absolute; top: 0.25rem; right: 0.3rem; border: 0; background: none; color: var(--muted); cursor: pointer; font-size: 0.85rem; }
+.gd-acts { display: flex; flex-wrap: wrap; gap: 0.3rem; margin-top: 0.45rem; }
+.gd-acts:empty { display: none; }
+@media (prefers-reduced-motion: reduce) { .gd-bot, .gd-e-normal rect, .gd-ant-led, .gd-mouth { animation: none !important; } }
+@media (max-width: 720px) { .gardi { right: 0.5rem; bottom: 0.5rem; } .gd-btn { width: 3.4rem; height: 4rem; } .gd-bubble { margin-bottom: 1.8rem; font-size: 0.9rem; } }
+@media print { .gardi { display: none !important; } }

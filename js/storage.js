@@ -27,7 +27,7 @@
       review: {},
       wired: {},
       daily: null,
-      settings: { theme: 'system', fontScale: 1, lineSpacing: 'normal', reducedMotion: false, sound: true, font: 'noto', letters: 'normal', readRate: 0.9, ruler: 'off' }
+      settings: { theme: 'system', fontScale: 1, lineSpacing: 'normal', reducedMotion: false, sound: true, font: 'noto', letters: 'normal', readRate: 0.9, ruler: 'off', gardi: true, gardiVoice: false }
     };
   }
 
@@ -70,6 +70,8 @@
     if (['noto', 'didact', 'ysabeau'].includes(s.font)) out.settings.font = s.font;
     if (['normal', 'wide', 'wider'].includes(s.letters)) out.settings.letters = s.letters;
     if (['off', 'line', 'focus'].includes(s.ruler)) out.settings.ruler = s.ruler;
+    if (typeof s.gardi === 'boolean') out.settings.gardi = s.gardi;
+    if (typeof s.gardiVoice === 'boolean') out.settings.gardiVoice = s.gardiVoice;
     if (typeof s.readRate === 'number' && s.readRate >= 0.6 && s.readRate <= 1.4) out.settings.readRate = s.readRate;
     return { ok: true, data: out };
   }
