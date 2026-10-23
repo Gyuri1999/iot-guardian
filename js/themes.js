@@ -433,5 +433,5 @@
     };
   }
 
-  root.IoTThemes = { themeOf, mount, THEMES };
+  root.IoTThemes = { themeOf, mount, THEMES, BY_CHAPTER };
 })(typeof window !== 'undefined' ? window : globalThis);

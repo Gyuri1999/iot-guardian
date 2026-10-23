@@ -544,3 +544,73 @@ dialog::backdrop { background: rgba(15, 24, 40, 0.55); }
 .strip-card:not(:disabled) { transition: transform 0.15s ease, box-shadow 0.15s ease; }
 .strip-card:not(:disabled):hover { transform: translateY(-2px); box-shadow: 0 6px 0 -2px color-mix(in srgb, var(--ink) 18%, transparent); }
 @media (prefers-reduced-motion: reduce) { .hdr-mark .lg-halo { animation: none; } .strip-card:not(:disabled):hover { transform: none; } }
+
+/* ---------- το σπίτι-χάρτης της αρχικής */
+.home-tabs { display: flex; gap: 0.4rem; }
+.home-tab { display: inline-flex; align-items: center; gap: 0.4rem; padding: 0.4rem 0.9rem; border: 1px solid var(--line); border-radius: 999px; background: var(--surface); color: var(--muted); font: 600 0.9rem var(--font-label); letter-spacing: 0.02em; cursor: pointer; }
+.home-tab .ic { width: 1.05rem; height: 1.05rem; }
+.home-tab[aria-selected="true"] { background: var(--ink); color: var(--surface); border-color: var(--ink); }
+.house-wrap { position: relative; border: 1px solid var(--line); border-radius: 12px; overflow: hidden; background: color-mix(in srgb, var(--paper) 70%, transparent); padding: 0.6rem 0.6rem 0.2rem; }
+.house-wrap[hidden], .scene-wrap[hidden] { display: none; }
+.house-head { display: flex; flex-wrap: wrap; align-items: baseline; gap: 0.3rem 0.8rem; padding: 0.2rem 0.4rem; }
+.house-head b { font-family: var(--font-label); text-transform: uppercase; letter-spacing: 0.06em; }
+.house-head span { color: var(--muted); font-size: 0.88rem; }
+.house-map { display: block; width: 100%; height: auto; max-height: 34rem; }
+.house-map { --hm-wall-a: #dcc49a; --hm-wall-b: #ccb07f; --hm-edge: #5e4a33; --hm-line: #1c2130; --hm-pill: var(--surface); }
+:root[data-theme="dark"] .house-map { --hm-wall-a: #34405f; --hm-wall-b: #2c3753; --hm-edge: #10141f; }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .house-map { --hm-wall-a: #34405f; --hm-wall-b: #2c3753; --hm-edge: #10141f; } }
+.hm-ground { fill: var(--ink); opacity: 0.045; }
+.hm-wall-a { fill: var(--hm-wall-a); stroke: var(--hm-line); stroke-width: 1; }
+.hm-wall-b { fill: var(--hm-wall-b); stroke: var(--hm-line); stroke-width: 1; }
+.hm-edge { fill: none; stroke: var(--hm-edge); stroke-width: 2.2; }
+.hm-floor { stroke: var(--hm-line); stroke-width: 0.8; }
+.fl-desk { fill: #c99a63; } .fl-entrance { fill: #b98d5d; } .fl-hallway { fill: #8a6a52; } .fl-workshop { fill: #b8a07a; }
+.fl-greenhouse { fill: #a9b88a; } .fl-livingroom { fill: #d2a873; } .fl-serverroom { fill: #59627a; } .fl-garage { fill: #b9b4aa; }
+.hb polygon { stroke: var(--hm-line); stroke-width: 0.5; }
+.hb .f-l { filter: brightness(0.86); } .hb .f-r { filter: brightness(0.72); }
+.hm-part polygon { fill: #efe3c8; }
+.p-wood polygon { fill: #a87a4c; } .p-screen polygon { fill: #2b3142; } .p-dark polygon { fill: #2b2f3a; } .p-sofa polygon { fill: #5b7fa6; }
+.p-rack polygon { fill: #2a3142; } .p-pir polygon { fill: #f2efe6; } .p-crate polygon { fill: #d9b27a; } .p-tool polygon { fill: #c0392b; } .p-car polygon { fill: #d9443a; }
+.p-door { fill: #7d5a38; stroke: var(--hm-line); stroke-width: 0.6; } .p-knob { fill: #e2b52d; } .p-mat { fill: #8a5a3a; } .p-bell { fill: #b33a2a; }
+.p-rug { fill: #b8574a; opacity: 0.5; } .p-window { fill: #9fd0f0; stroke: var(--hm-line); stroke-width: 0.6; }
+.p-glass { fill: #cfe8e4; opacity: 0.8; stroke: #5e7a74; stroke-width: 0.8; } .p-leaf { fill: #3f8f5a; stroke: var(--hm-line); stroke-width: 0.5; } .p-soil { fill: #6b4a2a; opacity: 0.5; }
+.p-led { fill: #e0a32e; } .p-runner { fill: #7a3e3e; opacity: 0.6; } .p-line { fill: #f2efe6; } .p-wheel { fill: #1c2130; }
+.p-bulb { fill: #8a8572; }
+/* κατάσταση δωματίου */
+.hm-room { cursor: pointer; transition: transform 0.18s ease, filter 0.18s ease; }
+.hm-room.st-empty { opacity: 0.35; filter: grayscale(0.8); cursor: default; }
+.hm-room.st-locked { filter: grayscale(0.7) brightness(0.97); }
+.hm-room.st-done .p-bulb, .hm-room.st-done .p-led { fill: #ffe9a6; }
+.hm-glow { fill: url(#hm-warm); pointer-events: none; }
+.hm-shade { fill: #1c2130; opacity: 0.1; pointer-events: none; }
+.hm-hit { fill: transparent; stroke: none; }
+.hm-room:not(.st-empty):hover, .hm-room:focus-visible, .hm-room.sel { transform: translateY(-4px); outline: none; }
+.hm-room:not(.st-empty):hover .hm-floor, .hm-room:focus-visible .hm-floor, .hm-room.sel .hm-floor { stroke: var(--accent); stroke-width: 2.4; }
+/* ετικέτες */
+.hm-label { pointer-events: none; }
+.hm-stem { stroke: var(--ink); stroke-width: 1; stroke-dasharray: 2 2.5; opacity: 0.5; }
+.hm-pill { fill: var(--hm-pill); stroke: var(--line-strong); stroke-width: 1.2; }
+.hm-label.st-current .hm-pill { stroke: var(--accent); stroke-width: 2.2; }
+.hm-label.st-done .hm-pill { stroke: var(--ok); stroke-width: 2; }
+.hm-t { font: 700 10.5px var(--font-label); fill: var(--ink); letter-spacing: 0.02em; }
+.hm-label.st-locked .hm-t { fill: var(--muted); }
+.hm-dot { fill: var(--accent); }
+.hm-star { font-size: 12px; fill: #e2a32e; }
+.hm-lock rect { fill: var(--muted); } .hm-lock path { fill: none; stroke: var(--muted); stroke-width: 1.6; }
+.hm-pin path { fill: #ff5a3c; stroke: #1c2130; stroke-width: 1; } .hm-pin circle { fill: #fff; }
+.hm-pin { animation: hm-bounce 1.2s ease-in-out infinite; }
+@keyframes hm-bounce { 50% { transform: translate(0px, -21px); } }
+@media (prefers-reduced-motion: reduce) { .hm-pin { animation: none; } .hm-room { transition: none; } }
+/* κάρτα δωματίου */
+.hm-panel { position: absolute; right: 0.8rem; top: 3rem; width: min(22rem, calc(100% - 1.6rem)); background: var(--surface); border: 1px solid var(--line-strong); border-radius: 12px; padding: 0.7rem 0.85rem 0.8rem; box-shadow: 0 10px 0 -4px color-mix(in srgb, var(--ink) 16%, transparent); z-index: 3; }
+.hm-panel[hidden] { display: none; }
+.hm-ph { display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; }
+.hm-ph h3 { margin: 0; font-family: var(--font-label); text-transform: uppercase; letter-spacing: 0.05em; }
+.hm-story { margin: 0.35rem 0 0.55rem; color: var(--muted); font-size: 0.9rem; }
+.hm-chaps { list-style: none; margin: 0; padding: 0; display: grid; gap: 0.35rem; }
+.hm-chaps li { display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: 0.55rem; padding: 0.4rem 0.5rem; border: 1px solid var(--line); border-radius: 8px; background: var(--paper); }
+.hm-n { font: 700 0.85rem var(--font-code); color: var(--accent); }
+.hm-ct { font-size: 0.9rem; line-height: 1.3; }
+.hm-ct small { display: block; color: var(--muted); font-size: 0.78rem; }
+.hm-locked .ic { width: 1.1rem; height: 1.1rem; color: var(--muted); }
+@media (max-width: 720px) { .hm-panel { position: static; width: auto; margin: 0.4rem 0 0.6rem; } }

@@ -139,6 +139,7 @@
   // Εικονίδια γραμμής (24×24, stroke = currentColor).
   const IC = {
     home: '<path d="M4 11l8-7 8 7"/><path d="M6 10v10h12V10"/><path d="M10 20v-6h4v6"/>',
+    lock: '<rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/>',
     map: '<path d="M4 6l5-2 6 2 5-2v14l-5 2-6-2-5 2z"/><path d="M9 4v14M15 6v14"/>',
     book: '<path d="M4 5a2 2 0 0 1 2-2h13v16H6a2 2 0 0 0-2 2z"/><path d="M4 19V5"/><path d="M8 7h7"/>',
     chip: '<rect x="7" y="7" width="10" height="10" rx="1.5"/><path d="M10 3v4M14 3v4M10 17v4M14 17v4M3 10h4M3 14h4M17 10h4M17 14h4"/>',
@@ -410,6 +411,84 @@
     }).join('');
   }
 
+  // ------------------------------------------------------------ Το σπίτι-χάρτης
+
+  // Τα δωμάτια του σπιτιού για τη διαδρομή: ποια κεφάλαια έχει το καθένα και σε τι κατάσταση είναι.
+  function houseRooms(tr) {
+    const by = (window.IoTThemes && window.IoTThemes.BY_CHAPTER) || {};
+    const nxt = nextTask(tr.id);
+    const rooms = {};
+    for (const ch of trackChapters(tr.id)) {
+      const ls = chapterLessons(ch.n);
+      if (!ch.ready || !ls.length) continue;
+      const key = by[ch.n];
+      if (!key) continue;
+      const r = rooms[key] || (rooms[key] = { chapters: [], done: 0, total: 0 });
+      r.chapters.push(ch);
+      r.total++;
+      if (chapterDone(ch.n)) r.done++;
+    }
+    for (const [key, r] of Object.entries(rooms)) {
+      const anyOpen = r.chapters.some(ch => chapterUnlocked(ch.n));
+      const here = nxt && r.chapters.some(ch => ch.n === nxt.chapter);
+      r.state = r.done === r.total ? 'done' : here ? 'current' : anyOpen ? 'open' : 'locked';
+      r.label = `${r.done} από ${r.total} κεφάλαια${r.state === 'done' ? ', τα φώτα άναψαν' : r.state === 'current' ? ', εδώ είναι η επόμενη άσκηση' : r.state === 'locked' ? ', κλειδωμένο' : ''}`;
+      r.key = key;
+    }
+    return rooms;
+  }
+  function houseHTML(tr) {
+    if (!window.IoTHouse) return '';
+    S.rooms = houseRooms(tr);
+    const lit = Object.values(S.rooms).filter(r => r.state === 'done').length;
+    const all = Object.keys(S.rooms).length;
+    return `<div class="house-head"><b>Το σπίτι σου</b><span>${lit} από ${all} δωμάτια με αναμμένα φώτα · πάτα ένα δωμάτιο</span></div>${window.IoTHouse.render(S.rooms)}`;
+  }
+  function bindHouse(tr) {
+    const tabs = [['tab-house', 'house'], ['tab-board', 'board']];
+    tabs.forEach(([id, v]) => {
+      const b = $('#' + id);
+      if (!b) return;
+      b.onclick = () => {
+        S.homeView = v;
+        tabs.forEach(([id2, v2]) => $('#' + id2).setAttribute('aria-selected', String(v2 === v)));
+        $('#house').hidden = v !== 'house';
+        $('#scene').hidden = v !== 'board';
+        if (v === 'board') window.dispatchEvent(new Event('resize'));
+      };
+    });
+    const map = $('#house .house-map');
+    if (!map) return;
+    const open = key => openRoom(tr, key);
+    map.addEventListener('click', e => { const g = e.target.closest('[data-room]'); if (g && S.rooms[g.dataset.room]) open(g.dataset.room); });
+    map.addEventListener('keydown', e => { if ((e.key === 'Enter' || e.key === ' ') && e.target.dataset && S.rooms[e.target.dataset.room]) { e.preventDefault(); open(e.target.dataset.room); } });
+  }
+  // Κάρτα δωματίου: η ιστορία του, τα κεφάλαιά του και κουμπί για την επόμενη άσκηση εκεί μέσα.
+  function openRoom(tr, key) {
+    const r = S.rooms[key];
+    const panel = $('#hm-panel');
+    if (!r || !panel) return;
+    sfx('click');
+    const th = window.IoTThemes.THEMES[key];
+    const name = window.IoTHouse.ROOMS[key].name;
+    const rows = r.chapters.map(ch => {
+      const ls = chapterLessons(ch.n);
+      const d = ls.filter(l => P.completed[l.id]).length;
+      const ok = chapterUnlocked(ch.n);
+      const first = ls.find(l => !P.completed[l.id] && taskUnlocked(l)) || ls[0];
+      return `<li><span class="hm-n">${String(chNum(ch.n)).padStart(2, '0')}</span><span class="hm-ct">${esc(ch.title)}<small>${ok ? `${d}/${ls.length} ασκήσεις` : 'κλειδωμένο'}</small></span>${ok ? `<button class="btn sm${d < ls.length ? ' primary' : ''}" data-task="${first.id}">${d === ls.length ? 'Ξανά' : d ? 'Συνέχεια' : 'Ξεκίνα'}</button>` : `<span class="hm-locked">${icon('lock')}</span>`}</li>`;
+    }).join('');
+    panel.innerHTML = `<div class="hm-ph"><h3>${esc(name)}</h3><button class="btn quiet sm" id="hm-close" aria-label="Κλείσιμο">✕</button></div>
+      ${th ? `<p class="hm-story">${esc(th.story)}</p>` : ''}<ul class="hm-chaps">${rows}</ul>`;
+    panel.hidden = false;
+    panel.dataset.room = key;
+    $('#house').querySelectorAll('.hm-room').forEach(g => g.classList.toggle('sel', g.dataset.room === key));
+    panel.querySelectorAll('[data-task]').forEach(b => { b.onclick = () => openTask(b.dataset.task); });
+    $('#hm-close').onclick = () => { panel.hidden = true; $('#house').querySelectorAll('.hm-room.sel').forEach(g => g.classList.remove('sel')); const g = $(`#house .hm-room[data-room="${key}"]`); if (g) g.focus(); };
+    const btn = panel.querySelector('.btn.primary, [data-task]');
+    if (btn) btn.focus();
+  }
+
   function renderHome() {
     stopMachine();
     S.task = null;
@@ -451,8 +530,13 @@
       <div class="main">
         ${header(`Πρόοδος · ${tr.name} · ${tr.boardName}`, done, total, 'Σήμερα', new Date().toLocaleDateString('el-GR', { day: 'numeric', month: 'short', year: 'numeric' }))}
         <div class="ws">
-          <section class="stage" aria-label="Η πλακέτα">
-            <div class="scene-wrap" id="scene">${sceneControls()}</div>
+          <section class="stage" aria-label="Το σπίτι και η πλακέτα">
+            <div class="home-tabs" role="tablist" aria-label="Προβολή">
+              <button class="home-tab" role="tab" id="tab-house" aria-selected="${S.homeView !== 'board'}">${icon('home')} Το σπίτι</button>
+              <button class="home-tab" role="tab" id="tab-board" aria-selected="${S.homeView === 'board'}">${icon('chip')} Η πλακέτα</button>
+            </div>
+            <div class="house-wrap" id="house"${S.homeView === 'board' ? ' hidden' : ''}>${houseHTML(tr)}<div class="hm-panel" id="hm-panel" hidden></div></div>
+            <div class="scene-wrap" id="scene"${S.homeView === 'board' ? '' : ' hidden'}>${sceneControls()}</div>
             <div class="card dock home-map">
               <div class="card-head"><h3>Χάρτης κεφαλαίων</h3><span class="muted" style="font-size:0.85rem">Κάθε κεφάλαιο ανοίγει όταν τελειώσεις το προηγούμενο</span></div>
               <div class="chaps">${chapters}</div>
@@ -476,6 +560,7 @@
       </div></div>`;
 
     mountScene(tr.board === 'pi' ? window.IoTScene.piScene(['led', 'button'], {}) : window.IoTScene.homeScene());
+    bindHouse(tr);
     const d2 = $('#sc-d2'); if (d2) d2.classList.add('on');
     const halo = $('#sc-d2-halo'); if (halo) halo.classList.add('on');
     const pwr = $('#sc-pwr'); if (pwr) pwr.classList.add('on');
