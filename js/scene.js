@@ -399,6 +399,27 @@
     return berries.map(([x, y]) => `<circle cx="${cx + x}" cy="${cy + y}" r="0.85" class="pi-logo"/>`).join('')
       + `<path d="M${cx - 1.6},${cy - 1.6} q1.6,-1.2 1.6,0.6 q0,-1.8 1.6,-0.6" class="pi-logo-leaf"/>`;
   }
+  // Αρχική (Raspberry Pi): το Pi 5 μόνο του, με ετικέτες για τα μέρη του, όπως το ESP32.
+  function piHomeScene() {
+    MAN = [];
+    let inner = piHost();
+    const T = PI_T;
+    const Q = (L, W, h) => P(ESP.u + W, ESP.v + L, h);
+    inner += callout(Q(26.5, 18.5, T + 1.8), 10, -132, 'BCM2712 · ΕΠΕΞΕΡΓΑΣΤΗΣ', null, 'pi-cpu');
+    inner += callout(Q(15, 16.3, T + 1.2), 88, -96, 'ΜΝΗΜΗ RAM', null, 'pi-ram');
+    inner += callout(Q(20, 3.4, PI_PIN_TOP), -150, -70, 'GPIO HEADER · 40 PINS', null, 'pi-gpio');
+    inner += callout(Q(6.8, 8.8, T + 2.4), -60, -118, 'ΑΝΕΜΙΣΤΗΡΑΣ', null, 'pi-fan');
+    inner += callout(Q(4, 30.8, T + 0.3), 104, -52, 'LED ΡΕΥΜΑΤΟΣ / ACT', null, 'pi-leds');
+    inner += callout(Q(10, 36.6, T + 2.8), 104, 2, 'USB-C · ΤΡΟΦΟΔΟΣΙΑ', null, 'pi-power');
+    inner += callout(Q(25, 36.6, T + 2.6), 112, 36, 'MICRO-HDMI × 2', null, 'pi-hdmi');
+    inner += callout(Q(40, 23, T + 1.6), 112, 82, 'ΚΑΜΕΡΑ / ΟΘΟΝΗ', null, 'pi-fpc');
+    inner += callout(Q(38, 13, T + 1.2), -140, 18, 'RP1 · ΕΙΣΟΔΟΙ / ΕΞΟΔΟΙ', null, 'pi-rp1');
+    inner += callout(Q(47.8, 9.8, T + 5), -136, -10, 'PoE', null, 'pi-poe');
+    inner += callout(Q(55, 6, T + 8.4), -84, 80, 'USB 2 · USB 3', null, 'pi-ports');
+    inner += callout(Q(55, 27, T + 7.6), 60, 66, 'ETHERNET', null, 'pi-ports');
+    return fit(`<g class="sc-mid">${inner}</g>`, [-330, -150, 340, 250], 'home', 'Το Raspberry Pi 5 με ετικέτες για τα μέρη του');
+  }
+
   function piHost() {
     const { u, v } = ESP;
     const T = PI_T;
@@ -426,9 +447,10 @@
     for (const ww of [2.4, 4.4]) for (let i = 0; i < 20; i++) s += tallPin(u + ww, v + PI_PIN_L(i), T + 2.4, PI_PIN_TOP);
     s += '</g>';
     // ανεμιστήρας (λευκό βύσμα) και PoE (2×2)
-    s += B(5, 7.6, T, 3.6, 2.4, 2.4, 'conn-white');
-    s += B(46, 8, T, 3.6, 3.6, 1.4, 'pinhdr');
+    s += `<g data-part="pi-fan">${B(5, 7.6, T, 3.6, 2.4, 2.4, 'conn-white')}</g>`;
+    s += '<g data-part="pi-poe">' + B(46, 8, T, 3.6, 3.6, 1.4, 'pinhdr');
     for (const [pl, pw] of [[46.9, 8.9], [48.7, 8.9], [46.9, 10.7], [48.7, 10.7]]) s += tallPin(u + pw, v + pl, T + 1.4, T + 5);
+    s += '</g>';
     // επεξεργαστής BCM2712 (μεταλλικό κάλυμμα), RAM, RP1
     s += `<g data-part="pi-ram">${B(10.5, 13, T, 9.6, 6.6, 1.2, 'chip')}</g>`;
     s += `<g data-part="pi-cpu">${B(21, 13, T, 11, 11, 1.8, 'cpu-lid')}<g transform="${onTop(T + 1.8)}"><text x="${tx(30.6)}" y="${ty(16.4)}" class="chip-t dark">BCM2712</text><text x="${tx(30.6)}" y="${ty(18.8)}" class="chip-t dark">ARM · 2.4 GHz</text></g></g>`;
@@ -459,8 +481,8 @@
     // LED τροφοδοσίας και δραστηριότητας
     const pwr = Q(4, 32, T + 0.3);
     const act = Q(4, 29.6, T + 0.3);
-    s += `<circle cx="${pwr[0].toFixed(1)}" cy="${pwr[1].toFixed(1)}" r="1.5" class="smd pwr" id="sc-pwr"/>`;
-    s += `<circle cx="${act[0].toFixed(1)}" cy="${act[1].toFixed(1)}" r="1.5" class="smd act" id="sc-d2"/>`;
+    s += `<g data-part="pi-leds"><circle cx="${pwr[0].toFixed(1)}" cy="${pwr[1].toFixed(1)}" r="1.5" class="smd pwr" id="sc-pwr"/>`;
+    s += `<circle cx="${act[0].toFixed(1)}" cy="${act[1].toFixed(1)}" r="1.5" class="smd act" id="sc-d2"/></g>`;
     s += '</g>';
     return s;
   }
@@ -990,5 +1012,5 @@
     });
   }
 
-  root.IoTScene = { K, ESP, PCB_TOP, PIN_U, PI_T, PI_PIN_L, PI_PIN_TOP, BB, TL, manifest: null, buildIn, carOffset, carV, dragToCm, CAR, US, P, labScene, piScene, homeScene, netScene, attachPanZoom, animatePacket, NET_NODES };
+  root.IoTScene = { K, ESP, PCB_TOP, PIN_U, PI_T, PI_PIN_L, PI_PIN_TOP, BB, TL, manifest: null, buildIn, carOffset, carV, dragToCm, CAR, US, P, labScene, piScene, homeScene, piHomeScene, netScene, attachPanZoom, animatePacket, NET_NODES };
 })(typeof window !== 'undefined' ? window : globalThis);

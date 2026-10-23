@@ -429,6 +429,16 @@
 
   // ------------------------------------------------------------ Το σπίτι-χάρτης
 
+  // Η πλακέτα της αρχικής: ESP32 ή Raspberry Pi 5, η καθεμία μόνη της με ετικέτες «τι είναι».
+  const homeBoard = tr => S.homeBoard || (tr.board === 'pi' ? 'pi' : 'esp32');
+  function mountHomeBoard(bd) {
+    const wrap = $('#scene');
+    if (!wrap) return;
+    wrap.querySelectorAll('svg.scene, .part-info, .part-tip').forEach(x => x.remove());
+    mountScene(bd === 'pi' ? window.IoTScene.piHomeScene() : window.IoTScene.homeScene());
+    ['sc-d2', 'sc-d2-halo', 'sc-pwr'].forEach(id => { const el = $('#' + id); if (el) el.classList.add('on'); });
+  }
+
   // Τα δωμάτια του σπιτιού για τη διαδρομή: ποια κεφάλαια έχει το καθένα και σε τι κατάσταση είναι.
   function houseRooms(tr) {
     const by = (window.IoTThemes && window.IoTThemes.BY_CHAPTER) || {};
@@ -470,7 +480,20 @@
         tabs.forEach(([id2, v2]) => $('#' + id2).setAttribute('aria-selected', String(v2 === v)));
         $('#house').hidden = v !== 'house';
         $('#scene').hidden = v !== 'board';
+        $('#board-switch').hidden = v !== 'board';
         if (v === 'board') window.dispatchEvent(new Event('resize'));
+      };
+    });
+    [['bd-esp32', 'esp32'], ['bd-pi', 'pi']].forEach(([id, bd]) => {
+      const b = $('#' + id);
+      if (!b) return;
+      b.onclick = () => {
+        if (homeBoard(tr) === bd) return;
+        S.homeBoard = bd;
+        $('#bd-esp32').setAttribute('aria-pressed', String(bd === 'esp32'));
+        $('#bd-pi').setAttribute('aria-pressed', String(bd === 'pi'));
+        mountHomeBoard(bd);
+        sfx('click');
       };
     });
     const map = $('#house .house-map');
@@ -553,6 +576,11 @@
               <button class="home-tab" role="tab" id="tab-board" aria-selected="${S.homeView === 'board'}">${icon('chip')} Η πλακέτα</button>
             </div>
             <div class="house-wrap" id="house"${S.homeView === 'board' ? ' hidden' : ''}>${houseHTML(tr)}<div class="hm-panel" id="hm-panel" hidden></div></div>
+            <div class="board-switch" id="board-switch" role="group" aria-label="Ποια πλακέτα"${S.homeView === 'board' ? '' : ' hidden'}>
+              <button class="bs-b" id="bd-esp32" aria-pressed="${homeBoard(tr) === 'esp32'}">ESP32</button>
+              <button class="bs-b" id="bd-pi" aria-pressed="${homeBoard(tr) === 'pi'}">Raspberry Pi 5</button>
+              <span class="bs-hint">Πάτα ένα κομμάτι για να δεις τι είναι</span>
+            </div>
             <div class="scene-wrap" id="scene"${S.homeView === 'board' ? '' : ' hidden'}>${sceneControls()}</div>
             <div class="card dock home-map">
               <div class="card-head"><h3>Χάρτης κεφαλαίων</h3><span class="muted" style="font-size:0.85rem">Κάθε κεφάλαιο ανοίγει όταν τελειώσεις το προηγούμενο</span></div>
@@ -576,11 +604,8 @@
         <footer class="strip" aria-label="Κεφάλαια"><div class="strip-head">Κεφάλαια</div><div class="strip-row">${chapterCards()}</div></footer>
       </div></div>`;
 
-    mountScene(tr.board === 'pi' ? window.IoTScene.piScene(['led', 'button'], {}) : window.IoTScene.homeScene());
+    mountHomeBoard(homeBoard(tr));
     bindHouse(tr);
-    const d2 = $('#sc-d2'); if (d2) d2.classList.add('on');
-    const halo = $('#sc-d2-halo'); if (halo) halo.classList.add('on');
-    const pwr = $('#sc-pwr'); if (pwr) pwr.classList.add('on');
     bindRail();
     $('#continue').onclick = () => openTask((nxt || mine[0]).id);
     $('#change-track').onclick = renderPicker;
