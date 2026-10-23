@@ -807,3 +807,19 @@ code .gl-term { font-family: var(--font-code); }
 .hm-chal-lock { display: flex; gap: 0.4rem; align-items: center; margin: 0.6rem 0 0; color: var(--muted); font-size: 0.85rem; }
 .hm-chal-lock .ic { width: 1rem; height: 1rem; flex: none; }
 .ch-timer { margin-left: 0.5rem; padding: 0.05rem 0.5rem; border-radius: 999px; background: var(--ink); color: var(--surface); font: 700 0.8rem var(--font-code); }
+
+/* ---------- ελεύθερο εργαστήριο */
+.bench { border: 1px solid var(--line); border-left: 4px solid var(--accent); border-radius: 10px; background: var(--surface); padding: 0.6rem 0.8rem; display: grid; gap: 0.5rem; }
+.bench-head { display: flex; align-items: center; gap: 0.45rem; }
+.bench-head .ic { width: 1.1rem; height: 1.1rem; color: var(--accent); }
+.bench-head b { font-family: var(--font-label); text-transform: uppercase; letter-spacing: 0.05em; }
+.bench-head .muted { font-size: 0.85rem; }
+.bench-parts { display: flex; flex-wrap: wrap; gap: 0.35rem; }
+.bench-chip { padding: 0.3rem 0.75rem; border: 1.5px solid var(--line-strong); border-radius: 999px; background: var(--paper); color: var(--muted); font: 600 0.85rem var(--font-body); cursor: pointer; }
+.bench-chip[aria-pressed="true"] { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 12%, var(--surface)); color: var(--ink); }
+.bench-chip[aria-pressed="true"]::before { content: "✓ "; color: var(--accent); }
+.bench-row { display: flex; flex-wrap: wrap; align-items: center; gap: 0.4rem; }
+.bench-row select { max-width: 22rem; }
+.bench-row .spacer { flex: 1; }
+.sandbox-card h3 { display: flex; align-items: center; gap: 0.4rem; }
+.sandbox-card h3 .ic { width: 1.1rem; height: 1.1rem; color: var(--accent); }

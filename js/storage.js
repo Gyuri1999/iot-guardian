@@ -27,6 +27,7 @@
       review: {},
       wired: {},
       challenges: {},
+      sandbox: { hw: {}, code: {} },
       daily: null,
       settings: { theme: 'system', fontScale: 1, lineSpacing: 'normal', reducedMotion: false, sound: true, font: 'noto', letters: 'normal', readRate: 0.9, ruler: 'off', gardi: true, gardiVoice: false }
     };
@@ -53,6 +54,13 @@
     if (typeof obj.current === 'string' && ids.has(obj.current)) out.current = obj.current;
     if (typeof obj.track === 'string' && /^(cpp|py|rs)-(esp32|pi)$/.test(obj.track)) out.track = obj.track;
     if (obj.stories && typeof obj.stories === 'object') for (const [k, v] of Object.entries(obj.stories)) if (/^\d{1,3}$/.test(k) && v === true) out.stories[k] = true;
+    const sb = obj.sandbox;
+    if (sb && typeof sb === 'object') {
+      const TR = /^(cpp|py|rs)-(esp32|pi)$/;
+      const HW = ['led', 'button', 'pir', 'sensor', 'router', 'ultrasonic', 'traffic'];
+      if (sb.hw && typeof sb.hw === 'object') for (const [k, v] of Object.entries(sb.hw)) if (TR.test(k) && Array.isArray(v)) out.sandbox.hw[k] = v.filter(h => HW.includes(h));
+      if (sb.code && typeof sb.code === 'object') for (const [k, v] of Object.entries(sb.code)) if (TR.test(k) && typeof v === 'string' && v.length <= MAX_DRAFT) out.sandbox.code[k] = v;
+    }
     const ROOMS = ['desk', 'entrance', 'hallway', 'workshop', 'greenhouse', 'livingroom', 'serverroom', 'garage'];
     if (obj.challenges && typeof obj.challenges === 'object') for (const [k, v] of Object.entries(obj.challenges)) if (ROOMS.includes(k) && v && Number.isInteger(v.n) && v.n > 0 && Number.isInteger(v.best) && v.best >= 0) out.challenges[k] = { n: v.n, best: v.best };
     if (obj.wired && typeof obj.wired === 'object') for (const [k, v] of Object.entries(obj.wired)) if (/^w-[a-z]{3,4}$/.test(k) && v === true) out.wired[k] = true;

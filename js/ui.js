@@ -15,6 +15,7 @@
   const IOT_DISPLAY = displayValue;
   const { lessons, CHAPTERS, SKILLS, KIND_LABELS, GLOSSARY } = window.IoTLessons;
   KIND_LABELS.challenge = 'Πρόκληση';
+  KIND_LABELS.sandbox = 'Ελεύθερο εργαστήριο';
   const NET = window.IoTNet;
   const VAL = window.IoTValidator;
   const PY = window.IoTPy;
@@ -156,6 +157,7 @@
   const IC = {
     home: '<path d="M4 11l8-7 8 7"/><path d="M6 10v10h12V10"/><path d="M10 20v-6h4v6"/>',
     lock: '<rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/>',
+    tool: '<path d="M14.5 6.5a4 4 0 0 0-5.3 5.3L4 17l3 3 5.2-5.2a4 4 0 0 0 5.3-5.3l-2.5 2.5-2.5-.5-.5-2.5z"/>',
     plug: '<path d="M9 3v5M15 3v5M7 8h10v3a5 5 0 0 1-10 0zM12 16v5"/>',
     bulb: '<path d="M12 3a6 6 0 0 0-3.5 10.9V17h7v-3.1A6 6 0 0 0 12 3zM9.5 20h5"/>',
     speaker: '<path d="M4 9.5h3.5L12 5.5v13l-4.5-4H4z"/><path d="M15.5 9a4 4 0 0 1 0 6M18 6.5a7.5 7.5 0 0 1 0 11"/>',
@@ -233,6 +235,7 @@
       <div class="rail-logo" aria-hidden="true">${LOGO}</div>
       ${b('nav-home', 'home', 'Αρχική και χάρτης κεφαλαίων', active === 'home')}
       ${b('nav-lab', 'chip', 'Εργαστήριο: συνέχεια από εκεί που έμεινες', active === 'lab')}
+      ${b('nav-sandbox', 'tool', 'Ελεύθερο εργαστήριο: πειραματίσου χωρίς ασκήσεις', active === 'sandbox')}
       ${b('nav-lang', 'lang', 'Γλώσσα και πλακέτα', active === 'lang')}
       <button class="rail-btn" data-open="collection" title="Συλλογή: κάρτες ιστορίας και σήματα" aria-label="Συλλογή: κάρτες ιστορίας και σήματα">${icon('star')}</button>
       <button class="rail-btn" data-open="glossary" title="Γλωσσάρι" aria-label="Γλωσσάρι">${icon('book')}</button>
@@ -705,6 +708,7 @@
             </div>
             ${cert}
             ${reviewCard(tr)}
+            <div class="card sandbox-card"><div class="card-head"><h3>${icon('tool')} Ελεύθερο εργαστήριο</h3></div><p class="muted" style="margin:0 0 0.5rem">Ο δικός σου πάγκος: διάλεξε εξαρτήματα, γράψε ό,τι θέλεις σε ${esc(tr.name)} και δες το να δουλεύει. Χωρίς ασκήσεις και ελέγχους.</p><button class="btn" id="open-sandbox">${icon('tool')} Άνοιξε το εργαστήριο</button></div>
             <div class="card"><div class="card-head"><h3>Δεξιότητες</h3><span class="muted" style="font-size:0.85rem">${done} από ${total} ασκήσεις</span></div><ul class="skills">${skills}</ul></div>
             ${collectionTeaser(tr)}
             <div class="card"><h3>Γνώρισε την πλακέτα</h3><p class="muted" style="margin:0">${tr.board === 'pi' ? 'Το Raspberry Pi 5 είναι ένας μικρός υπολογιστής με Linux. Το header με τα 40 pins (GPIO) συνδέει LED, κουμπιά και αισθητήρες: στον πάγκο το LED είναι στο GPIO 17, το κουμπί στο GPIO 27 και ο PIR στο GPIO 4.' : 'Το ESP32 έχει επεξεργαστή, WiFi και Bluetooth σε ένα μικρό module. Τα pins (GPIO) συνδέουν LED, κουμπιά και αισθητήρες. Το μπλε LED «D2» είναι συνδεδεμένο στο GPIO 2. Σε πραγματικές πλακέτες τα GPIO διαφέρουν από μοντέλο σε μοντέλο.'}</p></div>
@@ -716,6 +720,7 @@
     mountHomeBoard(homeBoard(tr));
     bindHouse(tr);
     if ($('#start-review')) $('#start-review').onclick = () => openReview(tr);
+    if ($('#open-sandbox')) $('#open-sandbox').onclick = openSandbox;
     gardiHome(tr, nxt);
     bindRail();
     $('#continue').onclick = () => openTask((nxt || mine[0]).id);
@@ -757,6 +762,7 @@
   function bindRail() {
     $('#nav-home').onclick = renderHome;
     $('#nav-lang').onclick = renderPicker;
+    if ($('#nav-sandbox')) $('#nav-sandbox').onclick = openSandbox;
     $('#nav-lab').onclick = () => {
       if (!curTrack()) { renderPicker(); return; }
       const cur = P.current && byId[P.current];
@@ -997,6 +1003,7 @@
   }
 
   function lessonStrip(l) {
+    if (l.sandbox || l.challenge) return '';
     const ch = CHAPTERS.find(c => c.n === l.chapter);
     const ls = chapterLessons(l.chapter);
     const ready = trackChapters(trackOf(l)).map(c => c.n);
@@ -1035,7 +1042,7 @@
       <div class="info-tabs" role="tablist" aria-label="Πληροφορίες μαθήματος">${tabs.map(([k, n]) => `<button role="tab" class="itab" id="itab-${k}" data-itab="${k}" aria-controls="info-${k}">${n}</button>`).join('')}</div>
       <div class="info-panel guide" id="info-lesson" role="tabpanel" aria-labelledby="itab-lesson">
         <div class="say-row">${sayBtn('#info-lesson', 'το μάθημα')}</div>
-        <span class="kind-tag">${esc(KIND_LABELS[l.kind])}${mode === 'config' ? (l.system ? ' · ρυθμίσεις του Pi' : ' · ρυθμίσεις broker') : mode === 'analysis' ? ' · ανάλυση καταγραφής' : ''} ${l.challenge ? ' · χωρίς βοήθειες' : ` · άσκηση ${idx} από ${ls.length}`}</span>
+        <span class="kind-tag">${esc(KIND_LABELS[l.kind])}${mode === 'config' ? (l.system ? ' · ρυθμίσεις του Pi' : ' · ρυθμίσεις broker') : mode === 'analysis' ? ' · ανάλυση καταγραφής' : ''} ${l.challenge ? ' · χωρίς βοήθειες' : l.sandbox ? ' · χωρίς ασκήσεις' : ` · άσκηση ${idx} από ${ls.length}`}</span>
         <h2>${esc(l.title)}</h2>
         <ul class="objectives">${l.objectives.map(o => `<li>${esc(o)}</li>`).join('')}</ul>
         <div class="theory">${l.theory}</div>
@@ -1109,12 +1116,13 @@
         ${panels.map(([k, html]) => `<div class="dock-panel" id="dock-${k}" role="tabpanel" aria-labelledby="dtab-${k}" ${k === S.dockTab ? '' : 'hidden'}>${html}</div>`).join('')}
       </div>` : '';
 
-    app().innerHTML = `<div class="app">${rail('lab')}
+    app().innerHTML = `<div class="app">${rail(l.sandbox ? 'sandbox' : 'lab')}
       <div class="main">
-        ${header(`Κεφ. ${chNum(l.chapter)} · ${ch.title}`, doneCh, ls.length, 'Εικονικός χρόνος', '00:00.000')}
+        ${header(l.sandbox ? 'Ελεύθερο εργαστήριο · χωρίς ασκήσεις' : `Κεφ. ${chNum(l.chapter)} · ${ch.title}`, doneCh, ls.length, 'Εικονικός χρόνος', '00:00.000')}
         <div class="ws">
           <section class="stage" aria-label="Σκηνή εργαστηρίου">
             ${missionHTML(l)}
+            ${l.sandbox ? benchHTML(l) : ''}
             <div id="wiring-slot"></div>
             <div class="scene-wrap" id="scene">${sceneControls()}${mode === 'code' ? inputsCardHTML(hw, w) : ''}</div>
             ${dock}
@@ -1172,6 +1180,10 @@
     renderHints();
     if (window.IoTLearn) window.IoTLearn.linkTerms($('#info-lesson .theory'), l.glossary, GLOSSARY);
     bindExplain(l);
+    if (l.sandbox) {
+      ['b-help', 'itab-help', 'itab-quiz', 'b-check'].forEach(id => { const x = $('#' + id); if (x) x.hidden = true; });
+      bindBench(l);
+    }
     if (l.challenge) {
       ['b-help', 'itab-help', 'itab-quiz'].forEach(id => { const x = $('#' + id); if (x) x.hidden = true; });
       clearInterval(S.chalT);
@@ -1324,6 +1336,108 @@
     }).join('');
   }
 
+  // ------------------------------------------------------------ Ελεύθερο εργαστήριο
+  function sandboxLesson(tr) {
+    const SB = window.IoTSandbox;
+    const allowed = SB.ALLOWED[tr.board] || SB.ALLOWED.esp32;
+    const saved = P.sandbox.hw[tr.id];
+    const hw = (saved || ['led', 'button']).filter(h => allowed.includes(h));
+    const first = trackChapters(tr.id)[0];
+    const lang = tr.lang;
+    const tbl = rows => `<div class="table-wrap"><table><tbody>${rows.map(([a, b]) => `<tr><td class="code">${esc(a)}</td><td>${esc(b)}</td></tr>`).join('')}</tbody></table></div>`;
+    const ideas = [].concat(...hw.map(h => SB.IDEAS[h] || []));
+    return {
+      id: 'sandbox', sandbox: true, kind: 'sandbox', chapter: first.n, theme: 'workshop',
+      title: 'Ελεύθερο εργαστήριο', lang: lang === 'cpp' ? undefined : lang, board: tr.board,
+      hardware: hw.length ? hw : ['led'],
+      initialWorld: { button: false, pir: false, temp: 24, humidity: 45, distance: 80, router: true },
+      initialCode: P.sandbox.code[tr.id] || SB.BLANK[tr.id] || '',
+      solution: '', validationTests: [], hints: [], quiz: null, prerequisites: [], glossary: [], skills: [],
+      objectives: ['Να πειραματιστώ ελεύθερα με τα εξαρτήματα που διαλέγω.', 'Να δω στη σκηνή και στον λογικό αναλυτή τι κάνει ο κώδικάς μου.'],
+      theory: `<p>Εδώ είναι ο δικός σου πάγκος. Δεν υπάρχουν ασκήσεις ούτε έλεγχοι: γράφεις, πατάς «Εκτέλεση» και βλέπεις τι γίνεται. Ο κώδικάς σου αποθηκεύεται μόνος του.</p>
+        <h3>Pins του πάγκου (${tr.board === 'pi' ? 'Raspberry Pi' : 'ESP32'})</h3>${tbl(SB.PINS[tr.board] || SB.PINS.esp32)}
+        <h3>Βασικές εντολές (${esc(tr.name)})</h3>${tbl(SB.CHEAT[tr.id] || [])}`,
+      steps: ideas.length ? ideas : ['Διάλεξε εξαρτήματα στον πάγκο για ιδέες.'],
+      explanationOnSuccess: '', remediation: ''
+    };
+  }
+  function openSandbox() {
+    const tr = curTrack();
+    if (!tr || !window.IoTSandbox) { renderPicker(); return; }
+    const L = sandboxLesson(tr);
+    byId[L.id] = L;
+    delete P.drafts[L.id];
+    openTask(L.id);
+  }
+  function sandboxTemplates(tr) {
+    // ασκήσεις που έχεις ήδη λύσει: η πιο προχωρημένη από κάθε κεφάλαιο
+    const groups = new Map();
+    for (const l of trackLessons(tr.id)) {
+      const w = worldOf(l);
+      if (!P.completed[l.id] || modeOf(l) !== 'code' || !l.solution || w.broker || w.wifi || (l.hardware || []).some(h => ['web', 'broker', 'db'].includes(h))) continue;
+      groups.set(l.chapter, l);
+    }
+    return [...groups.values()];
+  }
+  function benchHTML(l) {
+    const tr = curTrack();
+    const SB = window.IoTSandbox;
+    const allowed = SB.ALLOWED[tr.board] || SB.ALLOWED.esp32;
+    const tpl = sandboxTemplates(tr);
+    return `<section class="bench" id="bench" aria-label="Ο πάγκος σου">
+      <div class="bench-head">${icon('tool')}<b>Ο πάγκος σου</b><span class="muted">διάλεξε εξαρτήματα</span></div>
+      <div class="bench-parts">${SB.COMPONENTS.filter(c => allowed.includes(c.id)).map(c => `<button type="button" class="bench-chip" data-hw="${c.id}" aria-pressed="${l.hardware.includes(c.id)}">${esc(c.label)}</button>`).join('')}</div>
+      <div class="bench-row">
+        <label for="sb-tpl" class="muted">Ξεκίνα από:</label>
+        <select id="sb-tpl"><option value="">Αναβόσβημα LED (απλή αρχή)</option>${tpl.map(x => `<option value="${x.id}">${esc(x.title)} · Κεφ. ${chNum(x.chapter)}</option>`).join('')}</select>
+        <button class="btn sm" id="sb-load">Φόρτωσε</button>
+        <span class="spacer"></span>
+        <button class="btn sm" id="sb-copy">Αντιγραφή</button>
+        <button class="btn sm" id="sb-dl">Κατέβασε .${SB.EXT[langOf(l)]}</button>
+      </div>
+      ${tpl.length ? '' : '<p class="muted" style="margin:0;font-size:0.85rem">Κάθε άσκηση που λύνεις γίνεται κι αυτή αφετηρία εδώ.</p>'}
+    </section>`;
+  }
+  function bindBench(l) {
+    const tr = curTrack();
+    const SB = window.IoTSandbox;
+    const reopen = () => { if (S.runState === 'running') doStop(); openSandbox(); };
+    app().querySelectorAll('[data-hw]').forEach(b => {
+      b.onclick = () => {
+        const cur = new Set(l.hardware);
+        if (cur.has(b.dataset.hw)) cur.delete(b.dataset.hw); else cur.add(b.dataset.hw);
+        P.sandbox.hw[tr.id] = [...cur];
+        save();
+        sfx('click');
+        reopen();
+      };
+    });
+    $('#sb-load').onclick = () => {
+      const id = $('#sb-tpl').value;
+      const src = id ? byId[id] : null;
+      const prev = $('#code').value;
+      P.sandbox.code[tr.id] = src ? src.solution : SB.BLANK[tr.id];
+      if (src) P.sandbox.hw[tr.id] = hardwareOf(src).filter(h => (SB.ALLOWED[tr.board] || []).includes(h)).concat(hardwareOf(src).includes('led') || !hardwareOf(src).some(h => h === 'ultrasonic' || h === 'traffic') ? ['led'] : []);
+      save();
+      reopen();
+      gardi(src ? `Φόρτωσα τη λύση σου από «${src.title}». Άλλαξέ τη όπως θέλεις!` : 'Ξεκινάμε από ένα απλό αναβόσβημα.', 'happy', [{ label: 'Αναίρεση', run: () => { P.sandbox.code[tr.id] = prev; save(); openSandbox(); } }], { force: true });
+    };
+    $('#sb-copy').onclick = () => {
+      const t = $('#code').value;
+      try { navigator.clipboard.writeText(t).then(() => announce('Ο κώδικας αντιγράφηκε.')); } catch (e) { announce('Δεν έγινε αντιγραφή.'); }
+    };
+    $('#sb-dl').onclick = () => {
+      const ext = SB.EXT[langOf(l)];
+      const blob = new Blob([$('#code').value], { type: 'text/plain;charset=utf-8' });
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = ext === 'rs' ? 'main.rs' : `iot-guardian-${tr.id}.${ext}`;
+      document.body.appendChild(a);
+      a.click();
+      setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 500);
+    };
+  }
+
   // ------------------------------------------------------------ «Το σπίτι έχει πρόβλημα»
   const fmtSecs = n => `${Math.floor(n / 60)}:${String(n % 60).padStart(2, '0')}`;
   function openChallenge(tr, key) {
@@ -1375,7 +1489,8 @@
   function gardiLesson(l) {
     S.gardiStep = 0;
     clearTimeout(S.gardiIdle);
-    if (l.challenge) gardi('Χωρίς βοήθειες αυτή τη φορά! Τρέξε τον κώδικα, κοίτα τη σκηνή και τον λογικό αναλυτή, και σκέψου τι δεν ταιριάζει με το σύμπτωμα.', 'think');
+    if (l.sandbox) gardi('Καλώς ήρθες στο ελεύθερο εργαστήριο! Εδώ δεν υπάρχουν έλεγχοι: διάλεξε εξαρτήματα στον πάγκο και γράψε ό,τι θέλεις. Πάτα με για ιδέες.', 'happy');
+    else if (l.challenge) gardi('Χωρίς βοήθειες αυτή τη φορά! Τρέξε τον κώδικα, κοίτα τη σκηνή και τον λογικό αναλυτή, και σκέψου τι δεν ταιριάζει με το σύμπτωμα.', 'think');
     else if (S.wiring) gardi('Πρώτα σύνδεσε τα καλώδια! Διάλεξε καλώδιο και πάτα το σωστό pin της πλακέτας.', 'think');
     else if (!P.completed[l.id] && l.objectives && l.objectives.length) gardi(`Σε αυτή την άσκηση: ${l.objectives[0].replace(/^Να /, 'θα ').replace(/\.$/, '')}. Πάτα με για το πρώτο βήμα.`, 'happy');
     // αν περάσουν 90 δευτερόλεπτα χωρίς πρόοδο, προσφέρεται βοήθεια
@@ -1389,12 +1504,19 @@
     'Οι υπογραμμισμένες λέξεις στο μάθημα εξηγούνται αν τις πατήσεις.',
     'Στις Ρυθμίσεις υπάρχουν γραμματοσειρές για δυσλεξία και χάρακας ανάγνωσης.',
     'Το κουμπί «Άκουσε» διαβάζει φωναχτά το μάθημα, την αποστολή και τα σφάλματα.',
-    'Στον «Λογικό αναλυτή» βλέπεις πότε κάθε pin γίνεται HIGH και LOW.'
+    'Στον «Λογικό αναλυτή» βλέπεις πότε κάθε pin γίνεται HIGH και LOW.',
+    'Στο «Ελεύθερο εργαστήριο» (το κλειδί στα αριστερά) φτιάχνεις ό,τι θέλεις, χωρίς ασκήσεις.'
   ];
   function gardiTip() {
     const l = S.task;
     if (!l) { S.gardiHome = ((S.gardiHome || 0) + 1) % HOME_TIPS.length; gardi(HOME_TIPS[S.gardiHome], 'happy', null, { force: true }); return; }
     if (S.wiring) { const t = S.wiring.tasks[S.wiring.sel]; gardi(t ? `Τώρα: ${t.label}. Κοίτα τη σταθερά στην αρχή του κώδικα για τον αριθμό του pin.` : 'Όλα συνδέθηκαν!', 'think', null, { force: true }); return; }
+    if (l.sandbox) {
+      const ideas = (l.steps || []).length ? l.steps : ['Γράψε κάτι δικό σου και πάτα «Εκτέλεση»!'];
+      S.gardiStep = (S.gardiStep || 0) % ideas.length;
+      gardi(`Ιδέα: ${ideas[S.gardiStep++]}`, 'happy', [{ label: 'Άλλη ιδέα', run: gardiTip }], { force: true });
+      return;
+    }
     if (l.challenge) {
       const tips = ['Δεν λέω τη λύση, αλλά: τρέξε τον κώδικα και σύγκρινε τι γίνεται με αυτό που περιγράφει το σύμπτωμα.', 'Ο «Λογικός αναλυτής» δείχνει ποια γραμμή άλλαξε κάθε pin. Ψάξε πού διαφέρει από αυτό που περιμένεις.', 'Πάτα σε κάθε γραμμή: το «Τι κάνει αυτή η γραμμή;» σε βοηθά να τη διαβάσεις προσεκτικά.', 'Οι στόχοι της πρόκλησης δείχνουν τι πρέπει να ξαναδουλέψει. Τρέξε «Έλεγχος λύσης» για να δεις ποιος αποτυγχάνει.'];
       S.gardiStep = (S.gardiStep || 0) % tips.length;
@@ -1563,6 +1685,13 @@
     S.scope.rec = rec;
     bindScope();
     drawScopeSoon();
+    // ζωντανή ανανέωση ανεξάρτητα από το πώς τρέχει η κάθε γλώσσα
+    clearInterval(S.scopeT);
+    const mine = S.scope;
+    S.scopeT = setInterval(() => {
+      if (S.scope !== mine || !$('#scope')) { clearInterval(S.scopeT); return; }
+      if (S.dockTab === 'scope' && S.runState === 'running') drawScope();
+    }, 120);
   }
   function scopeInput(key) {
     if (!S.scope || !S.scope.rec) return;
@@ -2239,6 +2368,7 @@
     refreshMission(800);
     const ta = $('#code');
     P.drafts[S.task.id] = ta.value;
+    if (S.task.sandbox) P.sandbox.code[P.track] = ta.value;
     clearTimeout(S.saveTimer);
     S.saveTimer = setTimeout(save, 400);
     if (modeOf(S.task) === 'config') {
