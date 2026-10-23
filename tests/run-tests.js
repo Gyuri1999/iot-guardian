@@ -23,7 +23,8 @@ for (const f of extra) {
 vm.runInContext(fs.readFileSync(path.join(ROOT, 'js', 'storage.js'), 'utf8'), ctx, { filename: 'storage.js' });
 vm.runInContext(fs.readFileSync(path.join(ROOT, 'js', 'learn.js'), 'utf8'), ctx, { filename: 'learn.js' });
 vm.runInContext(fs.readFileSync(path.join(ROOT, 'js', 'wiring.js'), 'utf8'), ctx, { filename: 'wiring.js' });
-const { IoTInterp, IoTDevice, IoTValidator, IoTLessons, IoTStorage, IoTLearn, IoTWiring } = ctx;
+vm.runInContext(fs.readFileSync(path.join(ROOT, 'js', 'challenge.js'), 'utf8'), ctx, { filename: 'challenge.js' });
+const { IoTInterp, IoTDevice, IoTValidator, IoTLessons, IoTStorage, IoTLearn, IoTWiring, IoTChallenge } = ctx;
 
 let passed = 0;
 let failed = 0;
@@ -649,6 +650,30 @@ test('συνδεσμολογία Pi: GPIO17 και ονόματα pins', () => {
   assert(/ID_SD/.test(IoTWiring.judge(t, 'ID_SD', 'pi').msg));
   eq(IoTWiring.shown('3V3b'), '3V3');
   eq(IoTWiring.kindOf('GND4'), 'gnd');
+});
+
+// ------------------------------------------------------------ «Το σπίτι έχει πρόβλημα» (js/challenge.js)
+test('πρόκληση: λάθη μόνο ανά γραμμή, χωρίς σχόλια', () => {
+  const c = IoTChallenge.candidates('// HIGH\nvoid setup() {\n  pinMode(LED_PIN, OUTPUT);\n  digitalWrite(LED_PIN, HIGH); // HIGH\n}');
+  assert(c.some(x => x.kind === 'level' && x.code.includes('digitalWrite(LED_PIN, LOW); // HIGH')));
+  assert(c.some(x => x.kind === 'mode'));
+  assert(c.some(x => x.kind === 'drop' && !x.code.includes('pinMode')));
+  assert(!c.some(x => x.line === 1), 'το σχόλιο δεν αλλάζει');
+});
+test('πρόκληση: κάθε κεφάλαιο με λύση δίνει λάθος που πιάνεται από τους ελέγχους', () => {
+  const byCh = {};
+  for (const l of IoTLessons.lessons) (byCh[l.chapter] = byCh[l.chapter] || []).push(l);
+  let n = 0;
+  for (const [ch, ls] of Object.entries(byCh)) {
+    const pool = ls.filter(l => l.solution && l.validationTests && l.mode !== 'analysis').reverse();
+    if (!pool.length) continue;
+    const c = IoTChallenge.make(pool, IoTValidator.runTests, 'test' + ch);
+    assert(c, 'καμία πρόκληση για το κεφάλαιο ' + ch);
+    const fixed = IoTValidator.runTests(c.base.solution, c.base.validationTests, c.base);
+    assert(fixed.every(r => r.pass), 'η λύση πρέπει να περνά: ' + c.base.id);
+    n++;
+  }
+  assert(n > 20);
 });
 
 console.log(`\n${passed} πέρασαν, ${failed} απέτυχαν\n`);

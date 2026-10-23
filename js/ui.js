@@ -14,6 +14,7 @@
   const { CodeError, displayValue, BOARD_CONSTS } = window.IoTInterp;
   const IOT_DISPLAY = displayValue;
   const { lessons, CHAPTERS, SKILLS, KIND_LABELS, GLOSSARY } = window.IoTLessons;
+  KIND_LABELS.challenge = 'Πρόκληση';
   const NET = window.IoTNet;
   const VAL = window.IoTValidator;
   const PY = window.IoTPy;
@@ -562,6 +563,8 @@
       r.state = r.done === r.total ? 'done' : here ? 'current' : anyOpen ? 'open' : 'locked';
       r.label = `${r.done} από ${r.total} κεφάλαια${r.state === 'done' ? ', τα φώτα άναψαν' : r.state === 'current' ? ', εδώ είναι η επόμενη άσκηση' : r.state === 'locked' ? ', κλειδωμένο' : ''}`;
       r.key = key;
+      r.alarm = r.state === 'done' && !(P.challenges && P.challenges[key]);
+      r.fixed = !!(P.challenges && P.challenges[key]);
     }
     return rooms;
   }
@@ -620,17 +623,20 @@
       return `<li><span class="hm-n">${String(chNum(ch.n)).padStart(2, '0')}</span><span class="hm-ct">${esc(ch.title)}<small>${ok ? `${d}/${ls.length} ασκήσεις` : 'κλειδωμένο'}</small></span>${ok ? `<button class="btn sm quiet" data-notes="${ch.n}" title="Σημειώσεις κεφαλαίου" aria-label="Σημειώσεις κεφαλαίου ${chNum(ch.n)}">${icon('book')}</button><button class="btn sm${d < ls.length ? ' primary' : ''}" data-task="${first.id}">${d === ls.length ? 'Ξανά' : d ? 'Συνέχεια' : 'Ξεκίνα'}</button>` : `<span class="hm-locked">${icon('lock')}</span>`}</li>`;
     }).join('');
     panel.innerHTML = `<div class="hm-ph"><h3>${esc(name)}</h3>${sayBtn('#hm-panel', 'το δωμάτιο')}<button class="btn quiet sm" id="hm-close" aria-label="Κλείσιμο">✕</button></div>
-      ${th ? `<p class="hm-story">${esc(th.story)}</p>` : ''}<ul class="hm-chaps">${rows}</ul>`;
+      ${th ? `<p class="hm-story">${esc(th.story)}</p>` : ''}<ul class="hm-chaps">${rows}</ul>
+      ${r.state === 'done' ? `<div class="hm-chal${r.fixed ? ' fixed' : ''}"><b>${r.fixed ? '🔧 Πρόκληση λύθηκε' : '🚨 Το σπίτι έχει πρόβλημα!'}</b><span>${r.fixed ? `Καλύτερος χρόνος ${fmtSecs(P.challenges[key].best)} · ${P.challenges[key].n} ${P.challenges[key].n === 1 ? 'φορά' : 'φορές'}` : 'Κάτι χάλασε σε αυτό το δωμάτιο. Βρες το λάθος χωρίς βοήθειες.'}</span><button class="btn sm${r.fixed ? '' : ' primary'}" id="hm-chal">${r.fixed ? 'Νέο πρόβλημα' : 'Ξεκίνα την πρόκληση'}</button></div>` : `<p class="hm-chal-lock">${icon('lock')} Τελείωσε όλα τα κεφάλαια του δωματίου για να ξεκλειδώσει η πρόκληση «Το σπίτι έχει πρόβλημα».</p>`}`;
     panel.hidden = false;
     panel.dataset.room = key;
     $('#house').querySelectorAll('.hm-room').forEach(g => g.classList.toggle('sel', g.dataset.room === key));
     panel.querySelectorAll('[data-task]').forEach(b => { b.onclick = () => openTask(b.dataset.task); });
+    if ($('#hm-chal')) $('#hm-chal').onclick = () => openChallenge(tr, key);
     $('#hm-close').onclick = () => { panel.hidden = true; $('#house').querySelectorAll('.hm-room.sel').forEach(g => g.classList.remove('sel')); const g = $(`#house .hm-room[data-room="${key}"]`); if (g) g.focus(); };
     const btn = panel.querySelector('.btn.primary, [data-task]');
     if (btn) btn.focus();
   }
 
   function renderHome() {
+    clearInterval(S.chalT);
     if (window.IoTSpeak) window.IoTSpeak.stop();
     stopMachine();
     S.task = null;
@@ -1029,7 +1035,7 @@
       <div class="info-tabs" role="tablist" aria-label="Πληροφορίες μαθήματος">${tabs.map(([k, n]) => `<button role="tab" class="itab" id="itab-${k}" data-itab="${k}" aria-controls="info-${k}">${n}</button>`).join('')}</div>
       <div class="info-panel guide" id="info-lesson" role="tabpanel" aria-labelledby="itab-lesson">
         <div class="say-row">${sayBtn('#info-lesson', 'το μάθημα')}</div>
-        <span class="kind-tag">${esc(KIND_LABELS[l.kind])}${mode === 'config' ? (l.system ? ' · ρυθμίσεις του Pi' : ' · ρυθμίσεις broker') : mode === 'analysis' ? ' · ανάλυση καταγραφής' : ''} · άσκηση ${idx} από ${ls.length}</span>
+        <span class="kind-tag">${esc(KIND_LABELS[l.kind])}${mode === 'config' ? (l.system ? ' · ρυθμίσεις του Pi' : ' · ρυθμίσεις broker') : mode === 'analysis' ? ' · ανάλυση καταγραφής' : ''} ${l.challenge ? ' · χωρίς βοήθειες' : ` · άσκηση ${idx} από ${ls.length}`}</span>
         <h2>${esc(l.title)}</h2>
         <ul class="objectives">${l.objectives.map(o => `<li>${esc(o)}</li>`).join('')}</ul>
         <div class="theory">${l.theory}</div>
@@ -1166,6 +1172,11 @@
     renderHints();
     if (window.IoTLearn) window.IoTLearn.linkTerms($('#info-lesson .theory'), l.glossary, GLOSSARY);
     bindExplain(l);
+    if (l.challenge) {
+      ['b-help', 'itab-help', 'itab-quiz'].forEach(id => { const x = $('#' + id); if (x) x.hidden = true; });
+      clearInterval(S.chalT);
+      S.chalT = setInterval(() => { const t = $('#ch-timer'); if (!t || !S.chal || S.task !== l) { clearInterval(S.chalT); return; } t.textContent = fmtSecs(Math.round((Date.now() - S.chal.t0) / 1000)); }, 1000);
+    }
     gardiLesson(l);
     updateAll();
     window.scrollTo(0, 0);
@@ -1313,6 +1324,33 @@
     }).join('');
   }
 
+  // ------------------------------------------------------------ «Το σπίτι έχει πρόβλημα»
+  const fmtSecs = n => `${Math.floor(n / 60)}:${String(n % 60).padStart(2, '0')}`;
+  function openChallenge(tr, key) {
+    const C = window.IoTChallenge;
+    const r = houseRooms(tr)[key];
+    if (!C || !r) return;
+    const pool = [];
+    for (const ch of r.chapters) for (const l of chapterLessons(ch.n)) if (P.completed[l.id] && modeOf(l) !== 'analysis') pool.push(l);
+    const c = C.make(pool.reverse(), VAL.runTests, key + ((P.challenges[key] || {}).n || 0) + (S.chalSalt || ''));
+    if (!c) { gardi('Δεν βρήκα πρόβλημα για αυτό το δωμάτιο. Όλα δουλεύουν τέλεια!', 'happy'); return; }
+    const name = window.IoTHouse.ROOMS[key].name;
+    const story = C.story(name, c.kind);
+    const L = Object.assign({}, c.base, {
+      id: 'chal-' + key, challenge: key, kind: 'challenge', title: `Το σπίτι έχει πρόβλημα · ${name}`,
+      initialCode: c.code, hints: [], quiz: null, prerequisites: [], glossary: [], missionStory: story,
+      objectives: ['Να βρω και να διορθώσω ένα λάθος σε κώδικα που ήδη ξέρω, χωρίς βοήθειες.'],
+      theory: `<p>${esc(story)}</p><p>Ο κώδικας είναι από την άσκηση «${esc(c.base.title)}». Κάποιος άλλαξε <b>ένα</b> σημείο του. Τρέξε τον, σύγκρινε με το σύμπτωμα και διόρθωσε μόνο αυτό που χρειάζεται.</p><p>Εργαλεία που σε βοηθούν: η σκηνή, ο «Λογικός αναλυτής», το «Τι κάνει αυτή η γραμμή;» και ο «Έλεγχος λύσης».</p>`,
+      steps: ['Τρέξε τον κώδικα και παρατήρησε τι κάνει.', 'Σύγκρινε με το σύμπτωμα της πρόκλησης.', 'Βρες τη γραμμή που φταίει και διόρθωσέ τη.', 'Πάτα «Έλεγχος λύσης».']
+    });
+    byId[L.id] = L;
+    delete P.drafts[L.id];
+    S.chal = { key, t0: Date.now(), kind: c.kind };
+    S.chalSalt = String(Date.now() % 997);
+    sfx('err');
+    openTask(L.id);
+  }
+
   // ------------------------------------------------------------ Γκάρντι, ο βοηθός
   function gardi(text, mood, actions, o) {
     if (!window.IoTGardi || P.settings.gardi === false) return;
@@ -1337,7 +1375,8 @@
   function gardiLesson(l) {
     S.gardiStep = 0;
     clearTimeout(S.gardiIdle);
-    if (S.wiring) gardi('Πρώτα σύνδεσε τα καλώδια! Διάλεξε καλώδιο και πάτα το σωστό pin της πλακέτας.', 'think');
+    if (l.challenge) gardi('Χωρίς βοήθειες αυτή τη φορά! Τρέξε τον κώδικα, κοίτα τη σκηνή και τον λογικό αναλυτή, και σκέψου τι δεν ταιριάζει με το σύμπτωμα.', 'think');
+    else if (S.wiring) gardi('Πρώτα σύνδεσε τα καλώδια! Διάλεξε καλώδιο και πάτα το σωστό pin της πλακέτας.', 'think');
     else if (!P.completed[l.id] && l.objectives && l.objectives.length) gardi(`Σε αυτή την άσκηση: ${l.objectives[0].replace(/^Να /, 'θα ').replace(/\.$/, '')}. Πάτα με για το πρώτο βήμα.`, 'happy');
     // αν περάσουν 90 δευτερόλεπτα χωρίς πρόοδο, προσφέρεται βοήθεια
     const id = l.id;
@@ -1356,6 +1395,12 @@
     const l = S.task;
     if (!l) { S.gardiHome = ((S.gardiHome || 0) + 1) % HOME_TIPS.length; gardi(HOME_TIPS[S.gardiHome], 'happy', null, { force: true }); return; }
     if (S.wiring) { const t = S.wiring.tasks[S.wiring.sel]; gardi(t ? `Τώρα: ${t.label}. Κοίτα τη σταθερά στην αρχή του κώδικα για τον αριθμό του pin.` : 'Όλα συνδέθηκαν!', 'think', null, { force: true }); return; }
+    if (l.challenge) {
+      const tips = ['Δεν λέω τη λύση, αλλά: τρέξε τον κώδικα και σύγκρινε τι γίνεται με αυτό που περιγράφει το σύμπτωμα.', 'Ο «Λογικός αναλυτής» δείχνει ποια γραμμή άλλαξε κάθε pin. Ψάξε πού διαφέρει από αυτό που περιμένεις.', 'Πάτα σε κάθε γραμμή: το «Τι κάνει αυτή η γραμμή;» σε βοηθά να τη διαβάσεις προσεκτικά.', 'Οι στόχοι της πρόκλησης δείχνουν τι πρέπει να ξαναδουλέψει. Τρέξε «Έλεγχος λύσης» για να δεις ποιος αποτυγχάνει.'];
+      S.gardiStep = (S.gardiStep || 0) % tips.length;
+      gardi(tips[S.gardiStep++], 'think', null, { force: true });
+      return;
+    }
     const steps = l.steps || [];
     if (S.gardiStep < steps.length) {
       const i = S.gardiStep++;
@@ -2068,8 +2113,8 @@
     if (modeOf(l) !== 'code' || !l.validationTests || !l.validationTests.length) return '';
     const th = window.IoTThemes ? window.IoTThemes.themeOf(l) : null;
     return `<section class="mission" id="mission" aria-label="Αποστολή">
-      <div class="ms-head">${icon('flag')}<b>Αποστολή</b>${sayBtn('#mission', 'την αποστολή')}<span class="ms-count" id="ms-count" aria-live="polite"></span></div>
-      ${th ? `<p class="ms-story">${esc(th.story)}</p>` : ''}
+      <div class="ms-head">${icon('flag')}<b>${l.challenge ? 'Πρόκληση · χωρίς βοήθειες' : 'Αποστολή'}</b>${l.challenge ? '<span class="ch-timer" id="ch-timer" aria-label="Χρόνος">0:00</span>' : ''}${sayBtn('#mission', 'την αποστολή')}<span class="ms-count" id="ms-count" aria-live="polite"></span></div>
+      ${l.missionStory || th ? `<p class="ms-story">${esc(l.missionStory || th.story)}</p>` : ''}
       <ul class="ms-goals">${l.validationTests.map((t, i) => `<li data-i="${i}"><span class="ms-box" aria-hidden="true"></span><span>${esc(t.name)}</span><span class="sr-only ms-sr"> · δεν έχει γίνει ακόμα</span></li>`).join('')}</ul>
     </section>`;
   }
@@ -2095,7 +2140,9 @@
     if (ticked) {
       sfx('tick');
       const left = el.querySelectorAll('li').length - el.querySelectorAll('li.done').length;
-      gardi(left ? `Μπράβο! Ένας στόχος έγινε. Μένουν ${left}.` : 'Όλοι οι στόχοι της αποστολής έγιναν! Πάτα «Έλεγχος λύσης» για να το επιβεβαιώσεις.', left ? 'happy' : 'party');
+      // αν ο έλεγχος πέρασε ήδη, δεν ζητάμε ξανά «Έλεγχος λύσης»
+      const finished = S.task && (P.completed[S.task.id] || (S.task.challenge && S.chal && S.chal.done));
+      if (left || !finished) gardi(left ? `Μπράβο! Ένας στόχος έγινε. Μένουν ${left}.` : 'Όλοι οι στόχοι της αποστολής έγιναν! Πάτα «Έλεγχος λύσης» για να το επιβεβαιώσεις.', left ? 'happy' : 'party');
     }
     S.msPrev = true;
     const total = el.querySelectorAll('li').length;
@@ -2516,6 +2563,20 @@
 
   function maybeComplete() {
     const l = S.task;
+    if (l.challenge) {
+      if (!(S.results && S.results.allPass) || !S.chal || S.chal.done) return;
+      S.chal.done = true;
+      const secs = Math.round((Date.now() - S.chal.t0) / 1000);
+      const old = P.challenges[l.challenge] || { n: 0, best: 0 };
+      P.challenges[l.challenge] = { n: old.n + 1, best: old.best ? Math.min(old.best, secs) : secs };
+      S.chal.secs = secs;
+      clearInterval(S.chalT);
+      if (window.IoTLearn) P.daily = window.IoTLearn.bump(P.daily, window.IoTLearn.dayStr(new Date()), 1);
+      save();
+      celebrate();
+      setTimeout(() => gardi(`Το πρόβλημα λύθηκε σε ${fmtSecs(secs)}! Είσαι πραγματικός τεχνικός. 🔧`, 'party', null, { force: true }), 400);
+      return;
+    }
     const quizOk = !l.quiz || P.quizzes[l.id];
     if (S.results && S.results.allPass && quizOk && !P.completed[l.id]) {
       P.completed[l.id] = true;
@@ -2547,6 +2608,16 @@
       <span><span class="sr-only">${t.pass ? 'Πέρασε:' : 'Δεν πέρασε:'}</span>${esc(t.name)}${t.message ? `<small>${esc(t.message)}</small>` : ''}</span></li>`).join('')}</ul>`;
     if (!r.allPass) {
       slot.innerHTML = `<div class="card" tabindex="-1" style="margin-top:0.75rem"><h3>Αποτέλεσμα ελέγχου</h3>${list}<p class="info-line">${esc(l.remediation)}</p></div>`;
+      return;
+    }
+    if (l.challenge) {
+      const c = P.challenges[l.challenge] || {};
+      const secs = S.chal && S.chal.secs;
+      slot.innerHTML = `<div class="card success" tabindex="-1" style="margin-top:0.75rem"><h3>🔧 Το πρόβλημα λύθηκε!</h3>${list}
+        <p>${secs ? `Χρόνος: <b>${fmtSecs(secs)}</b>. ` : ''}${c.best ? `Καλύτερος χρόνος σε αυτό το δωμάτιο: <b>${fmtSecs(c.best)}</b>. ` : ''}Το δωμάτιο «${esc(window.IoTHouse.ROOMS[l.challenge].name)}» πήρε το κλειδί του τεχνικού.</p>
+        <div class="btn-row"><button class="btn primary" id="go-house">Πίσω στο σπίτι</button><button class="btn" id="chal-again">Νέο πρόβλημα εδώ</button></div></div>`;
+      $('#go-house').onclick = () => { S.homeView = 'house'; renderHome(); };
+      $('#chal-again').onclick = () => openChallenge(curTrack(), l.challenge);
       return;
     }
     if (l.quiz && !P.quizzes[l.id]) {

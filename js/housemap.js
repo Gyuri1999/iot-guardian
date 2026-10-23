@@ -93,7 +93,8 @@
         const w = 22 + text.length * 6.2;
         labels += `<g class="hm-label st-${st}" data-room="${key}" transform="translate(${top[0].toFixed(1)},${top[1].toFixed(1)})">`
           + `<rect x="${(-w / 2).toFixed(1)}" y="-10" width="${w.toFixed(1)}" height="20" rx="10" class="hm-pill"/>`
-          + (st === 'locked' ? lockIcon(-w / 2 + 11, -3.5) : st === 'done' ? `<text x="${(-w / 2 + 11).toFixed(1)}" y="4.5" text-anchor="middle" class="hm-star">★</text>` : `<circle cx="${(-w / 2 + 11).toFixed(1)}" cy="0" r="3.6" class="hm-dot"/>`)
+          + (st === 'locked' ? lockIcon(-w / 2 + 11, -3.5) : st === 'done' ? `<text x="${(-w / 2 + 11).toFixed(1)}" y="4.5" text-anchor="middle" class="hm-star">${info.fixed ? '🔧' : '★'}</text>` : `<circle cx="${(-w / 2 + 11).toFixed(1)}" cy="0" r="3.6" class="hm-dot"/>`)
+          + (info.alarm ? `<g class="hm-alarm" transform="translate(${(w / 2 - 2).toFixed(1)},-11)"><circle r="8"/><text y="3.6" text-anchor="middle">!</text></g>` : '')
           + `<text x="${(9).toFixed(1)}" y="4.2" text-anchor="middle" class="hm-t">${text}</text>`
           + (st === 'current' ? `<g class="hm-pin" transform="translate(0,-16)"><path d="M0,0 C-7,-8 -7,-17 0,-17 C7,-17 7,-8 0,0 Z"/><circle cx="0" cy="-11" r="2.6"/></g>` : '')
           + '</g>';

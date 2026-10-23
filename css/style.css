@@ -793,3 +793,17 @@ code .gl-term { font-family: var(--font-code); }
 @media (prefers-reduced-motion: reduce) { .gd-bot, .gd-e-normal rect, .gd-ant-led, .gd-mouth { animation: none !important; } }
 @media (max-width: 720px) { .gardi { right: 0.5rem; bottom: 0.5rem; } .gd-btn { width: 3.4rem; height: 4rem; } .gd-bubble { margin-bottom: 1.8rem; font-size: 0.9rem; } }
 @media print { .gardi { display: none !important; } }
+
+/* ---------- «Το σπίτι έχει πρόβλημα» */
+.hm-alarm circle { fill: #d9443a; stroke: #fff; stroke-width: 1.5; }
+.hm-alarm text { fill: #fff; font: 900 11px var(--font-label); }
+.hm-alarm { animation: hm-alarm 1s ease-in-out infinite; }
+@keyframes hm-alarm { 50% { opacity: 0.35; } }
+@media (prefers-reduced-motion: reduce) { .hm-alarm { animation: none; } }
+.hm-chal { display: grid; gap: 0.25rem; margin-top: 0.6rem; padding: 0.55rem 0.65rem; border: 1.5px solid #d9443a; border-radius: 10px; background: color-mix(in srgb, #d9443a 8%, var(--surface)); }
+.hm-chal.fixed { border-color: var(--ok); background: color-mix(in srgb, var(--ok) 8%, var(--surface)); }
+.hm-chal span { font-size: 0.86rem; color: var(--muted); }
+.hm-chal .btn { justify-self: start; }
+.hm-chal-lock { display: flex; gap: 0.4rem; align-items: center; margin: 0.6rem 0 0; color: var(--muted); font-size: 0.85rem; }
+.hm-chal-lock .ic { width: 1rem; height: 1rem; flex: none; }
+.ch-timer { margin-left: 0.5rem; padding: 0.05rem 0.5rem; border-radius: 999px; background: var(--ink); color: var(--surface); font: 700 0.8rem var(--font-code); }
