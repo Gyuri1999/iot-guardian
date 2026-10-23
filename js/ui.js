@@ -687,6 +687,7 @@
             <div class="home-tabs" role="tablist" aria-label="Προβολή">
               <button class="home-tab" role="tab" id="tab-house" aria-selected="${S.homeView !== 'board'}">${icon('home')} Το σπίτι</button>
               <button class="home-tab" role="tab" id="tab-board" aria-selected="${S.homeView === 'board'}">${icon('chip')} Η πλακέτα</button>
+              <button class="btn primary sm home-go" id="continue-top" title="${nxt ? esc(nxt.title) : ''}">${icon('play')} <span>${nxt ? `${done ? 'Συνέχεια' : 'Ξεκίνα'}: ${esc(nxt.title)}` : 'Επανάληψη από την αρχή'}</span></button>
             </div>
             <div class="house-wrap" id="house"${S.homeView === 'board' ? ' hidden' : ''}>${houseHTML(tr)}<div class="hm-panel" id="hm-panel" hidden></div></div>
             <div class="board-switch" id="board-switch" role="group" aria-label="Ποια πλακέτα"${S.homeView === 'board' ? '' : ' hidden'}>
@@ -724,8 +725,10 @@
     if ($('#start-review')) $('#start-review').onclick = () => openReview(tr);
     if ($('#open-sandbox')) $('#open-sandbox').onclick = openSandbox;
     gardiHome(tr, nxt);
+    if (!P.tours.home) setTimeout(() => { if (!S.task) startTour('home'); }, 700);
     bindRail();
     $('#continue').onclick = () => openTask((nxt || mine[0]).id);
+    $('#continue-top').onclick = () => openTask((nxt || mine[0]).id);
     $('#change-track').onclick = renderPicker;
     app().querySelectorAll('[data-story]').forEach(b => { b.onclick = e => { e.preventDefault(); e.stopPropagation(); showStory(Number(b.dataset.story)); }; });
     const tz = $('#open-collection');
@@ -1194,6 +1197,7 @@
       S.chalT = setInterval(() => { const t = $('#ch-timer'); if (!t || !S.chal || S.task !== l) { clearInterval(S.chalT); return; } t.textContent = fmtSecs(Math.round((Date.now() - S.chal.t0) / 1000)); }, 1000);
     }
     gardiLesson(l);
+    if (!P.tours.lab && !l.sandbox && !l.challenge) setTimeout(() => { if (S.task === l) startTour('lab'); }, 900);
     updateAll();
     window.scrollTo(0, 0);
   }
@@ -1521,9 +1525,45 @@
     openTask(L.id);
   }
 
+  // ------------------------------------------------------------ Ξενάγηση την πρώτη φορά
+  const TOURS = {
+    home: [
+      { sel: '#house .house-map', title: 'Το σπίτι σου', text: 'Κάθε δωμάτιο έχει κεφάλαια με ασκήσεις. Όταν τα τελειώνεις, ανάβουν τα φώτα του. Πάτα ένα δωμάτιο για να δεις τι έχει μέσα.' },
+      { sel: '#continue-top', title: 'Από εδώ ξεκινάς', text: 'Αυτό το κουμπί σε πάει πάντα στην επόμενη άσκηση.' },
+      { sel: '#tab-board', title: 'Η πλακέτα', text: 'Εδώ βλέπεις το ESP32 ή το Raspberry Pi από κοντά. Πατάς κάθε κομμάτι και μαθαίνεις τι είναι.' },
+      { sel: '.review-card', title: 'Λίγο κάθε μέρα', text: 'Οι ερωτήσεις από όσα έλυσες ξανάρχονται εδώ, για να μην τα ξεχνάς. Τρία βήματα τη μέρα κρατούν το σερί σου.' },
+      { sel: '#nav-sandbox', title: 'Ελεύθερο εργαστήριο', text: 'Ο δικός σου πάγκος: φτιάχνεις ό,τι θέλεις, χωρίς ασκήσεις.' },
+      { sel: '[data-open="settings"]', title: 'Ρυθμίσεις', text: 'Μέγεθος και γραμματοσειρά γραμμάτων, χάρακας ανάγνωσης, φωνή που διαβάζει φωναχτά.' },
+      { sel: '.gd-btn', title: 'Εγώ, ο Γκάρντι', text: 'Αν κολλήσεις, πάτα με! Θα σου πω το επόμενο βήμα, χωρίς να σου χαλάσω τη λύση.' }
+    ],
+    lab: [
+      { sel: '#mission', title: 'Η αποστολή', text: 'Η μικρή ιστορία και οι στόχοι της άσκησης. Κάθε στόχος τσεκάρεται μόνος του, μόλις τον πετύχεις.' },
+      { sel: '#wiring', title: 'Πρώτα τα καλώδια', text: 'Διάλεξε καλώδιο και πάτα το pin της πλακέτας όπου πρέπει να μπει.' },
+      { sel: '#scene', title: 'Η σκηνή', text: 'Εδώ βλέπεις το κύκλωμα να δουλεύει. Πατάς τα εξαρτήματα, π.χ. το κουμπί, και τα βλέπεις από κοντά.' },
+      { sel: '.code-mode', title: 'Κείμενο ή μπλοκ', text: 'Γράφεις κώδικα με το πληκτρολόγιο ή τον φτιάχνεις με τουβλάκια. Με τα μπλοκ βλέπεις από κάτω τον ίδιο κώδικα σε κείμενο.' },
+      { sel: '#b-run', title: 'Εκτέλεση', text: 'Τρέχει τον κώδικά σου βήμα-βήμα. Η γραμμή που εκτελείται φωτίζεται.' },
+      { sel: '#b-check', title: 'Έλεγχος λύσης', text: 'Όταν νομίζεις ότι τελείωσες, πάτα εδώ. Θα δεις ποιοι έλεγχοι πέρασαν και τι λείπει.' },
+      { sel: '#info-lesson .say', title: 'Το μάθημα', text: 'Εδώ είναι η θεωρία. Το «Άκουσε» τη διαβάζει φωναχτά και οι υπογραμμισμένες λέξεις εξηγούνται αν τις πατήσεις.' },
+      { sel: '.dock-tabs', title: 'Τι κάνει η πλακέτα', text: 'Serial Monitor, μεταβλητές και λογικός αναλυτής: δες τι συμβαίνει μέσα στο πρόγραμμα.' }
+    ]
+  };
+  function startTour(which) {
+    if (!window.IoTTour || window.IoTTour.active()) return;
+    if (window.IoTGardi) window.IoTGardi.hide();
+    window.IoTTour.start(TOURS[which], {
+      say: window.IoTSpeak && window.IoTSpeak.supported() ? t => window.IoTSpeak.say(t) : null,
+      onDone: finished => {
+        P.tours[which] = true;
+        save();
+        if (window.IoTSpeak) window.IoTSpeak.stop();
+        if (finished) gardi(which === 'home' ? 'Όλα έτοιμα! Πάτα «Ξεκίνα» για την πρώτη σου άσκηση.' : 'Καλή επιτυχία! Αν χρειαστείς κάτι, πάτα με.', 'happy');
+      }
+    });
+  }
+
   // ------------------------------------------------------------ Γκάρντι, ο βοηθός
   function gardi(text, mood, actions, o) {
-    if (!window.IoTGardi || P.settings.gardi === false) return;
+    if (!window.IoTGardi || P.settings.gardi === false || (window.IoTTour && window.IoTTour.active())) return;
     window.IoTGardi.say(text, mood, Object.assign({ actions: actions || [] }, o || {}));
   }
   function gardiHome(tr, nxt) {
@@ -3476,6 +3516,7 @@
         <div class="field"><label for="set-ruler">Χάρακας ανάγνωσης</label>
           <select id="set-ruler"><option value="off">Κλειστός</option><option value="line">Λωρίδα που ακολουθεί το ποντίκι</option><option value="focus">Λωρίδα και σκίαση στο υπόλοιπο κείμενο</option></select></div>
         <label class="check"><input type="checkbox" id="set-motion"> Μειωμένη κίνηση (χωρίς εφέ και κινούμενες μεταβάσεις)</label>
+        <div class="btn-row"><button class="btn sm" type="button" id="set-tour">Δες ξανά την ξενάγηση</button></div>
         <label class="check"><input type="checkbox" id="set-gardi"> Ο Γκάρντι, το ρομποτάκι-βοηθός στη γωνία</label>
         <label class="check"><input type="checkbox" id="set-gardi-voice"> Ο Γκάρντι μιλά και φωναχτά</label>
         <label class="check"><input type="checkbox" id="set-sound"> Ήχοι του παιχνιδιού (κλικ, κουδούνι, επιτυχία)</label>
@@ -3532,6 +3573,7 @@
     $('#set-spacing').onchange = e => { P.settings.lineSpacing = e.target.value; applySettings(); save(); };
     $('#set-motion').onchange = e => { P.settings.reducedMotion = e.target.checked; applySettings(); save(); };
     $('#set-sound').onchange = e => { P.settings.sound = e.target.checked; applySettings(); save(); sfx('tick'); };
+    $('#set-tour').onclick = () => { P.tours = {}; save(); $('#dlg-settings').close(); if (S.task) startTour('lab'); else renderHome(); };
     $('#set-gardi').onchange = e => { P.settings.gardi = e.target.checked; applySettings(); save(); if (e.target.checked) gardi('Γεια! Είμαι ξανά εδώ. Πάτα με όποτε θες μια συμβουλή.', 'happy'); };
     $('#set-gardi-voice').onchange = e => { P.settings.gardiVoice = e.target.checked; applySettings(); save(); };
     $('#set-ffont').onchange = e => { P.settings.font = e.target.value; applySettings(); save(); };

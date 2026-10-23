@@ -29,6 +29,7 @@
       challenges: {},
       sandbox: { hw: {}, code: {} },
       blocks: {},
+      tours: {},
       daily: null,
       settings: { theme: 'system', fontScale: 1, lineSpacing: 'normal', reducedMotion: false, sound: true, font: 'noto', letters: 'normal', readRate: 0.9, ruler: 'off', gardi: true, gardiVoice: false, codeView: 'text', readEnglish: true }
     };
@@ -58,6 +59,7 @@
     if (obj.blocks && typeof obj.blocks === 'object' && root.IoTBlocks) {
       for (const [k, v] of Object.entries(obj.blocks)) if ((ids.has(k) || /^sandbox:(cpp|py|rs)-(esp32|pi)$/.test(k)) && v && typeof v === 'object') out.blocks[k] = root.IoTBlocks.normalize(v);
     }
+    if (obj.tours && typeof obj.tours === 'object') for (const k of ['home', 'lab']) if (obj.tours[k] === true) out.tours[k] = true;
     const sb = obj.sandbox;
     if (sb && typeof sb === 'object') {
       const TR = /^(cpp|py|rs)-(esp32|pi)$/;

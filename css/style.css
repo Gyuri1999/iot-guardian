@@ -863,3 +863,42 @@ code .gl-term { font-family: var(--font-code); }
 .bk-ctl > .bk-slot .bk-slot-l, .bk-ctl > .bk-slot .bk-drop.end { color: rgba(28,33,48,0.7); }
 .editor.from-blocks textarea { cursor: default; }
 .editor.from-blocks { box-shadow: inset 0 0 0 2px color-mix(in srgb, #8e5bd0 35%, transparent); border-radius: 8px; }
+
+/* ---------- έλεγχος ποιότητας: κινητά και αφή */
+/* τα παράθυρα ρυθμίσεων/σημειώσεων δεν ξεπερνούν την οθόνη, ό,τι μακρύ κι αν γράφει μια επιλογή */
+.dlg-body { grid-template-columns: minmax(0, 1fr); }
+.field { min-width: 0; }
+.field select, .field input[type="range"], .field .btn-row select { width: 100%; max-width: 100%; min-width: 0; text-overflow: ellipsis; }
+.field .btn-row { flex-wrap: nowrap; }
+.field .btn-row select { flex: 1; }
+.field .help { overflow-wrap: anywhere; }
+.check { align-items: flex-start; }
+.check input[type="checkbox"] { width: 1.15rem; height: 1.15rem; flex: none; margin-top: 0.15rem; accent-color: var(--teal); }
+.dlg-head { flex-wrap: wrap; row-gap: 0.4rem; }
+.dlg-head h2 { flex: 1 1 auto; min-width: 8rem; }
+/* στοιχεία που πατιούνται με το δάχτυλο: τουλάχιστον ~32 px */
+.gd-x { width: 2rem; height: 2rem; top: 0.1rem; right: 0.1rem; font-size: 1rem; border-radius: 6px; }
+.gd-bubble { padding-right: 2.3rem; }
+.bench-row select, .scope-bar select { min-height: 2rem; }
+@media (pointer: coarse) {
+  .say { min-height: 2.1rem; }
+  .gl-term { padding: 0.15rem 0; }
+  .bk-tools button { width: 1.9rem; height: 1.9rem; }
+  .po-pin { min-height: 2.3rem; }
+}
+
+/* κουμπί «Συνέχεια» πάντα ορατό στην κορυφή της αρχικής */
+.home-tabs { align-items: center; flex-wrap: wrap; }
+.home-go { margin-left: auto; max-width: min(24rem, 100%); }
+.home-go span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* ---------- ξενάγηση */
+.tour-hole { position: fixed; z-index: 80; border-radius: 10px; box-shadow: 0 0 0 200vmax rgba(10, 16, 28, 0.62); outline: 3px solid #e2b52d; pointer-events: none; transition: left 0.2s, top 0.2s, width 0.2s, height 0.2s; }
+.tour-card { position: fixed; z-index: 81; background: var(--surface); color: var(--ink); border: 2px solid var(--ink); border-radius: 14px; padding: 0.75rem 0.9rem; box-shadow: 0 8px 0 -2px rgba(0, 0, 0, 0.25); display: grid; gap: 0.45rem; }
+.tour-head { display: flex; align-items: baseline; gap: 0.5rem; }
+.tour-head b { font-family: var(--font-label); text-transform: uppercase; letter-spacing: 0.05em; font-size: 1rem; }
+.tour-n { margin-left: auto; color: var(--muted); font: 700 0.8rem var(--font-code); }
+.tour-t { margin: 0; line-height: 1.5; }
+.tour-acts { display: flex; align-items: center; gap: 0.35rem; flex-wrap: wrap; }
+.tour-acts .spacer { flex: 1; }
+@media (prefers-reduced-motion: reduce) { .tour-hole { transition: none; } }
