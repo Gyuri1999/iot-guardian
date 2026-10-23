@@ -946,7 +946,7 @@
         it.obj.visible = t >= it.delay;
         it.obj.position.y = (1 - back(x)) * 14;
       } else {
-        it.obj.visible = t >= it.delay;
+        it.obj.visible = !it.obj.userData.unwired && t >= it.delay;
         const e = inOut(x);
         for (const g of it.obj.userData.tubes) g.setDrawRange(0, Math.max(0, Math.floor(g.index.count * e / 3) * 3));
         // το πρώτο βύσμα μπαίνει στο pin αμέσως, το δεύτερο όταν το καλώδιο φτάσει στην τρύπα
@@ -1041,8 +1041,24 @@
     return out;
   }
 
+  // Συνδεσμολογία από τον μαθητή: ένα καλώδιο κρύβεται ή εμφανίζεται (με «τράβηγμα» από το pin ως την τρύπα).
+  function wireVisible(i, on, animate) {
+    const g = cur && cur.objs.wires[i];
+    if (!g) return;
+    g.userData.unwired = !on;
+    g.visible = !!on;
+    if (on && animate) {
+      const it = { kind: 'wire', obj: g, delay: 0, dur: 900 };
+      if (cur.anim && cur.anim.t0) { it.delay = performance.now() - cur.anim.t0; cur.anim.items.push(it); } else cur.anim = { items: [it], t0: 0 };
+    } else if (on) {
+      for (const t of g.userData.tubes) t.setDrawRange(0, Infinity);
+      g.children.forEach(c => { c.visible = true; });
+    }
+    requestRender();
+  }
+
   root.IoTScene3D = {
-    mount, unmount, requestRender, capture, orbit,
+    mount, unmount, requestRender, capture, orbit, wireVisible,
     orbiting: () => !!(cur && cur.orbit && !(cur.orbit.tr && cur.orbit.tr.done)),
     spinning: () => !!(cur && cur.orbit && cur.orbit.auto),
     onState: f => { if (cur) cur.onState = f; }, info: () => cur && { W: cur.W, H: cur.H, live: cur.svg.isConnected, anim: !!cur.anim, orbit: cur.orbit && { yaw: +cur.orbit.yaw.toFixed(3), pitch: +cur.orbit.pitch.toFixed(3), tr: !!cur.orbit.tr, renders: cur.renders || 0 } } };

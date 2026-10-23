@@ -424,3 +424,6 @@
 .pintag .pt-dot { fill: var(--wc); stroke: var(--ink-line); stroke-width: 0.8; }
 .pintag .pt-t { font-family: var(--font-code); font-size: 13px; font-weight: 700; fill: var(--ink); }
 .sc-pintags { pointer-events: none; }
+
+/* καλώδιο που δεν έχει συνδεθεί ακόμα από τον μαθητή */
+.scene .unwired { display: none; }

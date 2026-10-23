@@ -113,7 +113,7 @@
   // Ταμπελάκια με το όνομα του pin από όπου φεύγει κάθε καλώδιο (μένουν ορατά και στην 3D σκηνή).
   // Μπαίνουν σε σειρά μπροστά από την πλακέτα, με γραμμή ως το pin, για να μη σκεπάζει το ένα το άλλο.
   let TAGS = [];
-  function pinTag(A, cls) { TAGS.push({ A, cls, name: A.name.replace(/^GND\d$/, 'GND') }); }
+  function pinTag(A, cls, wi) { TAGS.push({ A, cls, wi, name: A.name.replace(/^GND\d$/, 'GND') }); }
   function pinTagsSVG() {
     const out = [];
     const ux = [C, S];
@@ -130,7 +130,7 @@
         const x = base[0] + ux[0] * k;
         const y = base[1] + ux[1] * k + (back ? -12 : 12);
         const w = 22 + t.name.length * 9;
-        out.push(`<g class="pintag ${t.cls}" data-part="wire-${t.cls.replace('w-', '')}"><path d="M${pt(anchor)} L${x.toFixed(1)},${(y + (back ? 11 : -11)).toFixed(1)}" class="pt-lead"/><circle cx="${anchor[0].toFixed(1)}" cy="${anchor[1].toFixed(1)}" r="2.4" class="pt-pin"/><rect x="${(x - w / 2).toFixed(1)}" y="${(y - 11).toFixed(1)}" width="${w.toFixed(1)}" height="22" rx="11" class="pt-pill"/><circle cx="${(x - w / 2 + 11).toFixed(1)}" cy="${y.toFixed(1)}" r="4.6" class="pt-dot"/><text x="${(x + 5.5).toFixed(1)}" y="${(y + 4.8).toFixed(1)}" text-anchor="middle" class="pt-t">${t.name}</text></g>`);
+        out.push(`<g class="pintag ${t.cls}" data-wi="${t.wi}" data-part="wire-${t.cls.replace('w-', '')}"><path d="M${pt(anchor)} L${x.toFixed(1)},${(y + (back ? 11 : -11)).toFixed(1)}" class="pt-lead"/><circle cx="${anchor[0].toFixed(1)}" cy="${anchor[1].toFixed(1)}" r="2.4" class="pt-pin"/><rect x="${(x - w / 2).toFixed(1)}" y="${(y - 11).toFixed(1)}" width="${w.toFixed(1)}" height="22" rx="11" class="pt-pill"/><circle cx="${(x - w / 2 + 11).toFixed(1)}" cy="${y.toFixed(1)}" r="4.6" class="pt-dot"/><text x="${(x + 5.5).toFixed(1)}" y="${(y + 4.8).toFixed(1)}" text-anchor="middle" class="pt-t">${t.name}</text></g>`);
       });
     }
     TAGS = [];
@@ -141,17 +141,19 @@
     let plugs = '';
     const l = lift || 40;
     let d;
+    let wi = -1;
     if (!Array.isArray(a)) {
       const route = wireRoute(a, b, l);
       rec({ t: 'wire', a, b, cls, lift: l, id, route });
+      wi = MAN ? MAN.filter(o => o.t === 'wire').length - 1 : -1;
       plugs += box(a.u - 1.1, a.v - 1.1, a.h, 2.2, 2.2, 4.6, 'plug ' + cls);
       plugs += box(b.u - 0.8, b.v - 0.8, b.h, 1.6, 1.6, 3.4, 'plug ' + cls);
-      if (a.name) pinTag(a, cls);
+      if (a.name) pinTag(a, cls, wi);
       d = smoothPath(route.map(q => P(q.u, q.v, q.h)));
     } else {
       d = `M${pt(a)} C${pt([a[0], a[1] - l])} ${pt([b[0], b[1] - l])} ${pt(b)}`;
     }
-    return `<g class="wire-g" data-part="wire-${cls.replace('w-', '')}"><path d="${d}" class="wire-ol"/><path${id ? ` id="${id}"` : ''} d="${d}" class="wire ${cls}"/><path d="${d}" class="wire-hl"/>`
+    return `<g class="wire-g" data-wi="${wi}" data-part="wire-${cls.replace('w-', '')}"><path d="${d}" class="wire-ol"/><path${id ? ` id="${id}"` : ''} d="${d}" class="wire ${cls}"/><path d="${d}" class="wire-hl"/>`
       + (plugs || `<circle cx="${a[0].toFixed(1)}" cy="${a[1].toFixed(1)}" r="2.2" class="wire-end ${cls}"/><circle cx="${b[0].toFixed(1)}" cy="${b[1].toFixed(1)}" r="2.2" class="wire-end ${cls}"/>`) + '</g>';
   }
 
@@ -1012,5 +1014,5 @@
     });
   }
 
-  root.IoTScene = { K, ESP, PCB_TOP, PIN_U, PI_T, PI_PIN_L, PI_PIN_TOP, BB, TL, manifest: null, buildIn, carOffset, carV, dragToCm, CAR, US, P, labScene, piScene, homeScene, piHomeScene, netScene, attachPanZoom, animatePacket, NET_NODES };
+  root.IoTScene = { RIGHT_ROW, LEFT_ROW, PI_ODD, PI_EVEN, K, ESP, PCB_TOP, PIN_U, PI_T, PI_PIN_L, PI_PIN_TOP, BB, TL, manifest: null, buildIn, carOffset, carV, dragToCm, CAR, US, P, labScene, piScene, homeScene, piHomeScene, netScene, attachPanZoom, animatePacket, NET_NODES };
 })(typeof window !== 'undefined' ? window : globalThis);

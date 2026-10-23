@@ -154,6 +154,7 @@
   const IC = {
     home: '<path d="M4 11l8-7 8 7"/><path d="M6 10v10h12V10"/><path d="M10 20v-6h4v6"/>',
     lock: '<rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/>',
+    plug: '<path d="M9 3v5M15 3v5M7 8h10v3a5 5 0 0 1-10 0zM12 16v5"/>',
     bulb: '<path d="M12 3a6 6 0 0 0-3.5 10.9V17h7v-3.1A6 6 0 0 0 12 3zM9.5 20h5"/>',
     speaker: '<path d="M4 9.5h3.5L12 5.5v13l-4.5-4H4z"/><path d="M15.5 9a4 4 0 0 1 0 6M18 6.5a7.5 7.5 0 0 1 0 11"/>',
     map: '<path d="M4 6l5-2 6 2 5-2v14l-5 2-6-2-5 2z"/><path d="M9 4v14M15 6v14"/>',
@@ -913,6 +914,7 @@
   }
 
   function openTask(id) {
+    S.scope = null;
     if (window.IoTSpeak) window.IoTSpeak.stop();
     const l = byId[id];
     if (!l || !taskUnlocked(l)) return;
@@ -944,7 +946,7 @@
     renderLab();
   }
 
-  const DOCK_NAMES = { serial: 'Serial Monitor', mqtt: 'MQTT', net: 'Δίκτυο', logs: 'Log broker', energy: 'Ενέργεια', vars: 'Μεταβλητές', branch: 'if / else', loops: 'Επαναλήψεις', syntax: 'Σύνταξη', summary: 'Πώς το διαβάζει ο broker', cfglog: 'Log ελέγχου', hosts: 'Συσκευές', detail: 'Πακέτο', web: 'Browser', db: 'Βάση δεδομένων' };
+  const DOCK_NAMES = { scope: 'Λογικός αναλυτής', serial: 'Serial Monitor', mqtt: 'MQTT', net: 'Δίκτυο', logs: 'Log broker', energy: 'Ενέργεια', vars: 'Μεταβλητές', branch: 'if / else', loops: 'Επαναλήψεις', syntax: 'Σύνταξη', summary: 'Πώς το διαβάζει ο broker', cfglog: 'Log ελέγχου', hosts: 'Συσκευές', detail: 'Πακέτο', web: 'Browser', db: 'Βάση δεδομένων' };
 
   function dockPanels(l) {
     const mode = modeOf(l);
@@ -969,6 +971,7 @@
     if (p.includes('branch')) panels.push(['branch', '<div id="branch"></div>']);
     if (p.includes('loops')) panels.push(['loops', '<div class="table-wrap" id="loops"></div>']);
     if (mode === 'analysis') panels.push(['hosts', hostsTable()]);
+    if (mode === 'code' && scopeSignals(l).length) panels.push(['scope', scopePanelHTML()]);
     return panels;
   }
 
@@ -1104,6 +1107,7 @@
         <div class="ws">
           <section class="stage" aria-label="Σκηνή εργαστηρίου">
             ${missionHTML(l)}
+            <div id="wiring-slot"></div>
             <div class="scene-wrap" id="scene">${sceneControls()}${mode === 'code' ? inputsCardHTML(hw, w) : ''}</div>
             ${dock}
           </section>
@@ -1113,6 +1117,7 @@
       </div></div>`;
 
     mountScene(mode !== 'code' ? window.IoTScene.netScene() : boardOf(l) === 'pi' ? window.IoTScene.piScene(hw, w) : window.IoTScene.labScene(hw, w));
+    if (mode === 'code') setupWiring(l);
     bindRail();
     app().querySelectorAll('.strip [data-task]').forEach(b => { b.onclick = () => openTask(b.dataset.task); });
     bindChapterCards();
@@ -1178,6 +1183,7 @@
     app().querySelectorAll('[data-dtab]').forEach(b => b.setAttribute('aria-selected', String(b.dataset.dtab === tab)));
     app().querySelectorAll('.dock-panel').forEach(p => { p.hidden = p.id !== 'dock-' + tab; });
     if (!silent) { updateSerial(true); updateNet(true); updateLogs(true); updateMqtt(true); }
+    if (tab === 'scope') { bindScope(); drawScope(); }
   }
 
   // Συμβατότητα με παλιές κλήσεις: «guide» = οδηγίες, «code» = κώδικας.
@@ -1302,6 +1308,280 @@
             <tbody>${rows.map(r => `<tr>${t.cols.map(c => `<td class="code">${esc(pyd(r.vals.get(c.name.toLowerCase())))}</td>`).join('')}</tr>`).join('') || `<tr><td colspan="${t.cols.length}" class="muted">κανένα δεδομένο</td></tr>`}</tbody></table></div>`;
         }).join('') : '<p class="muted">Η βάση δεν έχει ακόμα πίνακες.</p>'}</div>`;
     }).join('');
+  }
+
+  // ------------------------------------------------------------ Σύνδεσε μόνος σου τα καλώδια
+  // S.wiring: { tasks, done: Set(i), sel, wrong: {i: n} }. Χωρίς παζλ όλα τα καλώδια θεωρούνται συνδεδεμένα.
+  function wiredCls(cls) {
+    const W = S.wiring;
+    if (!W) return true;
+    const ts = W.tasks.filter(t => t.cls === cls);
+    return ts.every(t => W.done.has(t.i));
+  }
+  function setupWiring(l, force) {
+    const slot = $('#wiring-slot');
+    S.wiring = null;
+    if (!slot || !window.IoTWiring) return;
+    slot.innerHTML = '';
+    const tasks = window.IoTWiring.tasksFrom(window.IoTScene.manifest);
+    if (!tasks.length) return;
+    // πρώτη φορά που βλέπεις ένα καλώδιο (π.χ. το πρώτο LED, το πρώτο κουμπί): το συνδέεις εσύ
+    const fresh = tasks.some(t => !P.wired[t.cls]);
+    addWiringButton(l);
+    if (!fresh && !force) return;
+    S.wiring = { tasks, done: new Set(), sel: 0, wrong: {}, board: boardOf(l) };
+    tasks.forEach(t => setWireShown(t.i, false));
+    renderWiring();
+    updateBoard();
+  }
+  function addWiringButton(l) {
+    const ctl = $('#scene .scene-ctl');
+    if (!ctl || $('#sc-wire')) return;
+    ctl.insertAdjacentHTML('beforeend', `<button class="sc-b sc-3d" id="sc-wire" title="Σύνδεσε μόνος σου τα καλώδια" aria-label="Σύνδεσε μόνος σου τα καλώδια">${icon('plug')}<span>Καλώδια</span></button>`);
+    $('#sc-wire').onclick = () => { if (S.runState === 'running') doStop(); setupWiring(l, true); const c = $('#wiring'); if (c) c.scrollIntoView({ block: 'nearest', behavior: 'smooth' }); };
+  }
+  function setWireShown(i, on, animate) {
+    const sc = S.scene;
+    if (sc) sc.querySelectorAll(`[data-wi="${i}"]`).forEach(el => el.classList.toggle('unwired', !on));
+    if (window.IoTScene3D && window.IoTScene3D.wireVisible) window.IoTScene3D.wireVisible(i, on, animate);
+  }
+  function pinoutHTML(board) {
+    const SC = window.IoTScene;
+    const Wg = window.IoTWiring;
+    const pin = p => `<button type="button" class="po-pin k-${Wg.kindOf(p)}" data-pin="${p}" title="${Wg.shown(p)}"><i></i><span>${Wg.shown(p)}</span></button>`;
+    if (board === 'pi') {
+      return `<div class="pinout pi" role="group" aria-label="Header 40 pins του Raspberry Pi"><div class="po-row">${SC.PI_ODD.map(pin).join('')}</div><div class="po-board">Raspberry Pi 5 · header 40 pins · pin 1 αριστερά</div><div class="po-row">${SC.PI_EVEN.map(pin).join('')}</div></div>`;
+    }
+    return `<div class="pinout esp" role="group" aria-label="Pins του ESP32"><div class="po-row">${SC.LEFT_ROW.map(pin).join('')}</div><div class="po-board"><span class="po-usb">USB</span>ESP32 DevKit · 38 pins</div><div class="po-row">${SC.RIGHT_ROW.map(pin).join('')}</div></div>`;
+  }
+  function renderWiring(msg, ok) {
+    const W = S.wiring;
+    const slot = $('#wiring-slot');
+    if (!W || !slot) return;
+    const all = W.done.size === W.tasks.length;
+    const cur = W.tasks[W.sel];
+    slot.innerHTML = `<section class="wiring${all ? ' all' : ''}" id="wiring" aria-label="Σύνδεσε τα καλώδια">
+      <div class="wr-head">${icon('plug')}<b>Σύνδεσε τα καλώδια</b><span class="wr-count">${W.done.size}/${W.tasks.length}</span>${sayBtn('#wiring', 'τις οδηγίες')}<button class="btn quiet sm" id="wr-auto">Σύνδεσέ τα για μένα</button></div>
+      <p class="wr-help">${all ? 'Το κύκλωμα είναι έτοιμο! Τώρα ο κώδικας μπορεί να ανάψει, να διαβάσει και να μετρήσει.' : `Διάλεξε καλώδιο και μετά πάτα το pin της πλακέτας όπου πρέπει να μπει. Βοήθεια: η σταθερά στην αρχή του κώδικα λέει τον αριθμό του GPIO.`}</p>
+      <div class="wr-tasks">${W.tasks.map(t => `<button type="button" class="wr-task ${t.cls}${W.done.has(t.i) ? ' done' : ''}${t.i === W.sel && !all ? ' sel' : ''}" data-wt="${t.i}" ${W.done.has(t.i) ? 'disabled' : ''} aria-pressed="${t.i === W.sel}"><i class="wr-dot"></i>${esc(t.label)}${W.done.has(t.i) ? ` → <b>${esc(window.IoTWiring.shown(t.pin))}</b> ✓` : ''}</button>`).join('')}</div>
+      ${all ? '' : pinoutHTML(W.board)}
+      ${msg ? `<div class="feedback ${ok ? 'ok' : 'no'}" role="status">${esc(msg)}</div>` : ''}
+    </section>`;
+    slot.querySelectorAll('[data-wt]').forEach(b => { b.onclick = () => { W.sel = Number(b.dataset.wt); renderWiring(); }; });
+    const hintPin = cur && (W.wrong[cur.i] || 0) >= 2 ? cur.pin : null;
+    slot.querySelectorAll('[data-pin]').forEach(b => {
+      if (hintPin && (b.dataset.pin === hintPin || (cur.role === 'gnd' && /^GND/.test(b.dataset.pin)))) b.classList.add('hint');
+      b.onclick = () => pickPin(b.dataset.pin);
+    });
+    $('#wr-auto').onclick = () => { W.tasks.forEach(t => { if (!W.done.has(t.i)) { W.done.add(t.i); setWireShown(t.i, true, true); } }); finishWiring(); };
+  }
+  function pickPin(p) {
+    const W = S.wiring;
+    const t = W && W.tasks[W.sel];
+    if (!t || W.done.has(t.i)) return;
+    const r = window.IoTWiring.judge(t, p, W.board);
+    if (r.ok) {
+      W.done.add(t.i);
+      setWireShown(t.i, true, true);
+      sfx('tick');
+      const next = W.tasks.find(x => !W.done.has(x.i));
+      if (next) W.sel = next.i;
+      if (!next) { finishWiring(r.msg); return; }
+    } else {
+      W.wrong[t.i] = (W.wrong[t.i] || 0) + 1;
+      sfx('err');
+    }
+    renderWiring(r.msg, r.ok);
+    announce(r.msg);
+    updateBoard();
+  }
+  function finishWiring(msg) {
+    const W = S.wiring;
+    W.tasks.forEach(t => { P.wired[t.cls] = true; });
+    save();
+    renderWiring(msg ? `${msg} Όλα τα καλώδια μπήκαν!` : 'Όλα τα καλώδια μπήκαν!', true);
+    sfx('win');
+    updateBoard();
+    setTimeout(() => { if (S.wiring === W) { S.wiring = null; const sl = $('#wiring-slot'); if (sl) sl.innerHTML = ''; } }, 4500);
+  }
+
+  // ------------------------------------------------------------ Λογικός αναλυτής
+  // Καταγράφει κάθε αλλαγή HIGH/LOW στα pins της πλακέτας με τον εικονικό χρόνο και τη γραμμή κώδικα.
+  const SCOPE_SIGS = {
+    led: { pin: 2, label: 'LED', pi: 17, esp: 2, cls: 'w-led', hw: 'led' },
+    btn: { pin: 15, label: 'Κουμπί', pi: 27, esp: 15, input: 'button', hw: 'button' },
+    pir: { pin: 4, label: 'PIR', pi: 4, esp: 4, input: 'pir', hw: 'pir' },
+    trig: { pin: 5, label: 'TRIG', pi: 23, esp: 5, hw: 'ultrasonic' },
+    echo: { pin: 18, label: 'ECHO', pi: 24, esp: 18, hw: 'ultrasonic' },
+    red: { pin: 25, label: 'Κόκκινο', pi: 16, esp: 25, hw: 'traffic' },
+    yel: { pin: 26, label: 'Κίτρινο', pi: 20, esp: 26, hw: 'traffic' },
+    grn: { pin: 27, label: 'Πράσινο', pi: 21, esp: 27, hw: 'traffic' }
+  };
+  function scopeSignals(l) {
+    const hw = hardwareOf(l);
+    const ledShown = hw.includes('led') || !(hw.includes('ultrasonic') || hw.includes('traffic'));
+    return Object.keys(SCOPE_SIGS).filter(k => (k === 'led' ? ledShown : hw.includes(SCOPE_SIGS[k].hw)));
+  }
+  function scopePanelHTML() {
+    return `<div class="scope-bar"><span class="muted" style="font-size:0.85rem">Κάθε γραμμή είναι ένα pin: πάνω = HIGH, κάτω = LOW. Οι μικρές κουκκίδες δείχνουν πότε ο κώδικας <i>διάβασε</i> μια είσοδο. Πέρνα το ποντίκι για να δεις ποια γραμμή κώδικα έκανε την αλλαγή.</span>
+      <div class="mini-btns" role="group" aria-label="Παράθυρο χρόνου">${[[500, '0,5 δ'], [2000, '2 δ'], [10000, '10 δ']].map(([ms, t]) => `<button class="btn sm" data-sw="${ms}" aria-pressed="false">${t}</button>`).join('')}<button class="btn sm" id="scope-live" aria-pressed="true">Ζωντανά</button></div></div>
+      <div class="scope-wrap"><svg class="scope" id="scope" viewBox="0 0 1000 100" preserveAspectRatio="none" role="img" aria-label="Λογικός αναλυτής: HIGH και LOW κάθε pin στον χρόνο"></svg></div>
+      <input type="range" id="scope-pos" min="0" max="100" value="100" step="1" aria-label="Μετακίνηση στον χρόνο">
+      <p class="scope-read" id="scope-read" aria-live="polite">Πάτα «Εκτέλεση» για να αρχίσει η καταγραφή.</p>`;
+  }
+  function scopeAttach(b) {
+    const keys = scopeSignals(S.task);
+    S.scope = { keys, ev: [], reads: [], last: {}, lastRead: {}, win: S.scopeWin || 2000, live: true, end: 0, cursor: null };
+    const level = k => { const sg = SCOPE_SIGS[k]; return sg.input ? (b.inputs[sg.input] ? 1 : 0) : (b.outputs[sg.pin] === 1 ? 1 : 0); };
+    const rec = (k, line) => {
+      const v = level(k);
+      if (S.scope.last[k] === v) return;
+      S.scope.last[k] = v;
+      S.scope.ev.push({ t: b.micros, k, v, line: line || null });
+      if (S.scope.ev.length > 6000) S.scope.ev.splice(0, 1000);
+    };
+    keys.forEach(k => rec(k, null));
+    const byPin = {};
+    keys.forEach(k => { byPin[SCOPE_SIGS[k].pin] = k; });
+    const dw = b.digitalWrite.bind(b);
+    b.digitalWrite = (pin, v, line) => { const r = dw(pin, v, line); if (byPin[pin]) rec(byPin[pin], line); return r; };
+    const dr = b.digitalRead.bind(b);
+    b.digitalRead = (pin, line) => {
+      const r = dr(pin, line);
+      const k = byPin[pin];
+      if (k) {
+        if (k === 'echo') rec('echo', line);
+        const lr = S.scope.lastRead[k];
+        if (lr === undefined || b.micros - lr > 3000) { S.scope.lastRead[k] = b.micros; S.scope.reads.push({ t: b.micros, k, line }); if (S.scope.reads.length > 4000) S.scope.reads.splice(0, 1000); }
+      }
+      return r;
+    };
+    S.scope.rec = rec;
+    bindScope();
+    drawScopeSoon();
+  }
+  function scopeInput(key) {
+    if (!S.scope || !S.scope.rec) return;
+    const k = key === 'button' ? 'btn' : key === 'pir' ? 'pir' : null;
+    if (k && S.scope.keys.includes(k)) S.scope.rec(k, null);
+  }
+  function bindScope() {
+    const svg = $('#scope');
+    if (!svg || svg.dataset.bound) return;
+    svg.dataset.bound = '1';
+    const win = ms => {
+      if (S.scope) S.scope.win = ms;
+      S.scopeWin = ms;
+      app().querySelectorAll('[data-sw]').forEach(b => b.setAttribute('aria-pressed', String(Number(b.dataset.sw) === ms)));
+      drawScope();
+    };
+    app().querySelectorAll('[data-sw]').forEach(b => { b.onclick = () => win(Number(b.dataset.sw)); });
+    win(S.scopeWin || 2000);
+    $('#scope-live').onclick = () => { if (!S.scope) return; S.scope.live = true; $('#scope-pos').value = '100'; drawScope(); };
+    $('#scope-pos').oninput = e => {
+      const sc = S.scope;
+      if (!sc || !S.board) return;
+      const now = S.board.micros / 1000;
+      const v = Number(e.target.value);
+      sc.live = v >= 100;
+      sc.end = Math.max(sc.win, (now * v) / 100);
+      drawScope();
+    };
+    const at = e => {
+      const r = svg.getBoundingClientRect();
+      return Math.max(0, Math.min(1, (e.clientX - r.left - r.width * 0.12) / (r.width * 0.88)));
+    };
+    svg.addEventListener('pointermove', e => { if (S.scope) { S.scope.cursor = at(e); drawScope(); } });
+    svg.addEventListener('pointerleave', () => { if (S.scope) { S.scope.cursor = null; drawScope(); } });
+    svg.addEventListener('click', e => { const line = scopeLineAt(at(e)); if (line) gotoLine(line); });
+  }
+  let scopeQueued = false;
+  function drawScopeSoon() {
+    if (scopeQueued) return;
+    scopeQueued = true;
+    requestAnimationFrame(() => { scopeQueued = false; drawScope(); });
+  }
+  function scopeView() {
+    const sc = S.scope;
+    const nowMs = S.board ? S.board.micros / 1000 : 0;
+    const end = sc.live ? Math.max(nowMs, sc.win) : Math.min(sc.end, Math.max(nowMs, sc.win));
+    return { t0: end - sc.win, t1: end, nowMs };
+  }
+  function scopeLineAt(fx) {
+    const sc = S.scope;
+    if (!sc) return null;
+    const { t0, t1 } = scopeView();
+    const t = (t0 + fx * (t1 - t0)) * 1000;
+    let best = null;
+    for (const e of sc.ev) { if (e.t <= t && e.line) best = e; if (e.t > t) break; }
+    return best && best.line;
+  }
+  function drawScope() {
+    const svg = $('#scope');
+    const sc = S.scope;
+    if (!svg || !sc) return;
+    const keys = sc.keys;
+    const RH = 34;
+    const H = keys.length * RH + 22;
+    const LX = 120;
+    const W = 1000;
+    svg.setAttribute('viewBox', `0 0 ${W} ${H}`);
+    svg.style.height = (H * 0.9) + 'px';
+    const { t0, t1, nowMs } = scopeView();
+    const X = t => LX + ((t / 1000 - t0) / (t1 - t0)) * (W - LX);
+    let out = '';
+    // πλέγμα χρόνου
+    const step = sc.win <= 500 ? 100 : sc.win <= 2000 ? 250 : 1000;
+    for (let g = Math.ceil(t0 / step) * step; g <= t1; g += step) {
+      const x = X(g * 1000);
+      out += `<line x1="${x.toFixed(1)}" y1="0" x2="${x.toFixed(1)}" y2="${H - 18}" class="sg-grid"/><text x="${x.toFixed(1)}" y="${H - 5}" class="sg-tick" text-anchor="middle">${g >= 1000 ? (g / 1000).toLocaleString('el-GR') + ' δ' : g + ' ms'}</text>`;
+    }
+    const board = S.task ? boardOf(S.task) : 'esp32';
+    keys.forEach((k, r) => {
+      const sg = SCOPE_SIGS[k];
+      const yH = r * RH + 8;
+      const yL = r * RH + RH - 6;
+      out += `<text x="8" y="${(yH + yL) / 2 + 4}" class="sg-label">${sg.label}</text><text x="${LX - 8}" y="${(yH + yL) / 2 + 4}" class="sg-pin" text-anchor="end">${board === 'pi' ? 'GPIO ' + sg.pi : 'GPIO ' + sg.esp}</text>`;
+      const evs = sc.ev.filter(e => e.k === k);
+      let v = 0;
+      for (const e of evs) { if (e.t / 1000 <= t0) v = e.v; else break; }
+      let d = `M${LX},${v ? yH : yL}`;
+      let xPrev = LX;
+      for (const e of evs) {
+        const tm = e.t / 1000;
+        if (tm <= t0) continue;
+        if (tm > Math.min(t1, nowMs)) break;
+        const x = X(e.t);
+        d += ` H${x.toFixed(1)} V${e.v ? yH : yL}`;
+        v = e.v;
+        xPrev = x;
+      }
+      const xEnd = X(Math.min(t1, nowMs) * 1000);
+      if (xEnd > xPrev) d += ` H${xEnd.toFixed(1)}`;
+      out += `<path d="${d}" class="sg-wave sg-${k}"/>`;
+      for (const rd of sc.reads) { if (rd.k !== k) continue; const tm = rd.t / 1000; if (tm < t0 || tm > t1) continue; out += `<circle cx="${X(rd.t).toFixed(1)}" cy="${yL + 3}" r="1.6" class="sg-read"/>`; }
+      out += `<line x1="0" y1="${r * RH + RH + 0.5}" x2="${W}" y2="${r * RH + RH + 0.5}" class="sg-sep"/>`;
+    });
+    // κέρσορας
+    const read = $('#scope-read');
+    if (sc.cursor !== null) {
+      const tc = t0 + sc.cursor * (t1 - t0);
+      const x = LX + sc.cursor * (W - LX);
+      out += `<line x1="${x.toFixed(1)}" y1="0" x2="${x.toFixed(1)}" y2="${H - 18}" class="sg-cursor"/>`;
+      if (read) {
+        const vals = keys.map(k => { let v = 0; for (const e of sc.ev) { if (e.k !== k) continue; if (e.t / 1000 <= tc) v = e.v; else break; } return `${SCOPE_SIGS[k].label}: <b class="${v ? 'hi' : 'lo'}">${v ? 'HIGH' : 'LOW'}</b>`; }).join(' · ');
+        const line = scopeLineAt(sc.cursor);
+        const src = line && $('#code') ? $('#code').value.split('\n')[line - 1] : '';
+        read.innerHTML = `<b>${(tc / 1000).toLocaleString('el-GR', { minimumFractionDigits: 3, maximumFractionDigits: 3 })} δ</b> · ${vals}${line ? `<br>Τελευταία αλλαγή από τη <button class="linklike" data-goto="${line}">γραμμή ${line}</button>: <code>${esc(src.trim())}</code>` : ''}`;
+        const g = read.querySelector('[data-goto]');
+        if (g) g.onclick = () => gotoLine(Number(g.dataset.goto));
+      }
+    } else if (read) {
+      read.textContent = S.board ? `Χρόνος: ${(nowMs / 1000).toLocaleString('el-GR', { minimumFractionDigits: 3, maximumFractionDigits: 3 })} δ · ${sc.ev.length} αλλαγές HIGH/LOW. Πέρνα το ποντίκι πάνω από τις γραμμές.` : 'Πάτα «Εκτέλεση» για να αρχίσει η καταγραφή.';
+    }
+    svg.innerHTML = out;
+    const pos = $('#scope-pos');
+    if (pos && sc.live) pos.value = '100';
   }
 
   // Αντικείμενα του δωματίου που πατιούνται: το κουδούνι πατά το κουμπί, το θερμόμετρο ζεσταίνει.
@@ -1452,7 +1732,16 @@
   }
 
   function toggleInput(key) {
+    const need = { button: 'w-btn', pir: 'w-pir' }[key];
+    if (need && !wiredCls(need)) {
+      announce(`Σύνδεσε πρώτα το καλώδιο: ${window.IoTWiring.WIRES[need].label}.`);
+      const card = $('#wiring');
+      if (card) { card.classList.remove('nudge'); void card.offsetWidth; card.classList.add('nudge'); }
+      sfx('err');
+      return;
+    }
     S.inputs[key] = !S.inputs[key];
+    scopeInput(key);
     sfx(key === 'button' && S.inputs.button && S.theme && S.theme.key === 'entrance' ? 'bell' : 'click');
     if (S.board) {
       if (key === 'router') S.board.setRouter(S.inputs.router);
@@ -1955,6 +2244,7 @@
       const c = E.compile(ta.value, opts);
       S.warnings = c.warnings;
       S.board = VAL.createWorld(w, S.inputs);
+      scopeAttach(S.board);
       S.machine = new E.Machine(c.program, S.board, opts);
       S.gen = S.machine.main();
       S.error = null;
@@ -2423,8 +2713,9 @@
     const b = S.board;
     const sc = S.scene;
     const cls = (sel, c, v) => { const el = sc && sc.querySelector(sel); if (el) el.classList.toggle(c, !!v); };
-    const ledOn = !!(b && b.led);
+    const ledOn = !!(b && b.led) && wiredCls('w-led') && wiredCls('w-gnd');
     const pin2 = !!(b && b.outputs[2] === 1);
+    if (S.scope && S.dockTab === 'scope') drawScopeSoon();
     // κάρτα εισόδων
     const dot = $('#led-dot');
     if (dot) dot.classList.toggle('on', ledOn);
@@ -2476,7 +2767,7 @@
       cls('#sc-link-esp-pi', 'on', isPi() ? !!sensorNode : !!(net && net.connected('device')));
       cls('#sc-link-pi-dash', 'on', !!(net && net.connected('dashboard')));
       for (const [k, pin] of [['r', 25], ['y', 26], ['g', 27]]) {
-        const on = !!(b && b.light(pin));
+        const on = !!(b && b.light(pin)) && wiredCls({ 25: 'w-red', 26: 'w-yel', 27: 'w-grn' }[pin]);
         cls('#sc-tl-' + k, 'on', on);
         cls('#sc-tl-' + k + '-halo', 'on', on);
       }

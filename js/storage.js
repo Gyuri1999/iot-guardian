@@ -25,6 +25,7 @@
       track: null,
       stories: {},
       review: {},
+      wired: {},
       daily: null,
       settings: { theme: 'system', fontScale: 1, lineSpacing: 'normal', reducedMotion: false, sound: true, font: 'noto', letters: 'normal', readRate: 0.9, ruler: 'off' }
     };
@@ -51,6 +52,7 @@
     if (typeof obj.current === 'string' && ids.has(obj.current)) out.current = obj.current;
     if (typeof obj.track === 'string' && /^(cpp|py|rs)-(esp32|pi)$/.test(obj.track)) out.track = obj.track;
     if (obj.stories && typeof obj.stories === 'object') for (const [k, v] of Object.entries(obj.stories)) if (/^\d{1,3}$/.test(k) && v === true) out.stories[k] = true;
+    if (obj.wired && typeof obj.wired === 'object') for (const [k, v] of Object.entries(obj.wired)) if (/^w-[a-z]{3,4}$/.test(k) && v === true) out.wired[k] = true;
     const day = /^\d{4}-\d{2}-\d{2}$/;
     if (obj.review && typeof obj.review === 'object') {
       for (const [k, v] of Object.entries(obj.review)) if (ids.has(k) && v && Number.isInteger(v.box) && v.box >= 1 && v.box <= 5 && day.test(v.due)) out.review[k] = { box: v.box, due: v.due };

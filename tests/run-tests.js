@@ -22,7 +22,8 @@ for (const f of extra) {
 }
 vm.runInContext(fs.readFileSync(path.join(ROOT, 'js', 'storage.js'), 'utf8'), ctx, { filename: 'storage.js' });
 vm.runInContext(fs.readFileSync(path.join(ROOT, 'js', 'learn.js'), 'utf8'), ctx, { filename: 'learn.js' });
-const { IoTInterp, IoTDevice, IoTValidator, IoTLessons, IoTStorage, IoTLearn } = ctx;
+vm.runInContext(fs.readFileSync(path.join(ROOT, 'js', 'wiring.js'), 'utf8'), ctx, { filename: 'wiring.js' });
+const { IoTInterp, IoTDevice, IoTValidator, IoTLessons, IoTStorage, IoTLearn, IoTWiring } = ctx;
 
 let passed = 0;
 let failed = 0;
@@ -626,6 +627,28 @@ test('σημειώσεις κεφαλαίου: στόχοι και λέξεις'
   const ls = IoTLessons.lessons.filter(l => l.chapter === 1);
   const html = IoTLearn.chapterNotes({ n: 1, title: 'Πρώτο πρόγραμμα' }, ls, IoTLessons.GLOSSARY, {});
   assert(html.includes('Τι μαθαίνω') && html.includes('setup()'));
+});
+
+// ------------------------------------------------------------ συνδεσμολογία (js/wiring.js)
+test('συνδεσμολογία: σωστό pin, GND, 3V3 και λάθος GPIO', () => {
+  const man = [{ t: 'esp32' }, { t: 'wire', cls: 'w-led', a: { name: 'D2' } }, { t: 'wire', cls: 'w-gnd', a: { name: 'GND2' } }];
+  const ts = IoTWiring.tasksFrom(man);
+  eq(ts.map(t => [t.i, t.pin]), [[0, 'D2'], [1, 'GND2']]);
+  assert(IoTWiring.judge(ts[0], 'D2', 'esp32').ok);
+  const g = IoTWiring.judge(ts[0], 'GND', 'esp32');
+  assert(!g.ok && /0 V/.test(g.msg));
+  assert(/αναμμένο/.test(IoTWiring.judge(ts[0], '3V3', 'esp32').msg));
+  assert(/LED_PIN/.test(IoTWiring.judge(ts[0], 'D4', 'esp32').msg));
+  assert(/μόνο είσοδος/.test(IoTWiring.judge(ts[0], 'D34', 'esp32').msg));
+  assert(IoTWiring.judge(ts[1], 'GND3', 'esp32').ok, 'κάθε GND είναι σωστό για τη γείωση');
+  assert(!IoTWiring.judge(ts[1], '5V', 'esp32').ok);
+});
+test('συνδεσμολογία Pi: GPIO17 και ονόματα pins', () => {
+  const t = IoTWiring.tasksFrom([{ t: 'wire', cls: 'w-led', a: { name: 'GPIO17' } }])[0];
+  assert(IoTWiring.judge(t, 'GPIO17', 'pi').ok);
+  assert(/ID_SD/.test(IoTWiring.judge(t, 'ID_SD', 'pi').msg));
+  eq(IoTWiring.shown('3V3b'), '3V3');
+  eq(IoTWiring.kindOf('GND4'), 'gnd');
 });
 
 console.log(`\n${passed} πέρασαν, ${failed} απέτυχαν\n`);
