@@ -818,8 +818,9 @@ code .gl-term { font-family: var(--font-code); }
 .bench-chip { padding: 0.3rem 0.75rem; border: 1.5px solid var(--line-strong); border-radius: 999px; background: var(--paper); color: var(--muted); font: 600 0.85rem var(--font-body); cursor: pointer; }
 .bench-chip[aria-pressed="true"] { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 12%, var(--surface)); color: var(--ink); }
 .bench-chip[aria-pressed="true"]::before { content: "✓ "; color: var(--accent); }
+.bench, .bench > * { min-width: 0; max-width: 100%; }
 .bench-row { display: flex; flex-wrap: wrap; align-items: center; gap: 0.4rem; }
-.bench-row select { max-width: 22rem; }
+.bench-row select { max-width: min(22rem, 100%); min-width: 0; }
 .bench-row .spacer { flex: 1; }
 .sandbox-card h3 { display: flex; align-items: center; gap: 0.4rem; }
 .sandbox-card h3 .ic { width: 1.1rem; height: 1.1rem; color: var(--accent); }

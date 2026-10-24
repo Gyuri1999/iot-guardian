@@ -136,6 +136,7 @@
     OutputPin: new Set(['set_high', 'set_low', 'toggle', 'write', 'set_pwm', 'set_pwm_frequency', 'clear_pwm']),
     PinDriver: new Set(['set_high', 'set_low', 'toggle', 'set_level', 'set_pull']),
     LedcDriver: new Set(['set_duty', 'enable', 'disable']),
+    Ssd1306Buffered: new Set(['init', 'flush', 'clear_buffer', 'clear', 'set_display_on']),
     LedcTimerDriver: new Set(['set_frequency']),
     Option: new Set(['take', 'insert', 'replace'])
   };
@@ -149,7 +150,7 @@
       if (isIntish(t) || isFloatish(t) || ['bool', 'char', '()', 'Duration', 'Instant', 'Level', '&str', '!'].includes(t)) return true;
       if (t.startsWith('&mut ')) return false;
       if (t.startsWith('&')) return true;
-      if (t === 'String' || t.startsWith('Vec<') || /^(OutputPin|InputPin|Pin|Gpio\d*|PinDriver|Peripherals|Pins|Box|LedcDriver|LedcTimerDriver|I2cDriver)/.test(t)) return false;
+      if (t === 'String' || t.startsWith('Vec<') || /^(OutputPin|InputPin|Pin|Gpio\d*|PinDriver|Peripherals|Pins|Box|LedcDriver|LedcTimerDriver|I2cDriver|Ssd1306)/.test(t)) return false;
       const opt = generic(t, 'Option');
       if (opt) return this.isCopyTy(opt[0]);
       const res = generic(t, 'Result');
@@ -463,6 +464,7 @@
           if (!retOk) throw rerr('E0277', `the \`?\` operator can only be used in a function that returns \`Result\` or \`Option\``, e.line,
             sc.fn && sc.fn.name === 'main' ? (this.prog.target === 'pi' ? 'Για να χρησιμοποιήσεις ? στη main, γράψε: fn main() -> Result<(), Box<dyn Error>> { … Ok(()) }' : 'Για να χρησιμοποιήσεις ? στη main, γράψε: fn main() -> anyhow::Result<()> { … }') : `Η ${sc.fn ? sc.fn.name : 'συνάρτηση'} πρέπει να επιστρέφει Result για να χρησιμοποιήσει ?.`);
           const r = generic(t, 'Result');
+          if (r && r[1] === 'DisplayError') throw rerr('E0277', '`?` couldn\'t convert the error: `DisplayError` doesn\'t implement `std::error::Error`', e.line, 'Τα λάθη της οθόνης (DisplayError) δεν περνούν με ?. Γράψε .unwrap() (π.χ. display.flush().unwrap();) ή .map_err(|e| anyhow::anyhow!("{:?}", e))?.');
           if (r) return r[0];
           const o = generic(t, 'Option');
           if (o) return o[0];
@@ -971,6 +973,7 @@
     'esp_idf_svc::hal::peripherals::Peripherals::take': 'Result<Peripherals, EspError>',
     'esp_idf_svc::hal::ledc::LedcDriver::new': 'Result<LedcDriver, EspError>', 'esp_idf_svc::hal::ledc::LedcTimerDriver::new': 'Result<LedcTimerDriver, EspError>',
     'esp_idf_svc::hal::i2c::I2cDriver::new': 'Result<I2cDriver, EspError>',
+    'ssd1306::Ssd1306::new': 'Ssd1306', 'embedded_graphics::text::Text::with_baseline': 'Text', 'embedded_graphics::text::Text::new': 'Text',
     'esp_idf_svc::hal::gpio::PinDriver::output': 'Result<PinDriver<Output>, EspError>', 'esp_idf_svc::hal::gpio::PinDriver::input': 'Result<PinDriver<Input>, EspError>',
     'esp_idf_svc::hal::delay::FreeRtos::delay_ms': '()', 'esp_idf_svc::hal::delay::Ets::delay_us': '()', 'esp_idf_svc::sys::link_patches': '()'
   };
@@ -988,6 +991,9 @@
     if ((base === 'OutputPin' || base === 'InputPin') && (name.startsWith('is_'))) return 'bool';
     if (base === 'OutputPin') return ['set_pwm', 'set_pwm_frequency', 'clear_pwm'].includes(name) ? 'Result<(), rppal::gpio::Error>' : '()';
     if (base === 'InputPin' && name === 'read') return 'Level';
+    if (base === 'Ssd1306') return name === 'into_buffered_graphics_mode' ? 'Ssd1306Buffered' : null;
+    if (base === 'Ssd1306Buffered') return name === 'clear_buffer' ? '()' : ['init', 'flush', 'clear', 'set_display_on'].includes(name) ? 'Result<(), DisplayError>' : null;
+    if (base === 'Text') return name === 'draw' ? 'Result<Point, DisplayError>' : null;
     if (base === 'LedcDriver') return name === 'get_max_duty' || name === 'get_duty' ? 'u32' : 'Result<(), EspError>';
     if (base === 'LedcTimerDriver') return name === 'set_frequency' ? 'Result<(), EspError>' : null;
     if (base.startsWith('PinDriver')) return name.startsWith('is_') ? 'bool' : name === 'get_level' ? 'Level' : 'Result<(), EspError>';

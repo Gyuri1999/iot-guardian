@@ -19,7 +19,7 @@
     { term: 'I2C', def: 'Τρόπος επικοινωνίας με δύο καλώδια: SDA (δεδομένα) και SCL (ρολόι). Πολλές συσκευές μπορούν να μοιράζονται τα ίδια δύο καλώδια.' }
   ].forEach(g => { if (!L.GLOSSARY.some(x => x.term === g.term)) L.GLOSSARY.push(g); });
 
-  const BASE = { lang: 'python', board: 'pi', chapter: 26 };
+  const BASE = { lang: 'python', board: 'pi', chapter: 26, missionStory: 'Στο σαλόνι στήνεις νέα εξαρτήματα: ένα buzzer για ήχο, ένα servo για κίνηση, ένα LED RGB για χρώμα και μια μικρή οθόνη. Δοκίμασε το καθένα πριν το βάλεις στο σπίτι.' };
   const PANELS = ['serial', 'vars', 'branch', 'loops'];
   const TS = (name, script, world) => ({ name, world, script });
   const SYN_BZ = 'from gpiozero import Button, Buzzer, TonalBuzzer, from gpiozero.tones import Tone, buzzer.on(), buzzer.off(), buzzer.play(Tone("A4")), buzzer.stop(), button.is_pressed, time.sleep, def, while True:, if / else';
@@ -246,7 +246,8 @@ while True:
 <li><code>oled.fill(0)</code> σβήνει τα πάντα.</li>
 <li><code>oled.text("Visitors:", 0, 0, 1)</code> γράφει στη θέση x = 0, y = 0. Το τελευταίο <strong>1</strong> είναι το χρώμα (1 = φωτεινό). Με <code>size=2</code> τα γράμματα γίνονται διπλά.</li>
 <li><code>oled.show()</code> <strong>στέλνει</strong> όλα όσα έγραψες στην οθόνη.</li></ol>
-<p>Τα <code>text()</code> γράφουν σε μια μνήμη· η οθόνη αλλάζει μόνο με <code>oled.show()</code>. Κάποιος το ξέχασε…</p>`,
+<p>Τα <code>text()</code> γράφουν σε μια μνήμη· η οθόνη αλλάζει μόνο με <code>oled.show()</code>. Κάποιος το ξέχασε…</p>
+<p><small>Σε πραγματικό Raspberry Pi: <code>pip install adafruit-circuitpython-ssd1306</code>, και το αρχείο γραμματοσειράς <code>font5x8.bin</code> (από τα παραδείγματα της βιβλιοθήκης adafruit_framebuf) στον ίδιο φάκελο με το πρόγραμμα. Χωρίς αυτό το <code>text()</code> σταματά με λάθος.</small></p>`,
       glossary: ['OLED', 'I2C'], supportedSyntax: SYN_OLED,
       initialCode: OLED_BUG, solution: OLED_OK,
       world: { button: false }, initialWorld: { button: false }, hardware: ['oled', 'button'], panels: PANELS,

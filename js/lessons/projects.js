@@ -473,6 +473,7 @@ ${on(3) ? `        let line = format!("Alarms: {}", alarms);\n${txt('        ', 
       const world = Object.assign({}, W);
       const lesson = {
         id: `c${tr.n}-l${i + 1}`, chapter: tr.n, kind: st.kind,
+        missionStory: st.proj === 'A' ? 'Στην εξώπορτα φτιάχνεις ένα έξυπνο κουδούνι: παίζει ήχο, γράφει στην οθόνη, ανοίγει την πόρτα και μετράει τους επισκέπτες.' : 'Στην είσοδο στήνεις τον συναγερμό του σπιτιού: ο αισθητήρας κίνησης φυλάει, το κουμπί οπλίζει και αφοπλίζει, και η πόρτα κλειδώνει.',
         skills: (tr.skill ? [tr.skill] : []).concat(['io', 'state', 'conditions']),
         title: st.title, prerequisites: i === 0 ? [] : [`c${tr.n}-l${i}`],
         objectives: st.objectives, theory: st.theory,

@@ -252,7 +252,8 @@ fn main() -> Result<(), Box<dyn Error>> {
 <pre>Text::with_baseline("Visitors:", Point::new(0, 0), small, Baseline::Top)
     .draw(&amp;mut display).unwrap();</pre>
 <p>Το <code>draw</code> ζωγραφίζει σε μια μνήμη (buffer). Η οθόνη αλλάζει μόνο με <code>display.flush()</code>. Κάποιος το ξέχασε…</p>
-<p>Γιατί <code>.unwrap()</code> και όχι <code>?</code>; Τα λάθη της οθόνης (<code>DisplayError</code>) δεν μετατρέπονται σε <code>Box&lt;dyn Error&gt;</code>. Σε πραγματικό έργο θα τα χειριζόσουν με <code>map_err</code>.</p>`,
+<p>Γιατί <code>.unwrap()</code> και όχι <code>?</code>; Τα λάθη της οθόνης (<code>DisplayError</code>) δεν μετατρέπονται σε <code>Box&lt;dyn Error&gt;</code>. Σε πραγματικό έργο θα τα χειριζόσουν με <code>map_err</code>.</p>
+<p><small>Σε πραγματικό Raspberry Pi, στο <code>Cargo.toml</code>: <code>rppal = { version = "0.22", features = ["hal"] }</code>, μαζί με <code>ssd1306</code> και <code>embedded-graphics</code>. Χωρίς το <code>hal</code>, το <code>I2c</code> δεν «ταιριάζει» με το ssd1306 και ο κώδικας δεν γίνεται compile.</small></p>`,
       glossary: ['OLED', 'I2C', 'embedded-graphics'], supportedSyntax: SYN_OLED,
       initialCode: OLED_BUG, solution: OLED_OK,
       world: { button: false }, hardware: ['oled', 'button'], panels: PANELS,
@@ -271,6 +272,7 @@ fn main() -> Result<(), Box<dyn Error>> {
   lessons.forEach((l, i) => {
     const world = l.world || {};
     L.lessons.push(Object.assign({
+      missionStory: 'Στο σαλόνι στήνεις νέα εξαρτήματα: ένα buzzer για ήχο, ένα servo για κίνηση, ένα LED RGB για χρώμα και μια μικρή οθόνη. Δοκίμασε το καθένα πριν το βάλεις στο σπίτι.',
       id: `c${N}-l${i + 1}`, chapter: N, lang: 'rust', board: 'pi',
       prerequisites: i === 0 ? [] : [`c${N}-l${i}`]
     }, l, { world, initialWorld: world }));

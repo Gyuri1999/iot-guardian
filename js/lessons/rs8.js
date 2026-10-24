@@ -262,7 +262,8 @@ ${HEAD}
       theory: `
 <p>Η οθόνη <strong>OLED</strong> συνδέεται με <strong>I2C</strong> (SDA = GPIO 21, SCL = GPIO 22). Στο ESP32 φτιάχνεις τον δίαυλο με <code>I2cDriver::new(peripherals.i2c0, peripherals.pins.gpio21, peripherals.pins.gpio22, &amp;config)?</code>.</p>
 <p>Από εκεί και πέρα ο κώδικας είναι <strong>ίδιος με του Raspberry Pi</strong>: τα crates <code>ssd1306</code> και <code>embedded-graphics</code> δεν νοιάζονται ποια πλακέτα έχεις. Αυτή είναι μια μεγάλη δύναμη της Rust.</p>
-<p>Το <code>draw</code> ζωγραφίζει σε μια μνήμη (buffer). Η οθόνη αλλάζει μόνο με <code>display.flush()</code>. Κάποιος το ξέχασε…</p>`,
+<p>Το <code>draw</code> ζωγραφίζει σε μια μνήμη (buffer). Η οθόνη αλλάζει μόνο με <code>display.flush()</code>. Κάποιος το ξέχασε…</p>
+<p>Γιατί <code>.unwrap()</code> και όχι <code>?</code>; Τα λάθη της οθόνης (<code>DisplayError</code>) δεν μετατρέπονται σε <code>anyhow::Error</code>, γιατί δεν υλοποιούν το <code>std::error::Error</code>.</p>`,
       glossary: ['OLED', 'I2C', 'embedded-graphics'], supportedSyntax: SYN_OLED,
       initialCode: OLED_BUG, solution: OLED_OK,
       world: { button: false }, hardware: ['oled', 'button'], panels: PANELS,
@@ -281,6 +282,7 @@ ${HEAD}
   lessons.forEach((l, i) => {
     const world = l.world || {};
     L.lessons.push(Object.assign({
+      missionStory: 'Στο σαλόνι στήνεις νέα εξαρτήματα: ένα buzzer για ήχο, ένα servo για κίνηση, ένα LED RGB για χρώμα και μια μικρή οθόνη. Δοκίμασε το καθένα πριν το βάλεις στο σπίτι.',
       id: `c${N}-l${i + 1}`, chapter: N, lang: 'rust', board: 'esp32',
       prerequisites: i === 0 ? [] : [`c${N}-l${i}`]
     }, l, { world, initialWorld: world }));

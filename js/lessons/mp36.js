@@ -20,7 +20,7 @@
     { term: 'I2C', def: 'Τρόπος επικοινωνίας με δύο καλώδια: SDA (δεδομένα) και SCL (ρολόι). Πολλές συσκευές μπορούν να μοιράζονται τα ίδια δύο καλώδια.' }
   ].forEach(g => { if (!L.GLOSSARY.some(x => x.term === g.term)) L.GLOSSARY.push(g); });
 
-  const BASE = { lang: 'python', board: 'esp32', chapter: 36 };
+  const BASE = { lang: 'python', board: 'esp32', chapter: 36, missionStory: 'Στο σαλόνι στήνεις νέα εξαρτήματα: ένα buzzer για ήχο, ένα servo για κίνηση, ένα LED RGB για χρώμα και μια μικρή οθόνη. Δοκίμασε το καθένα πριν το βάλεις στο σπίτι.' };
   const PANELS = ['serial', 'vars', 'branch', 'loops'];
   const SYN_PWM = 'from machine import Pin, PWM, PWM(Pin(23)), .freq(Hz), .duty_u16(0…65535), .duty(0…1023), Pin(15, Pin.IN), .value(), time.sleep_ms, def, while True:, if / else';
   const SYN_OLED = 'from machine import Pin, I2C, import ssd1306, I2C(0, scl=Pin(22), sda=Pin(21)), ssd1306.SSD1306_I2C(128, 64, i2c), oled.fill(0), oled.text("…", x, y), oled.show(), dht.DHT22(Pin(13)), str()';

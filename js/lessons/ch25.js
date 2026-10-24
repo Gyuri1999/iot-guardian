@@ -21,6 +21,7 @@
   ].forEach(g => { if (!L.GLOSSARY.some(x => x.term === g.term)) L.GLOSSARY.push(g); });
 
   const PANELS = ['serial', 'vars', 'branch', 'loops'];
+  const STORY = 'Στο σαλόνι στήνεις νέα εξαρτήματα: ένα buzzer για ήχο, ένα servo για κίνηση, ένα LED RGB για χρώμα και μια μικρή οθόνη. Δοκίμασε το καθένα πριν το βάλεις στο σπίτι.';
   const SYNTAX_BZ = 'pinMode, digitalRead, tone(BUZZER_PIN, συχνότητα [, ms]), noTone(BUZZER_PIN), delay, if / else';
   const SYNTAX_SRV = 'servo.attach(SERVO_PIN), servo.write(γωνία 0–180), servo.read(), digitalRead, if / else';
   const SYNTAX_RGB = 'analogWrite(RGB_RED_PIN / RGB_GREEN_PIN / RGB_BLUE_PIN, 0–255), readTemperature(), float, if / else if / else, δικές σου συναρτήσεις';
@@ -195,7 +196,7 @@ void loop() {
   const TS = (name, script, world) => ({ name, world, script });
   L.lessons.push(
     {
-      id: 'c25-l1', chapter: 25, kind: 'micro', skills: ['io', 'conditions'],
+      id: 'c25-l1', chapter: 25, missionStory: STORY, kind: 'micro', skills: ['io', 'conditions'],
       title: 'Το κουδούνι: tone() και noTone()',
       prerequisites: [],
       objectives: ['Να βγάζω ήχο από το buzzer με tone().', 'Να σταματώ τον ήχο με noTone().', 'Να ξέρω τι είναι η συχνότητα.'],
@@ -219,7 +220,7 @@ void loop() {
       remediation: 'Έλεγξε ότι βάζεις tone() μέσα στο if και noTone() μέσα στο else, και ότι χρησιμοποιείς το BUZZER_PIN.'
     },
     {
-      id: 'c25-l2', chapter: 25, kind: 'guided', skills: ['timing', 'io'],
+      id: 'c25-l2', chapter: 25, missionStory: STORY, kind: 'guided', skills: ['timing', 'io'],
       title: 'Μια μελωδία: ντο, μι, σολ',
       prerequisites: ['c25-l1'],
       objectives: ['Να παίζω νότες με διάρκεια: tone(pin, συχνότητα, ms).', 'Να χρησιμοποιώ μια δική μου συνάρτηση για κάθε νότα.'],
@@ -241,7 +242,7 @@ void loop() {
       remediation: 'Χρειάζονται τρεις κλήσεις note(): 262, 330 και 392 Hz.'
     },
     {
-      id: 'c25-l3', chapter: 25, kind: 'guided', skills: ['io', 'conditions'],
+      id: 'c25-l3', chapter: 25, missionStory: STORY, kind: 'guided', skills: ['io', 'conditions'],
       title: 'Η πόρτα του γκαράζ: servo',
       prerequisites: ['c25-l2'],
       objectives: ['Να συνδέω το servo με servo.attach().', 'Να το γυρίζω σε γωνία με servo.write().'],
@@ -266,7 +267,7 @@ void loop() {
       remediation: 'Χρειάζεται servo.attach(SERVO_PIN) στο setup() και servo.write(90) όταν είναι πατημένο το κουμπί.'
     },
     {
-      id: 'c25-l4', chapter: 25, kind: 'guided', skills: ['sensors', 'conditions', 'io'],
+      id: 'c25-l4', chapter: 25, missionStory: STORY, kind: 'guided', skills: ['sensors', 'conditions', 'io'],
       title: 'Φως διάθεσης: χρώματα με LED RGB',
       prerequisites: ['c25-l3'],
       objectives: ['Να ανακατεύω χρώματα με analogWrite(0–255).', 'Να διαλέγω χρώμα ανάλογα με τη θερμοκρασία.'],
@@ -290,7 +291,7 @@ void loop() {
       remediation: 'Χρειάζονται τρεις περιπτώσεις: κάτω από 20 μπλε, έως 28 πράσινο, πάνω από 28 κόκκινο.'
     },
     {
-      id: 'c25-l5', chapter: 25, kind: 'debug', skills: ['sensors', 'syntax'],
+      id: 'c25-l5', chapter: 25, missionStory: STORY, kind: 'debug', skills: ['sensors', 'syntax'],
       title: 'Βρες το λάθος: η οθόνη μένει άδεια',
       prerequisites: ['c25-l4'],
       objectives: ['Να γράφω κείμενο και αριθμούς στην οθόνη OLED.', 'Να καταλάβω ότι η οθόνη ενημερώνεται μόνο με display.display().'],
