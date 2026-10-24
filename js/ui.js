@@ -169,6 +169,7 @@
     gear: '<circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M4.9 4.9l2.1 2.1M17 17l2.1 2.1M4.9 19.1L7 17M17 7l2.1-2.1"/>',
     save: '<path d="M5 3h11l3 3v15H5z"/><path d="M8 3v6h8V3"/><rect x="8" y="13" width="8" height="5"/>',
     play: '<path d="M7 4l13 8-13 8z"/>',
+    shield: '<path d="M12 3l8 3v6c0 4.5-3.4 8-8 9-4.6-1-8-4.5-8-9V6z"/><path d="M9 12l2 2 4-4"/>',
     pause: '<path d="M7 4v16M17 4v16"/>',
     stop: '<rect x="6" y="6" width="12" height="12" rx="1.5"/>',
     flag: '<path d="M5 21V4"/><path d="M5 4h11l-2 4 2 4H5"/>',
@@ -238,6 +239,7 @@
       ${b('nav-home', 'home', 'Αρχική και χάρτης κεφαλαίων', active === 'home')}
       ${b('nav-lab', 'chip', 'Εργαστήριο: συνέχεια από εκεί που έμεινες', active === 'lab')}
       ${b('nav-sandbox', 'tool', 'Ελεύθερο εργαστήριο: πειραματίσου χωρίς ασκήσεις', active === 'sandbox')}
+      ${b('nav-cases', 'shield', 'Ιστορίες ασφάλειας: πραγματικές επιθέσεις και πώς προστατεύεσαι', active === 'cases')}
       ${b('nav-lang', 'lang', 'Γλώσσα και πλακέτα', active === 'lang')}
       <button class="rail-btn" data-open="collection" title="Συλλογή: κάρτες ιστορίας και σήματα" aria-label="Συλλογή: κάρτες ιστορίας και σήματα">${icon('star')}</button>
       <button class="rail-btn" data-open="glossary" title="Γλωσσάρι" aria-label="Γλωσσάρι">${icon('book')}</button>
@@ -768,6 +770,7 @@
     $('#nav-home').onclick = renderHome;
     $('#nav-lang').onclick = renderPicker;
     if ($('#nav-sandbox')) $('#nav-sandbox').onclick = openSandbox;
+    if ($('#nav-cases')) $('#nav-cases').onclick = () => renderCases();
     $('#nav-lab').onclick = () => {
       if (!curTrack()) { renderPicker(); return; }
       const cur = P.current && byId[P.current];
@@ -1421,6 +1424,157 @@
       explanationOnSuccess: '', remediation: ''
     };
   }
+  // ------------------------------------------------------------ Ιστορίες ασφάλειας (js/cases.js, js/cases-data.js)
+  function renderCases() {
+    const C = window.IoTCases;
+    if (!C) return;
+    stopMachine();
+    if (S.casePlayer) { S.casePlayer.stop(); S.casePlayer = null; }
+    S.task = null;
+    P.cases = P.cases || {};
+    document.title = 'Ιστορίες ασφάλειας · IoT Guardian';
+    const done = C.CASES.filter(c => P.cases[c.id]).length;
+    const cards = C.CASES.map(c => `<button type="button" class="case-card${P.cases[c.id] ? ' done' : ''}" data-case="${c.id}">
+        <span class="cc-ic" aria-hidden="true">${c.cover}</span>
+        <span class="cc-body"><b>${esc(c.title)}</b><small>${esc(c.year)} · ${esc(c.device)}</small><span class="cc-src">${esc(c.source.short)}</span></span>
+        <span class="cc-state">${P.cases[c.id] ? '✓ ολοκληρώθηκε' : 'ξεκίνα →'}</span></button>`).join('');
+    app().innerHTML = `<div class="app">${rail('cases')}
+      <div class="main cases">
+        ${header('Ιστορίες ασφάλειας', done, C.CASES.length, 'Σήμερα', new Date().toLocaleDateString('el-GR', { day: 'numeric', month: 'short', year: 'numeric' }))}
+        <div class="card cases-intro">
+          <span class="kind-tag">${icon('shield')} Ιστορίες ασφάλειας</span>
+          <h1>Πραγματικές επιθέσεις σε συσκευές IoT, και πώς προστατεύεσαι</h1>
+          <p>Κάθε ιστορία βασίζεται σε δημοσιευμένη έρευνα. Βλέπεις <strong>πώς έγινε</strong> σε μια κινούμενη σκηνή, διαλέγεις <strong>μέτρα προστασίας</strong> και η ίδια επίθεση ξαναπαίζει: αν διάλεξες σωστά, σταματά. Στο τέλος, ένα μικρό κουίζ.</p>
+          <p class="muted">Δείχνουμε μόνο την ιδέα κάθε επίθεσης, για να καταλάβεις πώς αμύνεσαι. Ποτέ μη δοκιμάζεις επιθέσεις σε συσκευές που δεν είναι δικές σου.</p>
+        </div>
+        <div class="case-grid">${cards}</div>
+      </div></div>`;
+    bindRail();
+    app().querySelectorAll('[data-case]').forEach(b => { b.onclick = () => renderCase(b.dataset.case); });
+    window.scrollTo(0, 0);
+  }
+
+  function renderCase(id) {
+    const C = window.IoTCases;
+    const c = C.CASES.find(x => x.id === id);
+    if (!c) { renderCases(); return; }
+    stopMachine();
+    if (S.casePlayer) S.casePlayer.stop();
+    document.title = `${c.title} · Ιστορίες ασφάλειας · IoT Guardian`;
+    const st = { phase: 1, watched: !!P.cases[id], defOk: !!P.cases[id] };
+    const ch = c.chapter ? chByN(c.chapter) : null;
+    app().innerHTML = `<div class="app">${rail('cases')}
+      <div class="main cases case-page">
+        <div class="case-top"><button class="btn sm" id="case-back">← Όλες οι ιστορίες</button></div>
+        <div class="card case-head">
+          <span class="kind-tag">${c.cover} ${esc(c.year)} · ${esc(c.device)}</span>
+          <h1>${esc(c.title)}</h1>
+          <p>${esc(c.intro)}</p>
+          <p class="case-src">Πηγή: <a href="${esc(c.source.url)}" target="_blank" rel="noopener noreferrer">${esc(c.source.cite)}</a></p>
+        </div>
+        <div class="case-tabs" role="tablist" aria-label="Μέρη της ιστορίας">
+          <button role="tab" class="case-tab" data-phase="1">1 · Πώς έγινε</button>
+          <button role="tab" class="case-tab" data-phase="2">2 · Προστάτευσέ το</button>
+          <button role="tab" class="case-tab" data-phase="3">3 · Κουίζ</button>
+        </div>
+        <div class="card case-stage-card">
+          <div class="case-stage" id="case-stage"></div>
+          <div class="case-say" id="case-say" aria-live="polite"><span class="cs-n" id="case-n"></span><span id="case-text">Πάτα «Παίξε» για να δεις πώς έγινε.</span></div>
+          <div class="case-ctl">
+            <button class="btn primary sm" id="case-play">${icon('play')} Παίξε</button>
+            <button class="btn sm" id="case-step">${icon('step')} Επόμενο βήμα</button>
+            <button class="btn sm" id="case-reset">⟲ Από την αρχή</button>
+            <span class="spacer"></span>
+            ${window.IoTSpeak && window.IoTSpeak.supported() ? `<button class="btn quiet sm" id="case-say-btn">${icon('speaker')} Άκουσε</button>` : ''}
+          </div>
+        </div>
+        <div class="card case-panel" id="case-panel"></div>
+      </div></div>`;
+    bindRail();
+    $('#case-back').onclick = renderCases;
+    let lastSay = '';
+    const player = C.mount($('#case-stage'), c, {
+      motion: motionOK,
+      sfx: n => sfx(n),
+      onSay: (text, k, n, good) => {
+        lastSay = text;
+        $('#case-n').textContent = `Βήμα ${k + 1}/${n}`;
+        $('#case-text').textContent = text;
+        $('#case-say').classList.toggle('good', !!good);
+      },
+      onEnd: r => {
+        if (r.attack) { st.watched = true; $('#case-text').textContent = lastSay + ' ' + '— Τέλος της επίθεσης. Πάμε στο «Προστάτευσέ το».'; tabs(); if (st.phase === 1) panel(); }
+        else if (r.blocked) { $('#case-say').classList.add('good'); sfx('win'); }
+        else { $('#case-text').textContent = '⚠️ Η επίθεση πέτυχε ξανά: τα μέτρα σου δεν τη σταμάτησαν.'; sfx('err'); }
+      }
+    });
+    S.casePlayer = player;
+    $('#case-play').onclick = () => player.play();
+    $('#case-step').onclick = () => player.step();
+    $('#case-reset').onclick = () => { player.reset(); $('#case-n').textContent = ''; $('#case-text').textContent = 'Πάτα «Παίξε» για να δεις πώς έγινε.'; $('#case-say').classList.remove('good'); };
+    if ($('#case-say-btn')) $('#case-say-btn').onclick = () => window.IoTSpeak.say($('#case-text').textContent);
+
+    function tabs() {
+      app().querySelectorAll('.case-tab').forEach(b => {
+        const p = Number(b.dataset.phase);
+        const open = p === 1 || (p === 2 && st.watched) || (p === 3 && st.defOk);
+        b.disabled = !open;
+        b.setAttribute('aria-selected', String(p === st.phase));
+        b.classList.toggle('on', p === st.phase);
+        b.onclick = () => { st.phase = p; tabs(); panel(); };
+      });
+    }
+    function panel() {
+      const el = $('#case-panel');
+      if (st.phase === 1) {
+        el.innerHTML = `<h2>Πώς έγινε</h2><ol class="case-steps">${c.steps.map(s => `<li>${esc(s.say)}</li>`).join('')}</ol>
+          ${st.watched ? '<button class="btn primary" id="case-go2">Προστάτευσέ το →</button>' : '<p class="muted">Δες όλη την επίθεση (▶ Παίξε) για να ξεκλειδώσει το επόμενο μέρος.</p>'}`;
+        if ($('#case-go2')) $('#case-go2').onclick = () => { st.phase = 2; tabs(); panel(); };
+        return;
+      }
+      if (st.phase === 2) {
+        el.innerHTML = `<h2>Προστάτευσέ το</h2><p>Ποια μέτρα θα είχαν σταματήσει αυτή την επίθεση; Διάλεξε <strong>όλα</strong> τα σωστά (και κανένα λάθος) και ξαναπαίξε την.</p>
+          <div class="case-defs">${c.defenses.map(d => `<label class="case-def"><input type="checkbox" value="${d.id}"> <span>${esc(d.label)}</span></label>`).join('')}</div>
+          <div class="case-ctl"><button class="btn primary" id="case-try">${icon('shield')} Ξαναπαίξε με τα μέτρα μου</button></div>
+          <div id="case-fb" aria-live="polite"></div>`;
+        $('#case-try').onclick = () => {
+          const chosen = [...el.querySelectorAll('.case-def input:checked')].map(x => x.value);
+          const j = C.judge(c, chosen);
+          player.replay(chosen);
+          window.scrollTo({ top: $('#case-stage').getBoundingClientRect().top + scrollY - 20, behavior: motionOK() ? 'smooth' : 'auto' });
+          const row = (d, cls, head) => `<li class="${cls}"><b>${head} ${esc(d.label)}</b><br>${esc(d.why)}</li>`;
+          $('#case-fb').innerHTML = `<ul class="case-fb">${j.good.map(d => row(d, 'ok', '✓')).join('')}${j.bad.map(d => row(d, 'no', '✗')).join('')}</ul>
+            ${j.ok ? '<p class="case-win">Σωστά! Με αυτά τα μέτρα η επίθεση σταματά. <button class="btn primary sm" id="case-go3">Στο κουίζ →</button></p>'
+              : `<p class="case-miss">${j.missed.length ? `Σου λείπουν ακόμα ${j.missed.length} σωστά μέτρα. ` : ''}${j.bad.length ? 'Ξεδιάλεξε όσα δεν βοηθούν (✗). ' : ''}Δοκίμασε ξανά.</p>`}`;
+          if (j.ok) { st.defOk = true; tabs(); $('#case-go3').onclick = () => { st.phase = 3; tabs(); panel(); }; }
+        };
+        return;
+      }
+      const q = c.quiz;
+      el.innerHTML = `<h2>Κουίζ</h2><fieldset class="case-quiz"><legend>${esc(q.question)}</legend>
+          ${q.options.map((o, k) => `<label><input type="radio" name="case-q" value="${k}"> ${esc(o)}</label>`).join('')}</fieldset>
+        <button class="btn primary" id="case-check">Έλεγχος</button><div id="case-qfb" aria-live="polite"></div>`;
+      $('#case-check').onclick = () => {
+        const v = el.querySelector('input[name="case-q"]:checked');
+        if (!v) { $('#case-qfb').innerHTML = '<p class="case-miss">Διάλεξε μια απάντηση.</p>'; return; }
+        if (Number(v.value) !== q.answer) { sfx('err'); $('#case-qfb').innerHTML = `<p class="case-miss">Όχι ακόμα. ${esc(q.retry || 'Ξαναδές την επίθεση και τα μέτρα.')}</p>`; return; }
+        const first = !P.cases[id];
+        P.cases[id] = true;
+        save();
+        sfx('win');
+        $('#case-qfb').innerHTML = `<p class="case-win">${esc(q.explain)}</p>
+          <div class="case-lesson"><h3>Τι κρατάμε</h3><p>${esc(c.lesson)}</p>
+          ${ch ? `<p>Εξάσκηση στον κώδικα: <strong>Κεφάλαιο ${ch.n} · ${esc(ch.title)}</strong>.</p>` : ''}</div>
+          <button class="btn" id="case-more">Όλες οι ιστορίες</button>`;
+        $('#case-more').onclick = renderCases;
+        if (first) announce('Η ιστορία ολοκληρώθηκε!');
+      };
+    }
+    tabs();
+    panel();
+    window.scrollTo(0, 0);
+  }
+
   function openSandbox() {
     const tr = curTrack();
     if (!tr || !window.IoTSandbox) { renderPicker(); return; }

@@ -28,6 +28,7 @@
       wired: {},
       challenges: {},
       sandbox: { hw: {}, code: {} },
+      cases: {},
       blocks: {},
       tours: {},
       daily: null,
@@ -58,6 +59,10 @@
     if (obj.stories && typeof obj.stories === 'object') for (const [k, v] of Object.entries(obj.stories)) if (/^\d{1,3}$/.test(k) && v === true) out.stories[k] = true;
     if (obj.blocks && typeof obj.blocks === 'object' && root.IoTBlocks) {
       for (const [k, v] of Object.entries(obj.blocks)) if ((ids.has(k) || /^sandbox:(cpp|py|rs)-(esp32|pi)$/.test(k)) && v && typeof v === 'object') out.blocks[k] = root.IoTBlocks.normalize(v);
+    }
+    if (obj.cases && typeof obj.cases === 'object') {
+      const known = root.IoTCases ? new Set(root.IoTCases.CASES.map(c => c.id)) : null;
+      for (const [k, v] of Object.entries(obj.cases)) if (/^[a-z0-9-]{2,30}$/.test(k) && v === true && (!known || known.has(k))) out.cases[k] = true;
     }
     if (obj.tours && typeof obj.tours === 'object') for (const k of ['home', 'lab']) if (obj.tours[k] === true) out.tours[k] = true;
     const sb = obj.sandbox;

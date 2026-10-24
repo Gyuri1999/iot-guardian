@@ -20,12 +20,13 @@ for (const f of extra) {
   try { vm.runInContext(fs.readFileSync(path.join(ROOT, 'js', 'lessons', f), 'utf8'), ctx, { filename: 'lessons/' + f }); }
   catch (e) { loadErrors.push(f + ': ' + e.message); }
 }
+for (const f of ['cases.js', 'cases-data.js']) vm.runInContext(fs.readFileSync(path.join(ROOT, 'js', f), 'utf8'), ctx, { filename: f });
 vm.runInContext(fs.readFileSync(path.join(ROOT, 'js', 'storage.js'), 'utf8'), ctx, { filename: 'storage.js' });
 vm.runInContext(fs.readFileSync(path.join(ROOT, 'js', 'learn.js'), 'utf8'), ctx, { filename: 'learn.js' });
 vm.runInContext(fs.readFileSync(path.join(ROOT, 'js', 'wiring.js'), 'utf8'), ctx, { filename: 'wiring.js' });
 vm.runInContext(fs.readFileSync(path.join(ROOT, 'js', 'challenge.js'), 'utf8'), ctx, { filename: 'challenge.js' });
 vm.runInContext(fs.readFileSync(path.join(ROOT, 'js', 'blocks.js'), 'utf8'), ctx, { filename: 'blocks.js' });
-const { IoTInterp, IoTDevice, IoTValidator, IoTLessons, IoTStorage, IoTLearn, IoTWiring, IoTChallenge, IoTBlocks } = ctx;
+const { IoTInterp, IoTDevice, IoTValidator, IoTLessons, IoTStorage, IoTLearn, IoTWiring, IoTChallenge, IoTBlocks, IoTCases } = ctx;
 
 let passed = 0;
 let failed = 0;
@@ -778,6 +779,34 @@ test('Rust στο Pi: set_pwm_frequency θέλει f64 και το rppal::i2c δ
   let e2 = null;
   try { new IoTValidator.Runner('use rppal::i2c::I2c;\nfn main() {}\n', { board: 'esp32' }, {}, 'rust'); } catch (x) { e2 = x; }
   assert(e2 && /E0432/.test(e2.message), 'το rppal είναι μόνο για το Pi');
+});
+
+// ------------------------------------------------------------ ιστορίες ασφάλειας (js/cases.js, js/cases-data.js)
+test('ιστορίες ασφάλειας: τουλάχιστον 6, όλες με σωστά δεδομένα και πηγή', () => {
+  assert(IoTCases.CASES.length >= 6, 'λίγες ιστορίες: ' + IoTCases.CASES.length);
+  const ids = new Set();
+  for (const c of IoTCases.CASES) {
+    eq(IoTCases.check(c), [], c.id);
+    assert(!ids.has(c.id), 'διπλό id ' + c.id); ids.add(c.id);
+    assert(c.steps.length >= 3 && c.defenses.some(d => !d.good), c.id + ': θέλει βήματα και τουλάχιστον ένα λάθος μέτρο');
+    if (c.chapter) assert(IoTLessons.CHAPTERS.some(ch => ch.n === c.chapter), c.id + ': άγνωστο κεφάλαιο ' + c.chapter);
+  }
+});
+test('ιστορίες ασφάλειας: αξιολόγηση μέτρων', () => {
+  const c = IoTCases.CASES[0];
+  const good = c.defenses.filter(d => d.good).map(d => d.id);
+  const bad = c.defenses.filter(d => !d.good).map(d => d.id);
+  const j = IoTCases.judge(c, good);
+  assert(j.ok && j.stopStep >= 0, 'όλα τα σωστά → ok');
+  assert(!IoTCases.judge(c, good.concat(bad[0])).ok, 'με λάθος μέτρο δεν περνά');
+  assert(!IoTCases.judge(c, good.slice(1)).ok || good.length === 1, 'αν λείπει σωστό δεν περνά');
+  eq(IoTCases.judge(c, bad).stopStep, -1);
+});
+test('ιστορίες ασφάλειας: αποθήκευση ολοκληρωμένων', () => {
+  const s = IoTStorage.defaults();
+  s.cases = { [IoTCases.CASES[0].id]: true, 'den-yparxei': true, 'Κακό': true };
+  const v = IoTStorage.validate(JSON.parse(JSON.stringify(s)));
+  eq(Object.keys(v.data ? v.data.cases : v.value.cases), [IoTCases.CASES[0].id]);
 });
 
 console.log(`\n${passed} πέρασαν, ${failed} απέτυχαν\n`);
