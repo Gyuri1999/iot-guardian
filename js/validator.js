@@ -198,7 +198,7 @@
     },
     // OLED: { check: 'oled', has: '24.5' } ή { check: 'oled', empty: false }
     oled(b, c) {
-      const t = b.oledText ? b.oledText() : '';
+      const t = b.oledText ? b.oledText().replace(/\s+/g, ' ').trim() : '';
       const pass = c.has !== undefined ? t.includes(c.has) : c.empty !== undefined ? (t === '') === c.empty : t !== '';
       return { pass, vars: { v: t ? `«${t}»` : (b.oled && b.oled.pending ? 'τίποτα (λείπει το display.display())' : 'τίποτα') } };
     },
