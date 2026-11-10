@@ -169,6 +169,7 @@
     gear: '<circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M4.9 4.9l2.1 2.1M17 17l2.1 2.1M4.9 19.1L7 17M17 7l2.1-2.1"/>',
     save: '<path d="M5 3h11l3 3v15H5z"/><path d="M8 3v6h8V3"/><rect x="8" y="13" width="8" height="5"/>',
     play: '<path d="M7 4l13 8-13 8z"/>',
+    radar: '<circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="5"/><path d="M12 12l6-6"/><circle cx="16" cy="15" r="1.2"/>',
     shield: '<path d="M12 3l8 3v6c0 4.5-3.4 8-8 9-4.6-1-8-4.5-8-9V6z"/><path d="M9 12l2 2 4-4"/>',
     pause: '<path d="M7 4v16M17 4v16"/>',
     stop: '<rect x="6" y="6" width="12" height="12" rx="1.5"/>',
@@ -239,6 +240,7 @@
       ${b('nav-home', 'home', 'Αρχική και χάρτης κεφαλαίων', active === 'home')}
       ${b('nav-lab', 'chip', 'Εργαστήριο: συνέχεια από εκεί που έμεινες', active === 'lab')}
       ${b('nav-sandbox', 'tool', 'Ελεύθερο εργαστήριο: πειραματίσου χωρίς ασκήσεις', active === 'sandbox')}
+      ${b('nav-intruder', 'radar', 'Βρες τον εισβολέα: μπλόκαρε τα ύποπτα πακέτα στο δίκτυο', active === 'intruder')}
       ${b('nav-cases', 'shield', 'Ιστορίες ασφάλειας: πραγματικές επιθέσεις και πώς προστατεύεσαι', active === 'cases')}
       ${b('nav-lang', 'lang', 'Γλώσσα και πλακέτα', active === 'lang')}
       <button class="rail-btn" data-open="collection" title="Συλλογή: κάρτες ιστορίας και σήματα" aria-label="Συλλογή: κάρτες ιστορίας και σήματα">${icon('star')}</button>
@@ -771,6 +773,7 @@
     $('#nav-lang').onclick = renderPicker;
     if ($('#nav-sandbox')) $('#nav-sandbox').onclick = openSandbox;
     if ($('#nav-cases')) $('#nav-cases').onclick = () => renderCases();
+    if ($('#nav-intruder')) $('#nav-intruder').onclick = () => renderIntruder();
     $('#nav-lab').onclick = () => {
       if (!curTrack()) { renderPicker(); return; }
       const cur = P.current && byId[P.current];
@@ -1424,6 +1427,49 @@
       explanationOnSuccess: '', remediation: ''
     };
   }
+  // ------------------------------------------------------------ Βρες τον εισβολέα (js/intruder.js)
+  function renderIntruder() {
+    const G = window.IoTIntruder;
+    if (!G) return;
+    stopMachine();
+    if (S.casePlayer) { S.casePlayer.stop(); S.casePlayer = null; }
+    if (S.intruder) { S.intruder.stop(); S.intruder = null; }
+    S.task = null;
+    P.intruder = P.intruder || {};
+    document.title = 'Βρες τον εισβολέα · IoT Guardian';
+    const total = G.ROUNDS.length * 3;
+    const got = () => G.ROUNDS.reduce((a, r) => a + (P.intruder[r.id] || 0), 0);
+    app().innerHTML = `<div class="app">${rail('intruder')}
+      <div class="main intruder">
+        ${header('Αστέρια φύλακα δικτύου', got(), total, 'Σήμερα', new Date().toLocaleDateString('el-GR', { day: 'numeric', month: 'short', year: 'numeric' }))}
+        <div class="card cases-intro">
+          <span class="kind-tag">${icon('radar')} Μίνι παιχνίδι</span>
+          <h1>Βρες τον εισβολέα</h1>
+          <p>Είσαι το <strong>firewall</strong> του σπιτιού. Κάθε πακέτο σταματά στο router και σου δείχνει από πού έρχεται, πού πάει και τι λέει. Εσύ αποφασίζεις: <strong>περνάει</strong> ή <strong>μπλοκάρεται</strong>; Κάθε μπλοκ γίνεται ένας κανόνας firewall. Δεν υπάρχει χρονόμετρο: το πακέτο σε περιμένει.</p>
+          <p class="muted">Όλα είναι συνθετικά: διευθύνσεις, συσκευές και μηνύματα. Μαθαίνουμε μόνο να αμυνόμαστε.</p>
+        </div>
+        <div class="card itr-host" id="itr-host"></div>
+      </div></div>`;
+    bindRail();
+    S.intruder = G.mount($('#itr-host'), {
+      progress: P.intruder,
+      motion: motionOK,
+      sfx: n => sfx(n),
+      speak: window.IoTSpeak && window.IoTSpeak.supported() ? t => window.IoTSpeak.say(t) : null,
+      onResult: (id, stars) => {
+        const first = !P.intruder[id];
+        P.intruder[id] = Math.max(P.intruder[id] || 0, stars);
+        save();
+        const n = app().querySelector('.progress-pill .pp-num');
+        if (n) n.textContent = `${got()}/${total}`;
+        const bar = app().querySelector('.progress-pill .pp-bar i');
+        if (bar) bar.style.width = Math.round((got() / total) * 100) + '%';
+        if (first) announce('Ο γύρος ολοκληρώθηκε!');
+      }
+    });
+    window.scrollTo(0, 0);
+  }
+
   // ------------------------------------------------------------ Ιστορίες ασφάλειας (js/cases.js, js/cases-data.js)
   function renderCases() {
     const C = window.IoTCases;

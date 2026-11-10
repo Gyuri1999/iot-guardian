@@ -29,6 +29,7 @@
       challenges: {},
       sandbox: { hw: {}, code: {} },
       cases: {},
+      intruder: {},
       blocks: {},
       tours: {},
       daily: null,
@@ -63,6 +64,9 @@
     if (obj.cases && typeof obj.cases === 'object') {
       const known = root.IoTCases ? new Set(root.IoTCases.CASES.map(c => c.id)) : null;
       for (const [k, v] of Object.entries(obj.cases)) if (/^[a-z0-9-]{2,30}$/.test(k) && v === true && (!known || known.has(k))) out.cases[k] = true;
+    }
+    if (obj.intruder && typeof obj.intruder === 'object') {
+      for (const [k, v] of Object.entries(obj.intruder)) if (/^r[1-9]$/.test(k) && Number.isInteger(v) && v >= 1 && v <= 3) out.intruder[k] = v;
     }
     if (obj.tours && typeof obj.tours === 'object') for (const k of ['home', 'lab']) if (obj.tours[k] === true) out.tours[k] = true;
     const sb = obj.sandbox;

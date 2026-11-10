@@ -20,13 +20,13 @@ for (const f of extra) {
   try { vm.runInContext(fs.readFileSync(path.join(ROOT, 'js', 'lessons', f), 'utf8'), ctx, { filename: 'lessons/' + f }); }
   catch (e) { loadErrors.push(f + ': ' + e.message); }
 }
-for (const f of ['cases.js', 'cases-data.js']) vm.runInContext(fs.readFileSync(path.join(ROOT, 'js', f), 'utf8'), ctx, { filename: f });
+for (const f of ['cases.js', 'cases-data.js', 'intruder.js']) vm.runInContext(fs.readFileSync(path.join(ROOT, 'js', f), 'utf8'), ctx, { filename: f });
 vm.runInContext(fs.readFileSync(path.join(ROOT, 'js', 'storage.js'), 'utf8'), ctx, { filename: 'storage.js' });
 vm.runInContext(fs.readFileSync(path.join(ROOT, 'js', 'learn.js'), 'utf8'), ctx, { filename: 'learn.js' });
 vm.runInContext(fs.readFileSync(path.join(ROOT, 'js', 'wiring.js'), 'utf8'), ctx, { filename: 'wiring.js' });
 vm.runInContext(fs.readFileSync(path.join(ROOT, 'js', 'challenge.js'), 'utf8'), ctx, { filename: 'challenge.js' });
 vm.runInContext(fs.readFileSync(path.join(ROOT, 'js', 'blocks.js'), 'utf8'), ctx, { filename: 'blocks.js' });
-const { IoTInterp, IoTDevice, IoTValidator, IoTLessons, IoTStorage, IoTLearn, IoTWiring, IoTChallenge, IoTBlocks, IoTCases } = ctx;
+const { IoTInterp, IoTDevice, IoTValidator, IoTLessons, IoTStorage, IoTLearn, IoTWiring, IoTChallenge, IoTBlocks, IoTCases, IoTIntruder } = ctx;
 
 let passed = 0;
 let failed = 0;
@@ -807,6 +807,35 @@ test('ιστορίες ασφάλειας: αποθήκευση ολοκληρω
   s.cases = { [IoTCases.CASES[0].id]: true, 'den-yparxei': true, 'Κακό': true };
   const v = IoTStorage.validate(JSON.parse(JSON.stringify(s)));
   eq(Object.keys(v.data ? v.data.cases : v.value.cases), [IoTCases.CASES[0].id]);
+});
+
+// ------------------------------------------------------------ βρες τον εισβολέα (js/intruder.js)
+test('εισβολέας: γύροι με σωστά, συνθετικά δεδομένα', () => {
+  assert(IoTIntruder.ROUNDS.length >= 4, 'λίγοι γύροι');
+  const ids = new Set();
+  for (const r of IoTIntruder.ROUNDS) {
+    eq(IoTIntruder.check(r), [], r.id);
+    assert(!ids.has(r.id), 'διπλό id ' + r.id); ids.add(r.id);
+  }
+  // ο έλεγχος πιάνει πραγματικές διευθύνσεις και ελλιπή πακέτα
+  const bad = JSON.parse(JSON.stringify(IoTIntruder.ROUNDS[0]));
+  bad.packets[1].addr = '8.8.8.8';
+  delete bad.packets[0].need;
+  assert(IoTIntruder.check(bad).length === 2, 'έπρεπε να βρει 2 προβλήματα');
+});
+test('εισβολέας: απόφαση, αστέρια και ξεκλείδωμα', () => {
+  const ps = IoTIntruder.ROUNDS[0].packets;
+  const evil = ps.find(p => p.bad), good = ps.find(p => !p.bad);
+  assert(IoTIntruder.judge(evil, 'block').correct && !IoTIntruder.judge(evil, 'allow').correct, 'κακό');
+  assert(IoTIntruder.judge(good, 'allow').correct && !IoTIntruder.judge(good, 'block').correct, 'καλό');
+  eq([0, 1, 2, 5].map(IoTIntruder.stars), [3, 2, 1, 1]);
+  assert(IoTIntruder.unlocked({}, 0) && !IoTIntruder.unlocked({}, 1) && IoTIntruder.unlocked({ r1: 1 }, 1), 'ξεκλείδωμα');
+});
+test('εισβολέας: αποθήκευση αστεριών', () => {
+  const s = IoTStorage.defaults();
+  s.intruder = { r1: 3, r2: 7, r3: 'x', zz: 2, r4: 1 };
+  const v = IoTStorage.validate(JSON.parse(JSON.stringify(s)));
+  eq((v.data || v.value).intruder, { r1: 3, r4: 1 });
 });
 
 console.log(`\n${passed} πέρασαν, ${failed} απέτυχαν\n`);
