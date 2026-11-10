@@ -169,6 +169,7 @@
     gear: '<circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M4.9 4.9l2.1 2.1M17 17l2.1 2.1M4.9 19.1L7 17M17 7l2.1-2.1"/>',
     save: '<path d="M5 3h11l3 3v15H5z"/><path d="M8 3v6h8V3"/><rect x="8" y="13" width="8" height="5"/>',
     play: '<path d="M7 4l13 8-13 8z"/>',
+    xray: '<rect x="3" y="6" width="18" height="12" rx="2"/><path d="M7 9v6M11 9v6M15 9v6M19 9v6" stroke-dasharray="1.5 1.5"/>',
     radar: '<circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="5"/><path d="M12 12l6-6"/><circle cx="16" cy="15" r="1.2"/>',
     shield: '<path d="M12 3l8 3v6c0 4.5-3.4 8-8 9-4.6-1-8-4.5-8-9V6z"/><path d="M9 12l2 2 4-4"/>',
     pause: '<path d="M7 4v16M17 4v16"/>',
@@ -300,7 +301,36 @@
       window.IoTScene.buildIn(svg);
     }
     bindOrbit(wrap, svg, has3d, pz);
+    bindXray(wrap, has3d);
     return svg;
+  }
+
+  // ---------- «Μέσα»: ακτινογραφία του breadboard (μεταλλικές λωρίδες και ρεύμα που κυλά).
+  function bindXray(wrap, has3d) {
+    const D3 = window.IoTScene3D;
+    const ctl = wrap.querySelector('.scene-ctl');
+    const old = wrap.querySelector('#sc-xray');
+    if (old) old.remove();
+    if (!ctl || !has3d || !D3.xray || !D3.hasBoard()) { const n = wrap.parentElement.querySelector('.xray-note'); if (n) n.hidden = true; return; }
+    ctl.insertAdjacentHTML('beforeend', `<button class="sc-b sc-3d" id="sc-xray" aria-pressed="false" title="Δες μέσα στο breadboard: ποιες τρύπες ενώνονται και πώς κυλά το ρεύμα" aria-label="Δες μέσα στο breadboard">${icon('xray')}<span>Μέσα</span></button>`);
+    const btn = $('#sc-xray');
+    let note = wrap.parentElement.querySelector('.xray-note');
+    if (!note) {
+      wrap.insertAdjacentHTML('afterend', `<div class="xray-note" hidden><strong>Μέσα στο breadboard</strong>
+        <ul><li>Κάθε <b>στήλη από 5 τρύπες</b> ενώνεται από κάτω με μια <b>μεταλλική λωρίδα</b>. Ό,τι μπαίνει στην ίδια στήλη είναι συνδεδεμένο.</li>
+        <li>Οι μακριές λωρίδες πάνω και κάτω είναι οι <b>ράγες ρεύματος</b>: η κόκκινη για το +, η μπλε για τη γείωση (GND).</li>
+        <li>Οι <b>πορτοκαλί</b> λωρίδες είναι αυτές που χρησιμοποιεί το κύκλωμά σου. Όταν τρέχει ο κώδικας, οι <b>κίτρινες κουκκίδες</b> δείχνουν πώς κυλά το ρεύμα: από το pin, μέσα από το εξάρτημα, στη γείωση.</li></ul></div>`);
+      note = wrap.parentElement.querySelector('.xray-note');
+    }
+    const show = on => {
+      D3.xray(on);
+      S.xray = on;
+      btn.setAttribute('aria-pressed', String(on));
+      btn.classList.toggle('on', on);
+      if (note) note.hidden = !on;
+    };
+    btn.onclick = () => { show(!D3.xrayOn()); announce(D3.xrayOn() ? 'Βλέπεις μέσα στο breadboard: τις μεταλλικές λωρίδες και το ρεύμα.' : 'Κανονική όψη του breadboard.'); };
+    if (S.xray) show(true);
   }
 
   // ---------- 3D περιστροφή: η σκηνή γυρίζει γύρω γύρω (σύρσιμο, ροδέλα, Esc για επιστροφή).

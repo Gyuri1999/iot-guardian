@@ -1059,3 +1059,7 @@ code .gl-term { font-family: var(--font-code); }
 .tch-tbl small { display: block; color: var(--muted); margin-top: 0.2rem; white-space: nowrap; }
 .tch-bar { display: block; width: 9rem; height: 0.55rem; border-radius: 999px; background: var(--surface-2); overflow: hidden; }
 .tch-bar i { display: block; height: 100%; background: var(--teal); }
+
+/* ------------------------------------------------------------ ακτινογραφία του breadboard */
+.xray-note { margin: 0.6rem 0 0; padding: 0.7rem 0.9rem; border-left: 5px solid #e8892f; border-radius: 10px; background: var(--surface-2); }
+.xray-note ul { margin: 0.4rem 0 0; padding-left: 1.2rem; display: grid; gap: 0.3rem; }

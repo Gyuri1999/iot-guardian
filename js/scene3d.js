@@ -336,8 +336,9 @@
   function breadboard(k, M, S) {
     const { u, v, du, dv } = S.BB;
     const g = k.group(k.scene, 'breadboard');
-    k.B(g, u, v, 0, du, dv, 2.4, M.cream, { r: 0.6 });
-    k.decal(g, u, v, 2.4, du, dv, c => {
+    const shell = k.mat(0xf5f0e4, { r: 0.8, unique: true });
+    const body = k.B(g, u, v, 0, du, dv, 2.4, shell, { r: 0.6 });
+    const top = k.decal(g, u, v, 2.4, du, dv, c => {
       c.fillStyle = '#e0d7c4'; c.fillRect(u + 1, v + dv / 2 - 0.6, du - 2, 1.2);
       c.fillStyle = '#d9534f'; c.fillRect(u + 1, v + 1.3, du - 2, 0.25); c.fillRect(u + 1, v + dv - 6.6, du - 2, 0.25);
       c.fillStyle = '#3c6fd6'; c.fillRect(u + 1, v + 6.2, du - 2, 0.25); c.fillRect(u + 1, v + dv - 1.6, du - 2, 0.25);
@@ -348,6 +349,15 @@
         for (const y of ys) c.fillRect(u + x, v + y, 0.9, 0.9);
       }
     }, { ppu: 16, r: 0.85 });
+    // «Ακτινογραφία»: οι μεταλλικές λωρίδες μέσα στο breadboard (κρυφές μέχρι να ανοίξει)
+    const copper = k.group(g);
+    copper.visible = false;
+    const dim = k.mat(0xa39d92, { r: 0.45, m: 0.35 });
+    for (let x = 3; x < du - 2; x += 2.54) k.B(copper, u + x - 0.15, v + 7.6, 0.9, 1.2, 18.16 - 7.6 + 1.3, 0.55, dim, { ol: false, cast: false });
+    for (const y of [2.2, 4.6, dv - 5.5, dv - 3.1]) k.B(copper, u + 1.2, v + y - 0.15, 0.9, du - 2.4, 1.2, 0.55, dim, { ol: false, cast: false });
+    g.userData.shell = [shell, top.material];
+    g.userData.copper = copper;
+    g.userData.bodyOl = body.children;
     return g;
   }
 
@@ -363,6 +373,7 @@
     dome.position.set(u, 12.2, v);
     g.userData.glow = [red];
     g.userData.anchor = new THREE.Vector3(u, 12.6, v);
+    g.userData.legs = { sig: [{ u: u - 1.2, v, top: 6 }], gnd: { u: u + 1.2, v, top: 6 } };
     return g;
   }
 
@@ -376,6 +387,7 @@
     k.cylH(cap, u, v, 5.4, 2.5, 1.4, red, { seg: 28 });
     g.userData.cap = cap;
     g.userData.capMat = red;
+    g.userData.legs = { sig: [{ u: u - 3.4, v: v + 3.4, top: 4 }], input: true };
     return g;
   }
 
@@ -387,6 +399,7 @@
     const dome = k.mesh(g, k.keep(new THREE.SphereGeometry(4.6, 14, 7, 0, Math.PI * 2, 0, Math.PI / 2)), k.mat(0xf8f6f0, { r: 0.35, flat: true }));
     dome.position.set(u, 4.3, v);
     g.userData.anchor = new THREE.Vector3(u, 2.6, v);
+    g.userData.legs = { sig: [{ u, v: v + 5, top: 3.4 }], input: true };
     return g;
   }
 
@@ -560,6 +573,7 @@
     k.cylH(g, u, v, 7.6, 0.9, 0.05, k.mat(0x050507, { r: 0.9 }), { ol: false, seg: 20 });
     g.userData.body = body;
     g.userData.anchor = new THREE.Vector3(u, 8, v);
+    g.userData.legs = { sig: [{ u: u - 1.27, v, top: 4 }], gnd: { u: u + 1.27, v, top: 4 } };
     return g;
   }
   function rgb3d(k, M, o) {
@@ -572,6 +586,7 @@
     const dome = k.mesh(g, k.keep(new THREE.SphereGeometry(1.8, 24, 12, 0, Math.PI * 2, 0, Math.PI / 2)), lens);
     dome.position.set(u, 12.2, v);
     g.userData.lens = lens;
+    g.userData.legs = { sig: [-1.9, 0.63, 1.9].map(d => ({ u: u + d, v, top: 6 })), gnd: { u: u - 0.63, v, top: 6 } };
     return g;
   }
   function servo3d(k, M, o) {
@@ -699,6 +714,7 @@
     g.userData.isWire = true;
     g.userData.curve = curve;
     g.userData.cls = cls;
+    g.userData.end = { u: Bp.u, v: Bp.v, h: Bp.h };
     return g;
   }
 
@@ -756,7 +772,7 @@
       let g = null;
       switch (o.t) {
         case 'esp32': g = esp32(k, M, S); break;
-        case 'bb': g = breadboard(k, M, S); break;
+        case 'bb': g = objs.bb = breadboard(k, M, S); break;
         case 'pi5': g = pi5(k, M, S); break;
         case 'led': g = objs.led = led(k, M, o); break;
         case 'button': g = objs.button = button(k, M, o); break;
@@ -971,6 +987,73 @@
     });
   }
 
+  // ------------------------------------------------------------ ακτινογραφία του breadboard
+  // Το πλαστικό γίνεται διάφανο και φαίνονται οι μεταλλικές λωρίδες. Για κάθε καλώδιο που καταλήγει στο
+  // breadboard φτιάχνεται η διαδρομή του ρεύματος: τρύπα → λωρίδα → πόδι εξαρτήματος → (άλλο πόδι → ράγα GND
+  // → καλώδιο GND). Όταν το καλώδιο είναι ενεργό, φωτεινά πακέτα κυλούν σε αυτή τη διαδρομή.
+  const BAR_H = 1.15;
+  function nets() {
+    if (cur.nets) return cur.nets;
+    const S = root.IoTScene;
+    const { objs, k } = cur;
+    const bb = S.BB;
+    const onBB = e => e && e.u >= bb.u && e.u <= bb.u + bb.du && e.v >= bb.v && e.v <= bb.v + bb.dv && e.h < 4;
+    const railV = bb.v + bb.dv - 3.1 + 0.45; // ράγα GND (κάτω, δίπλα στη μπλε γραμμή)
+    const parts = cur.scene.children.filter(o => o.userData.legs);
+    const gndWire = objs.wires.find(w => w.userData.cls === 'w-gnd' && onBB(w.userData.end) && w.userData.end.v - bb.v > bb.dv - 7);
+    const hot = k.mat(0xffa040, { r: 0.3, m: 0.3, e: 0xff7a00, unique: true });
+    hot.emissiveIntensity = 0.9;
+    const group = k.group(objs.bb);
+    group.visible = false;
+    const bar = (a, b) => { // οριζόντια λωρίδα από a σε b (ευθυγραμμισμένη σε u ή v)
+      const u0 = Math.min(a.u, b.u), v0 = Math.min(a.v, b.v);
+      k.B(group, u0 - 0.75, v0 - 0.75, BAR_H - 0.4, Math.abs(a.u - b.u) + 1.5, Math.abs(a.v - b.v) + 1.5, 0.85, hot, { ol: false, cast: false });
+    };
+    const V3 = (u, v, h) => new THREE.Vector3(u, h, v);
+    const list = [];
+    for (const w of objs.wires) {
+      const e = w.userData.end;
+      if (!onBB(e) || w === gndWire) continue;
+      let best = null, bd = 14;
+      for (const p of parts) for (const leg of p.userData.legs.sig) {
+        const d = Math.hypot(leg.u - e.u, leg.v - e.v);
+        if (d < bd) { bd = d; best = { p, leg }; }
+      }
+      if (!best) continue;
+      const { p, leg } = best;
+      const corner = { u: e.u, v: leg.v };
+      bar(e, corner);
+      bar(corner, leg);
+      let pts = [V3(e.u, e.v, e.h), V3(e.u, e.v, BAR_H), V3(corner.u, corner.v, BAR_H), V3(leg.u, leg.v, BAR_H), V3(leg.u, leg.v, leg.top)];
+      const gl = p.userData.legs.gnd;
+      if (gl && gndWire) {
+        const ge = gndWire.userData.end;
+        const r = { u: gl.u, v: railV };
+        bar(gl, r);
+        bar(r, { u: ge.u, v: railV });
+        pts = pts.concat([V3(gl.u, gl.v, gl.top), V3(gl.u, gl.v, BAR_H), V3(r.u, r.v, BAR_H), V3(ge.u, railV, BAR_H), V3(ge.u, ge.v, BAR_H), V3(ge.u, ge.v, ge.h)]);
+      }
+      if (p.userData.legs.input) pts.reverse();
+      const path = new THREE.CurvePath();
+      for (let i = 1; i < pts.length; i++) if (pts[i].distanceTo(pts[i - 1]) > 0.01) path.add(new THREE.LineCurve3(pts[i - 1], pts[i]));
+      list.push({ wire: w, path, gnd: gl && gndWire ? gndWire : null, len: path.getLength() });
+    }
+    cur.nets = { list, group };
+    return cur.nets;
+  }
+
+  function xray(on) {
+    if (!cur || !cur.objs.bb) return false;
+    const bb = cur.objs.bb;
+    cur.xray = !!on;
+    for (const m of bb.userData.shell) { m.transparent = true; m.opacity = on ? 0.28 : 1; m.depthWrite = !on; m.needsUpdate = true; }
+    bb.userData.bodyOl.forEach(c => { c.visible = !on; });
+    bb.userData.copper.visible = !!on;
+    nets().group.visible = !!on;
+    requestRender();
+    return cur.xray;
+  }
+
   // ------------------------------------------------------------ ζωντανή πλακέτα
   // Όταν τρέχει ο κώδικας: φωτεινά «πακέτα» κυλούν στα αναμμένα καλώδια (από την πλακέτα προς την έξοδο,
   // ή από τον αισθητήρα προς την πλακέτα για τις εισόδους), το LED λάμπει, ο PIR, ο υπέρηχος και το buzzer
@@ -1071,6 +1154,24 @@
       });
       moving = true;
     }
+    // ρεύμα μέσα στο breadboard (μόνο με την ακτινογραφία)
+    if (cur.xray && objs.bb) {
+      for (const n of nets().list) {
+        const on = n.wire.userData.lit && n.wire.visible && !n.wire.userData.unwired && (!n.gnd || !n.gnd.userData.unwired) && !cur.anim && !still;
+        if (!n.sprites) {
+          const N = Math.max(3, Math.round(n.len / 7));
+          n.sprites = [];
+          for (let i = 0; i < N; i++) { const sp = new THREE.Sprite(fx.sprMat(0xffd27a)); sp.scale.setScalar(3.4); sp.renderOrder = 6; fx.group.add(sp); n.sprites.push(sp); }
+        }
+        n.sprites.forEach((sp, i) => {
+          sp.visible = on;
+          if (!on) return;
+          const q = ((t * 30 / n.len) + i / n.sprites.length) % 1;
+          n.path.getPointAt(q, sp.position);
+        });
+        if (on) moving = true;
+      }
+    } else if (cur.nets) cur.nets.list.forEach(n => n.sprites && n.sprites.forEach(sp => { sp.visible = false; }));
     // λάμψη του LED
     const led = objs.led;
     fx.halo.visible = !!(led && L.led && led.visible);
@@ -1292,7 +1393,8 @@
   }
 
   root.IoTScene3D = {
-    mount, unmount, requestRender, capture, orbit, wireVisible, parts,
+    mount, unmount, requestRender, capture, orbit, wireVisible, parts, xray,
+    hasBoard: () => !!(cur && cur.objs.bb), xrayOn: () => !!(cur && cur.xray),
     orbiting: () => !!(cur && cur.orbit && !(cur.orbit.tr && cur.orbit.tr.done)),
     spinning: () => !!(cur && cur.orbit && cur.orbit.auto),
     onState: f => { if (cur) cur.onState = f; }, info: () => cur && { W: cur.W, H: cur.H, live: cur.svg.isConnected, anim: !!cur.anim, orbit: cur.orbit && { yaw: +cur.orbit.yaw.toFixed(3), pitch: +cur.orbit.pitch.toFixed(3), tr: !!cur.orbit.tr, renders: cur.renders || 0 } } };
