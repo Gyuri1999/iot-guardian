@@ -30,6 +30,7 @@
       sandbox: { hw: {}, code: {} },
       cases: {},
       intruder: {},
+      nick: '',
       blocks: {},
       tours: {},
       daily: null,
@@ -65,6 +66,7 @@
       const known = root.IoTCases ? new Set(root.IoTCases.CASES.map(c => c.id)) : null;
       for (const [k, v] of Object.entries(obj.cases)) if (/^[a-z0-9-]{2,30}$/.test(k) && v === true && (!known || known.has(k))) out.cases[k] = true;
     }
+    if (typeof obj.nick === 'string') out.nick = obj.nick.replace(/[\u0000-\u001f<>]/g, '').trim().slice(0, 24);
     if (obj.intruder && typeof obj.intruder === 'object') {
       for (const [k, v] of Object.entries(obj.intruder)) if (/^r[1-9]$/.test(k) && Number.isInteger(v) && v >= 1 && v <= 3) out.intruder[k] = v;
     }

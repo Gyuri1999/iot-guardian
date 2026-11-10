@@ -1044,3 +1044,18 @@ code .gl-term { font-family: var(--font-code); }
 .itr-wait p { margin: 0; color: var(--muted); }
 @media (prefers-reduced-motion: reduce) { .itr-link, .itr-node.ok .itr-ring, .itr-node.hit .itr-ring, .itr-shield.up circle, .itr-pkt.blocked { animation: none; } .itr-pkt.blocked { opacity: 0; } }
 :root[data-reduced-motion="true"] .itr-pkt.blocked { opacity: 0; }
+
+/* ------------------------------------------------------------ Κωδικός προόδου και σελίδα τάξης (js/teacher.js) */
+.tc-field .btn-row { flex-wrap: wrap; gap: 0.5rem; }
+#tc-name { flex: 1 1 12rem; min-height: 2.75rem; font: inherit; padding: 0.4rem 0.7rem; border: 1px solid var(--line-strong); border-radius: var(--radius); background: var(--surface); color: var(--ink); }
+#tc-code { font-family: var(--font-code); font-size: 0.85rem; min-height: 4.5rem; word-break: break-all; }
+.tch-head { display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap; margin-bottom: 0.6rem; }
+.tch-head h2 { margin: 0; font-size: 1.15rem; }
+.tch-scroll { overflow-x: auto; }
+.tch-tbl { width: 100%; border-collapse: collapse; font-size: 0.95rem; }
+.tch-tbl th, .tch-tbl td { padding: 0.5rem 0.6rem; border-bottom: 1px solid var(--line); text-align: left; vertical-align: top; }
+.tch-tbl thead th { font-family: var(--font-label); font-size: 0.85rem; color: var(--muted); white-space: nowrap; }
+.tch-tbl tbody th { white-space: nowrap; text-transform: none; letter-spacing: normal; font: 700 1rem var(--font-body); color: var(--ink); }
+.tch-tbl small { display: block; color: var(--muted); margin-top: 0.2rem; white-space: nowrap; }
+.tch-bar { display: block; width: 9rem; height: 0.55rem; border-radius: 999px; background: var(--surface-2); overflow: hidden; }
+.tch-bar i { display: block; height: 100%; background: var(--teal); }

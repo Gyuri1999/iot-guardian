@@ -20,13 +20,13 @@ for (const f of extra) {
   try { vm.runInContext(fs.readFileSync(path.join(ROOT, 'js', 'lessons', f), 'utf8'), ctx, { filename: 'lessons/' + f }); }
   catch (e) { loadErrors.push(f + ': ' + e.message); }
 }
-for (const f of ['cases.js', 'cases-data.js', 'intruder.js']) vm.runInContext(fs.readFileSync(path.join(ROOT, 'js', f), 'utf8'), ctx, { filename: f });
+for (const f of ['cases.js', 'cases-data.js', 'intruder.js', 'teacher.js']) vm.runInContext(fs.readFileSync(path.join(ROOT, 'js', f), 'utf8'), ctx, { filename: f });
 vm.runInContext(fs.readFileSync(path.join(ROOT, 'js', 'storage.js'), 'utf8'), ctx, { filename: 'storage.js' });
 vm.runInContext(fs.readFileSync(path.join(ROOT, 'js', 'learn.js'), 'utf8'), ctx, { filename: 'learn.js' });
 vm.runInContext(fs.readFileSync(path.join(ROOT, 'js', 'wiring.js'), 'utf8'), ctx, { filename: 'wiring.js' });
 vm.runInContext(fs.readFileSync(path.join(ROOT, 'js', 'challenge.js'), 'utf8'), ctx, { filename: 'challenge.js' });
 vm.runInContext(fs.readFileSync(path.join(ROOT, 'js', 'blocks.js'), 'utf8'), ctx, { filename: 'blocks.js' });
-const { IoTInterp, IoTDevice, IoTValidator, IoTLessons, IoTStorage, IoTLearn, IoTWiring, IoTChallenge, IoTBlocks, IoTCases, IoTIntruder } = ctx;
+const { IoTInterp, IoTDevice, IoTValidator, IoTLessons, IoTStorage, IoTLearn, IoTWiring, IoTChallenge, IoTBlocks, IoTCases, IoTIntruder, IoTTeacher } = ctx;
 
 let passed = 0;
 let failed = 0;
@@ -836,6 +836,47 @@ test('εισβολέας: αποθήκευση αστεριών', () => {
   s.intruder = { r1: 3, r2: 7, r3: 'x', zz: 2, r4: 1 };
   const v = IoTStorage.validate(JSON.parse(JSON.stringify(s)));
   eq((v.data || v.value).intruder, { r1: 3, r4: 1 });
+});
+
+// ------------------------------------------------------------ κωδικός προόδου για τον δάσκαλο (js/teacher.js)
+const tcSample = (n, d) => ({ v: 1, n, d: d || '2026-11-10', t: { 'cpp-esp32': [12, 88, 2, 19, 3], 'rs-pi': [0, 30, 0, 7, 1] }, s: 2, c: 1, i: 5 });
+test('δάσκαλος: ο κωδικός κάνει τον κύκλο και κρατά τα ελληνικά', () => {
+  const code = IoTTeacher.encode(tcSample('Νίκος Β2'));
+  assert(/^IOTG1\.[A-Za-z0-9_-]+\.[0-9a-f]{8}$/.test(code), code);
+  const r = IoTTeacher.decode('  ' + code.slice(0, 20) + '\n' + code.slice(20) + ' ');
+  assert(r.ok, r.error);
+  eq(r.data, tcSample('Νίκος Β2'));
+});
+test('δάσκαλος: πιάνει λάθη αντιγραφής και άκυρα δεδομένα', () => {
+  const code = IoTTeacher.encode(tcSample('Άννα'));
+  assert(!IoTTeacher.decode(code.slice(0, -12) + code.slice(-11)).ok, 'κομμένος');
+  const body = code.split('.')[1];
+  const flipped = body.slice(0, 5) + (body[5] === 'A' ? 'B' : 'A') + body.slice(6);
+  assert(!IoTTeacher.decode(`IOTG1.${flipped}.${code.split('.')[2]}`).ok, 'αλλαγμένος');
+  assert(!IoTTeacher.decode('γεια').ok, 'σκουπίδια');
+  // σωστός έλεγχος αλλά κακά δεδομένα: ο decode τα απορρίπτει
+  const forge = o => { const b = Buffer.from(JSON.stringify(o)).toString('base64').replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, ''); return `IOTG1.${b}.${IoTTeacher.check('IOTG1' + b)}`; };
+  assert(!IoTTeacher.decode(forge(Object.assign(tcSample('x'), { t: { 'cpp-esp32': [99, 10, 0, 1, 1] } }))).ok, 'done > total');
+  assert(!IoTTeacher.decode(forge(Object.assign(tcSample('x'), { t: { 'java-pc': [1, 2, 0, 1, 1] } }))).ok, 'άγνωστη διαδρομή');
+  const r = IoTTeacher.decode(forge(tcSample('<img src=x onerror=alert(1)>')));
+  assert(r.ok && !/[<>]/.test(r.data.n), 'το όνομα καθαρίζεται');
+});
+test('δάσκαλος: τάξη με ενημέρωση και CSV', () => {
+  const r = IoTTeacher.decodeMany([tcSample('Άννα', '2026-11-01'), tcSample('Βασίλης')].map(IoTTeacher.encode).join('\n') + '\nIOTG1.xx.12345678');
+  eq([r.good.length, r.bad.length], [2, 1]);
+  let m = IoTTeacher.merge([], r.good);
+  eq([m.added, m.list.map(x => x.n)], [2, ['Άννα', 'Βασίλης']]);
+  m = IoTTeacher.merge(m.list, [Object.assign(tcSample('άννα', '2026-11-09'), { s: 9 })]);
+  eq([m.added, m.updated, m.list.length, m.list[0].s], [0, 1, 2, 9]);
+  const csv = IoTTeacher.csv([tcSample('=cmd')], [{ id: 'cpp-esp32', label: 'C++ · ESP32' }]);
+  assert(csv.includes("'=cmd") && csv.includes('12/88'), csv);
+});
+test('δάσκαλος: αποθήκευση ψευδωνύμου', () => {
+  const s = IoTStorage.defaults();
+  s.nick = '  <b>Νίκος</b> Β2 με πολύ μεγάλο όνομα εδώ ';
+  const v = IoTStorage.validate(JSON.parse(JSON.stringify(s)));
+  const nick = (v.data || v.value).nick;
+  assert(!/[<>]/.test(nick) && nick.length <= 24, nick);
 });
 
 console.log(`\n${passed} πέρασαν, ${failed} απέτυχαν\n`);

@@ -1427,6 +1427,114 @@
       explanationOnSuccess: '', remediation: ''
     };
   }
+  // ------------------------------------------------------------ Κωδικός προόδου και σελίδα τάξης (js/teacher.js)
+  function progressSummary(name) {
+    const t = {};
+    for (const tr of TRACKS) {
+      const ls = trackLessons(tr.id);
+      const done = ls.filter(l => P.completed[l.id]).length;
+      if (!done && P.track !== tr.id) continue;
+      const chs = trackChapters(tr.id);
+      const chDone = chs.filter(c => chapterDone(c.n)).length;
+      const open = chs.find(c => !c.bonus && !chapterDone(c.n));
+      t[tr.id] = [done, ls.length, chDone, chs.length, open ? chNum(open.n) : 0];
+    }
+    const d = new Date();
+    const day = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+    return {
+      v: 1, n: name, d: day, t,
+      s: Object.keys(P.stories || {}).length,
+      c: Object.keys(P.cases || {}).length,
+      i: Object.values(P.intruder || {}).reduce((a, x) => a + x, 0)
+    };
+  }
+
+  const CLASS_KEY = 'iot-guardian-class';
+  function loadClass() {
+    try {
+      const raw = JSON.parse(localStorage.getItem(CLASS_KEY) || '[]');
+      return Array.isArray(raw) ? raw.map(window.IoTTeacher.normalize).filter(Boolean) : [];
+    } catch (e) { return []; }
+  }
+  function saveClass(list) { try { localStorage.setItem(CLASS_KEY, JSON.stringify(list)); } catch (e) { /* χωρίς αποθήκευση */ } }
+
+  function renderTeacher() {
+    const T = window.IoTTeacher;
+    if (!T) return;
+    stopMachine();
+    if (S.casePlayer) { S.casePlayer.stop(); S.casePlayer = null; }
+    if (S.intruder) { S.intruder.stop(); S.intruder = null; }
+    S.task = null;
+    document.title = 'Σελίδα τάξης · IoT Guardian';
+    let list = loadClass();
+    const trackLabel = tr => `${tr.name} · ${tr.boardName}`;
+    app().innerHTML = `<div class="app">${rail('teacher')}
+      <div class="main teacher">
+        ${header('Μαθητές στην τάξη', list.length, list.length, 'Σήμερα', new Date().toLocaleDateString('el-GR', { day: 'numeric', month: 'short', year: 'numeric' }))}
+        <div class="card cases-intro">
+          <span class="kind-tag">${icon('book')} Για δασκάλους</span>
+          <h1>Σελίδα τάξης</h1>
+          <p>Κάθε μαθητής ανοίγει <strong>${icon('save')} Εξαγωγή προόδου</strong> στη μπάρα, γράφει ένα ψευδώνυμο και πατά «Φτιάξε κωδικό». Επικόλλησε εδώ τους κωδικούς (όσους θέλεις μαζί). Δεν υπάρχουν λογαριασμοί ούτε server: η λίστα μένει μόνο σε αυτόν τον browser.</p>
+          <p class="muted">Ο κωδικός πιάνει λάθη στην αντιγραφή, αλλά δεν είναι προστασία από αλλαγές: είναι εργαλείο για να δεις πού βρίσκεται η τάξη, όχι για βαθμό. Άνοιξε αυτή τη σελίδα κατευθείαν με <code>#teacher</code> στο τέλος της διεύθυνσης.</p>
+        </div>
+        <div class="card">
+          <div class="field"><label for="tch-in">Κωδικοί μαθητών</label>
+            <textarea id="tch-in" rows="4" placeholder="IOTG1.… (ένας σε κάθε γραμμή)" spellcheck="false"></textarea>
+            <div class="btn-row"><button class="btn primary" id="tch-add">Πρόσθεσε στην τάξη</button></div>
+            <div id="tch-msg" aria-live="polite"></div></div>
+        </div>
+        <div class="card"><div class="tch-head"><h2>Η τάξη</h2><span class="spacer"></span>
+          <button class="btn sm" id="tch-csv">Λήψη CSV</button><button class="btn sm quiet" id="tch-clear">Άδειασμα λίστας</button></div>
+          <div id="tch-table"></div></div>
+      </div></div>`;
+    bindRail();
+    const bar = (a, b) => `<span class="tch-bar" title="${a}/${b}"><i style="width:${b ? Math.round((a / b) * 100) : 0}%"></i></span>`;
+    function table() {
+      const used = TRACKS.filter(tr => list.some(x => x.t[tr.id]));
+      const num = app().querySelector('.progress-pill .pp-num');
+      if (num) num.textContent = `${list.length}/${list.length}`;
+      if (!list.length) { $('#tch-table').innerHTML = '<p class="muted">Δεν έχεις προσθέσει ακόμα μαθητές.</p>'; return; }
+      $('#tch-table').innerHTML = `<div class="tch-scroll"><table class="tch-tbl">
+        <thead><tr><th scope="col">Ψευδώνυμο</th><th scope="col">Ημερομηνία</th>${used.map(tr => `<th scope="col">${esc(trackLabel(tr))}</th>`).join('')}<th scope="col">Κάρτες ιστορίας</th><th scope="col">Ιστορίες ασφάλειας</th><th scope="col">Εισβολέας ★</th><th scope="col"><span class="sr-only">Αφαίρεση</span></th></tr></thead>
+        <tbody>${list.map((x, k) => `<tr><th scope="row">${esc(x.n)}</th><td>${esc(x.d.split('-').reverse().join('/'))}</td>
+          ${used.map(tr => { const v = x.t[tr.id]; return v ? `<td>${bar(v[0], v[1])}<small>${v[0]}/${v[1]} μαθήματα · ${v[2]}/${v[3]} κεφ.${v[4] ? ` · τώρα στο κεφ. ${v[4]}` : ' · τα τελείωσε όλα'}</small></td>` : '<td class="muted">—</td>'; }).join('')}
+          <td>${x.s}</td><td>${x.c}</td><td>${x.i}</td><td><button class="btn quiet sm" data-rm="${k}" aria-label="Αφαίρεση: ${esc(x.n)}">✕</button></td></tr>`).join('')}</tbody></table></div>`;
+      $('#tch-table').querySelectorAll('[data-rm]').forEach(b => { b.onclick = () => { list.splice(Number(b.dataset.rm), 1); saveClass(list); table(); }; });
+    }
+    $('#tch-add').onclick = () => {
+      const r = T.decodeMany($('#tch-in').value);
+      const m = T.merge(list, r.good);
+      list = m.list;
+      saveClass(list);
+      table();
+      const parts = [];
+      if (m.added) parts.push(`${m.added} νέοι μαθητές`);
+      if (m.updated) parts.push(`${m.updated} ενημερώθηκαν`);
+      $('#tch-msg').innerHTML = (parts.length ? `<p class="case-win">✓ ${parts.join(' · ')}.</p>` : '') +
+        (r.bad.length ? `<ul class="case-fb">${r.bad.map(b => `<li class="no"><b>${esc(b.code)}</b><br>${esc(b.error)}</li>`).join('')}</ul>` : '') +
+        (!r.good.length && !r.bad.length ? '<p class="case-miss">Επικόλλησε πρώτα κωδικούς.</p>' : '');
+      if (!r.bad.length) $('#tch-in').value = '';
+    };
+    $('#tch-csv').onclick = () => {
+      if (!list.length) return;
+      const blob = new Blob([T.csv(list, TRACKS.map(tr => ({ id: tr.id, label: trackLabel(tr) })))], { type: 'text/csv;charset=utf-8' });
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = 'taxi-iot-guardian.csv';
+      document.body.appendChild(a);
+      a.click();
+      setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 1000);
+    };
+    $('#tch-clear').onclick = () => {
+      if (!list.length || !confirm('Να αδειάσει η λίστα της τάξης σε αυτόν τον browser; Οι μαθητές δεν επηρεάζονται.')) return;
+      list = [];
+      saveClass(list);
+      table();
+    };
+    table();
+    window.scrollTo(0, 0);
+  }
+
   // ------------------------------------------------------------ Βρες τον εισβολέα (js/intruder.js)
   function renderIntruder() {
     const G = window.IoTIntruder;
@@ -3791,6 +3899,12 @@
     <dialog id="dlg-data" aria-labelledby="dlg-data-title">
       <div class="dlg-head"><h2 id="dlg-data-title">Εξαγωγή και εισαγωγή προόδου</h2><button class="btn quiet" data-close>Κλείσιμο</button></div>
       <div class="dlg-body">
+        <div class="field tc-field"><label for="tc-name">Κωδικός προόδου για τον δάσκαλο</label>
+          <span class="help">Γράψε ένα ψευδώνυμο που θα αναγνωρίσει ο δάσκαλός σου (όχι επώνυμο ή τηλέφωνο). Ο κωδικός έχει μόνο το ψευδώνυμο και πόσα έχεις τελειώσει.</span>
+          <div class="btn-row"><input id="tc-name" maxlength="24" autocomplete="off" spellcheck="false" placeholder="π.χ. Νίκος Β2"><button class="btn primary" id="tc-make">Φτιάξε κωδικό</button></div>
+          <textarea id="tc-code" readonly hidden aria-label="Ο κωδικός προόδου σου"></textarea>
+          <div class="btn-row"><button class="btn" id="tc-copy" hidden>Αντιγραφή κωδικού</button><button class="btn quiet" id="tc-teacher">Είμαι δάσκαλος → Σελίδα τάξης</button></div>
+          <div id="tc-msg" aria-live="polite"></div></div>
         <div class="field"><label for="exp-text">Εξαγωγή</label>
           <textarea id="exp-text" readonly></textarea>
           <span class="help">Αντίγραψε αυτό το κείμενο και φύλαξέ το. Περιέχει μόνο εκπαιδευτική πρόοδο και τον κώδικα των ασκήσεων.</span>
@@ -3871,6 +3985,23 @@
     };
     $('#gl-search').oninput = e => renderGl(e.target.value);
     renderGl('');
+
+    $('#tc-make').onclick = () => {
+      const name = $('#tc-name').value.replace(/[<>]/g, '').replace(/\s+/g, ' ').trim().slice(0, 24);
+      if (!name) { $('#tc-msg').innerHTML = '<p class="case-miss">Γράψε πρώτα ένα ψευδώνυμο.</p>'; $('#tc-name').focus(); return; }
+      P.nick = name;
+      save();
+      $('#tc-code').value = window.IoTTeacher.encode(progressSummary(name));
+      $('#tc-code').hidden = false;
+      $('#tc-copy').hidden = false;
+      $('#tc-msg').innerHTML = '<p class="muted">Αντίγραψέ τον και στείλε τον στον δάσκαλό σου (π.χ. στο e-class ή με email).</p>';
+    };
+    $('#tc-copy').onclick = () => {
+      const t = $('#tc-code');
+      const fb = () => { t.focus(); t.select(); announce('Ο κωδικός επιλέχθηκε: πάτα Ctrl+C.'); };
+      try { navigator.clipboard.writeText(t.value).then(() => announce('Ο κωδικός αντιγράφηκε.'), fb); } catch (e) { fb(); }
+    };
+    $('#tc-teacher').onclick = () => { $('#dlg-data').close(); renderTeacher(); };
 
     let pending = null;
     $('#exp-copy').onclick = () => {
@@ -3987,6 +4118,10 @@
         $('#set-rate-out').textContent = Math.round((P.settings.readRate || 0.9) * 100) + '%';
       }
       if (which === 'data') {
+        $('#tc-name').value = P.nick || '';
+        $('#tc-code').hidden = true;
+        $('#tc-copy').hidden = true;
+        $('#tc-msg').innerHTML = '';
         $('#exp-text').value = window.IoTStorage.exportJson(P);
         $('#imp-text').value = '';
         $('#imp-result').innerHTML = '';
@@ -4004,7 +4139,7 @@
       if (!S.task || e.target.id === 'code' || modeOf(S.task) !== 'code') return;
       if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) { e.preventDefault(); if (e.shiftKey) doStep(); else doRun(); }
     });
-    renderHome();
+    if (location.hash === '#teacher' && window.IoTTeacher) renderTeacher(); else renderHome();
   }
 
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot);
