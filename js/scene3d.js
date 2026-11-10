@@ -362,6 +362,7 @@
     const dome = k.mesh(g, k.keep(new THREE.SphereGeometry(1.8, 24, 12, 0, Math.PI * 2, 0, Math.PI / 2)), red);
     dome.position.set(u, 12.2, v);
     g.userData.glow = [red];
+    g.userData.anchor = new THREE.Vector3(u, 12.6, v);
     return g;
   }
 
@@ -385,6 +386,7 @@
     k.B(g, u - 5.2, v - 5.2, 3.8, 10.4, 10.4, 0.5, M.white, { r: 0.5 });
     const dome = k.mesh(g, k.keep(new THREE.SphereGeometry(4.6, 14, 7, 0, Math.PI * 2, 0, Math.PI / 2)), k.mat(0xf8f6f0, { r: 0.35, flat: true }));
     dome.position.set(u, 4.3, v);
+    g.userData.anchor = new THREE.Vector3(u, 2.6, v);
     return g;
   }
 
@@ -543,6 +545,7 @@
       cyl.position.set(cu, H + 7, v + 1.2 + 2);
       k.decalV(g, cu - 2.9, v + 5.2, H + 7 - 2.9, 5.8, 5.8, c => { c.translate(cu, -(H + 7)); c.scale(2.9, 2.9); meshTex(c); }, { ppu: 40 });
     }
+    g.userData.anchor = new THREE.Vector3(u + w / 2, H + 7, v + 5.4);
     return g;
   }
 
@@ -556,6 +559,7 @@
     k.cylH(g, u, v, 3.4, 3.1, 4.2, body, { seg: 32 });
     k.cylH(g, u, v, 7.6, 0.9, 0.05, k.mat(0x050507, { r: 0.9 }), { ol: false, seg: 20 });
     g.userData.body = body;
+    g.userData.anchor = new THREE.Vector3(u, 8, v);
     return g;
   }
   function rgb3d(k, M, o) {
@@ -693,6 +697,8 @@
     if (o.id) g.userData.id = o.id;
     g.userData.glow = [body];
     g.userData.isWire = true;
+    g.userData.curve = curve;
+    g.userData.cls = cls;
     return g;
   }
 
@@ -754,13 +760,13 @@
         case 'pi5': g = pi5(k, M, S); break;
         case 'led': g = objs.led = led(k, M, o); break;
         case 'button': g = objs.button = button(k, M, o); break;
-        case 'pir': g = pir(k, M, o); break;
+        case 'pir': g = objs.pir = pir(k, M, o); break;
         case 'sensor': g = sensor(k, M, o); break;
         case 'router': g = router(k, M, o); break;
         case 'tablet': g = tablet(k, M, o); break;
         case 'miniEsp': g = miniEsp(k, M, o); break;
         case 'rpi': g = rpi(k, M, o); break;
-        case 'ultrasonic': g = ultrasonic(k, M, S); break;
+        case 'ultrasonic': g = objs.us = ultrasonic(k, M, S); break;
         case 'traffic': g = objs.traffic = trafficLight(k, M, S); break;
         case 'car': g = objs.car = car(k, M, S); break;
       case 'buzzer': g = objs.buzzer = buzzer3d(k, M, o); break;
@@ -946,8 +952,10 @@
       const mt = mv && /translate\(\s*(-?[\d.]+)/.exec(mv.getAttribute('transform') || '');
       if (mt) objs.car.position.z = -parseFloat(mt[1]) / (C30 * root.IoTScene.K);
     }
+    cur.live = Object.assign(cur.live || {}, { led: on('#sc-led'), pir: on('#sc-pir'), us: on('#sc-us-waves') });
     for (const w of objs.wires) {
       const lit = w.userData.id && on('#' + w.userData.id);
+      w.userData.lit = !!lit;
       for (const m of w.userData.glow) { m.emissive.copy(m.color); m.emissiveIntensity = lit ? 0.45 : 0; }
     }
     // επισήμανση κομματιού (hover / επιλογή): το περίγραμμα παίρνει το χρώμα της SVG
@@ -961,6 +969,140 @@
       const m = selp.has(p) ? cur.hl.sel : cur.hl.hot;
       obj.traverse(x => { if (x.userData.ol) x.userData.ol.material = m; });
     });
+  }
+
+  // ------------------------------------------------------------ ζωντανή πλακέτα
+  // Όταν τρέχει ο κώδικας: φωτεινά «πακέτα» κυλούν στα αναμμένα καλώδια (από την πλακέτα προς την έξοδο,
+  // ή από τον αισθητήρα προς την πλακέτα για τις εισόδους), το LED λάμπει, ο PIR, ο υπέρηχος και το buzzer
+  // βγάζουν κύματα. Με «λιγότερη κίνηση» μένει μόνο η ακίνητη λάμψη.
+  const INPUT_WIRES = new Set(['w-btn', 'w-pir', 'w-echo']);
+  const PULSE_SPEED = 46; // μονάδες σκηνής ανά δευτερόλεπτο
+
+  function calm() {
+    const d = document.documentElement;
+    if (d.dataset.reducedMotion === 'true') return true;
+    try { return root.matchMedia('(prefers-reduced-motion: reduce)').matches; } catch (e) { return false; }
+  }
+
+  function fxKit() {
+    if (cur.fx) return cur.fx;
+    const k = cur.k;
+    const c = document.createElement('canvas');
+    c.width = c.height = 64;
+    const x = c.getContext('2d');
+    const gr = x.createRadialGradient(32, 32, 0, 32, 32, 32);
+    gr.addColorStop(0, 'rgba(255,255,255,1)');
+    gr.addColorStop(0.25, 'rgba(255,255,255,0.75)');
+    gr.addColorStop(1, 'rgba(255,255,255,0)');
+    x.fillStyle = gr;
+    x.fillRect(0, 0, 64, 64);
+    const tex = k.keep(new THREE.CanvasTexture(c));
+    tex.encoding = THREE.sRGBEncoding;
+    const sprMats = new Map();
+    const sprMat = col => {
+      if (!sprMats.has(col)) sprMats.set(col, k.keep(new THREE.SpriteMaterial({ map: tex, color: new THREE.Color(col).lerp(new THREE.Color(0xffffff), 0.75), blending: THREE.AdditiveBlending, transparent: true, depthWrite: false })));
+      return sprMats.get(col);
+    };
+    const ringGeo = k.keep(new THREE.RingGeometry(0.86, 1, 56));
+    const group = new THREE.Group();
+    group.renderOrder = 5;
+    cur.scene.add(group);
+    const ringSet = (n, col, flat) => {
+      const list = [];
+      for (let i = 0; i < n; i++) {
+        const m = new THREE.Mesh(ringGeo, k.keep(new THREE.MeshBasicMaterial({ color: col, transparent: true, depthWrite: false, side: THREE.DoubleSide })));
+        if (flat) m.rotation.x = -Math.PI / 2;
+        m.visible = false;
+        group.add(m);
+        list.push(m);
+      }
+      return list;
+    };
+    const halo = new THREE.Sprite(k.keep(new THREE.SpriteMaterial({ map: tex, color: 0xff5a36, blending: THREE.AdditiveBlending, transparent: true, depthWrite: false, opacity: 0.8 })));
+    halo.visible = false;
+    group.add(halo);
+    cur.fx = { group, sprMat, pulses: new Map(), halo, pirRings: ringSet(3, 0xe2b52d, true), usRings: ringSet(4, 0x3d8fd6, false), buzzRings: ringSet(3, 0x8e5bd0, true) };
+    return cur.fx;
+  }
+
+  // κύματα που μεγαλώνουν και σβήνουν· place(mesh, x 0..1) τα τοποθετεί
+  function waves(list, on, still, t, period, place) {
+    list.forEach((m, i) => {
+      m.visible = on && !still;
+      if (!m.visible) return;
+      const x = ((t / period) + i / list.length) % 1;
+      m.material.opacity = 0.75 * (1 - x) * Math.min(1, x * 6);
+      place(m, x);
+    });
+  }
+
+  function live(now) {
+    if (!cur || !cur.live) return false;
+    const fx = fxKit();
+    const { objs } = cur;
+    const L = cur.live;
+    const still = calm();
+    const t = now / 1000;
+    let moving = false;
+    // πακέτα στα καλώδια
+    for (const w of objs.wires) {
+      const on = w.userData.lit && w.visible && !w.userData.unwired && !cur.anim && !still;
+      let ps = fx.pulses.get(w);
+      if (!on) { if (ps) ps.forEach(p => { p.visible = false; }); continue; }
+      const curve = w.userData.curve;
+      if (!ps) {
+        const len = curve.getLength();
+        const n = Math.max(2, Math.round(len / 22));
+        const col = WIRE_COLORS[w.userData.cls] || 0xffffff;
+        ps = [];
+        for (let i = 0; i < n; i++) { const s = new THREE.Sprite(fx.sprMat(col)); s.scale.setScalar(3.2); fx.group.add(s); ps.push(s); }
+        ps.len = len;
+        fx.pulses.set(w, ps);
+      }
+      const back = INPUT_WIRES.has(w.userData.cls);
+      ps.forEach((s, i) => {
+        let p = ((t * PULSE_SPEED / ps.len) + i / ps.length) % 1;
+        if (back) p = 1 - p;
+        curve.getPointAt(p, s.position);
+        s.position.y += 0.2;
+        const edge = Math.sin(Math.PI * p);
+        s.scale.setScalar(3.5 + 4.5 * edge);
+        s.visible = true;
+      });
+      moving = true;
+    }
+    // λάμψη του LED
+    const led = objs.led;
+    fx.halo.visible = !!(led && L.led && led.visible);
+    if (fx.halo.visible) {
+      fx.halo.position.copy(led.userData.anchor).add(new THREE.Vector3(0, led.position.y, 0));
+      const pulse = still ? 0 : Math.sin(t * 4.2) * 0.12;
+      fx.halo.scale.setScalar(26 * (1 + pulse));
+      fx.halo.material.opacity = 0.7 + pulse;
+      if (!still) moving = true;
+    }
+    // κίνηση στον PIR: δαχτυλίδια στο πάτωμα
+    const pir = objs.pir;
+    waves(fx.pirRings, !!(pir && L.pir), still, t, 1.6, (m, x) => {
+      m.position.copy(pir.userData.anchor);
+      m.scale.setScalar(6 + 20 * x);
+    });
+    // υπέρηχος: τόξα που φεύγουν προς το εμπόδιο
+    const us = objs.us;
+    waves(fx.usRings, !!(us && L.us), still, t, 0.9, (m, x) => {
+      m.position.copy(us.userData.anchor);
+      m.position.z += 2 + 30 * x;
+      m.scale.setScalar(2 + 7 * x);
+    });
+    // buzzer: κύκλοι ήχου που ανεβαίνουν
+    const bz = objs.buzzer;
+    waves(fx.buzzRings, !!(bz && L.buzz), still, t, 0.7, (m, x) => {
+      m.position.copy(bz.userData.anchor);
+      m.position.y += 6 * x;
+      m.scale.setScalar(3 + 9 * x);
+    });
+    if (!still && ((pir && L.pir) || (us && L.us) || (bz && L.buzz))) moving = true;
+    return moving;
   }
 
   // ------------------------------------------------------------ απόδοση
@@ -997,9 +1139,10 @@
     else placeCamera(cam, svg, W, H, root.IoTScene.K);
     if (!cur) return;
     const busy = animate(t);
+    const alive = live(t);
     cur.renders = (cur.renders || 0) + 1;
     renderer.render(cur.scene, cam);
-    if (busy || spin) requestRender();
+    if (busy || spin || alive) requestRender();
   }
 
   // «Στήσιμο»: τα αντικείμενα πέφτουν ένα-ένα, μετά τα καλώδια «τραβιούνται» από άκρη σε άκρη (όπως το buildIn της SVG).
@@ -1134,6 +1277,7 @@
     if (!cur) return;
     const o = cur.objs;
     if (o.buzzer) o.buzzer.userData.body.emissive.setHex(st.buzz ? 0x3a2a66 : 0);
+    cur.live = Object.assign(cur.live || {}, { buzz: !!st.buzz });
     if (o.servo && typeof st.servo === 'number') o.servo.userData.arm.rotation.y = ((st.servo - 90) * Math.PI) / 180;
     if (o.rgb && st.rgb) {
       const [r, gg, b] = st.rgb;
