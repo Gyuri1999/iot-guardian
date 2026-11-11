@@ -285,11 +285,27 @@
       for (const y of [dv - 5.5, dv - 3.1]) holes += `<rect x="${(u + x).toFixed(2)}" y="${(v + y).toFixed(2)}" width="0.9" height="0.9"/>`;
     }
     s += `<g transform="${planeMatrix(2.4)}"><g class="bb-holes">${holes}</g>
-      <rect x="${u + 1}" y="${v + 1.3}" width="${du - 2}" height="0.25" class="rail-r"/>
-      <rect x="${u + 1}" y="${v + 6.2}" width="${du - 2}" height="0.25" class="rail-b"/>
-      <rect x="${u + 1}" y="${v + dv - 6.6}" width="${du - 2}" height="0.25" class="rail-r"/>
-      <rect x="${u + 1}" y="${v + dv - 1.6}" width="${du - 2}" height="0.25" class="rail-b"/></g></g>`;
+      <rect x="${u + 2.6}" y="${v + 1.1}" width="${du - 4}" height="0.5" class="rail-r"/>
+      <rect x="${u + 2.6}" y="${v + 6.1}" width="${du - 4}" height="0.5" class="rail-b"/>
+      <rect x="${u + 2.6}" y="${v + dv - 6.8}" width="${du - 4}" height="0.5" class="rail-r"/>
+      <rect x="${u + 2.6}" y="${v + dv - 1.7}" width="${du - 4}" height="0.5" class="rail-b"/>
+      <path d="M${u + 0.6},${v + 1.35} h1.4 M${u + 1.3},${v + 0.65} v1.4 M${u + 0.6},${v + dv - 6.55} h1.4 M${u + 1.3},${v + dv - 7.25} v1.4" class="rail-sign r"/>
+      <path d="M${u + 0.6},${v + 6.35} h1.4 M${u + 0.6},${v + dv - 1.45} h1.4" class="rail-sign b"/></g></g>`;
     return s;
+  }
+
+  // Αντίσταση 220 Ω ξαπλωμένη στη σειρά d (μπροστά από το LED): ενώνει τη στήλη του καλωδίου (1) με τη στήλη του + του LED (3).
+  // Χρώματα: κόκκινο, κόκκινο, καφέ (= 220 Ω), χρυσό.
+  const RES_AT = () => ({ u: bbHole(1, 3).u, v: bbHole(1, 3).v });
+  function resistor() {
+    const { u, v } = RES_AT();
+    rec({ t: 'resistor', u, v });
+    const H = 3.6;
+    let s = `<g id="sc-res" class="sc-res" data-part="resistor"><path d="M${pt(P(u - 2.54, v, 2.4))} L${pt(P(u - 2.54, v, H))} L${pt(P(u - 1.6, v, H))} M${pt(P(u + 2.54, v, 2.4))} L${pt(P(u + 2.54, v, H))} L${pt(P(u + 1.6, v, H))}" class="legs"/>`;
+    s += `<path d="M${pt(P(u - 1.75, v, H))} L${pt(P(u + 1.75, v, H))}" class="res-ol"/>`;
+    const seg = [['#d9b77e', -1.75, -1.25], ['#c0392b', -1.25, -0.95], ['#d9b77e', -0.95, -0.6], ['#c0392b', -0.6, -0.3], ['#d9b77e', -0.3, 0.05], ['#7a4a26', 0.05, 0.35], ['#d9b77e', 0.35, 0.9], ['#c9a227', 0.9, 1.2], ['#d9b77e', 1.2, 1.75]];
+    for (const [c, a, b] of seg) s += `<path d="M${pt(P(u + a, v, H))} L${pt(P(u + b, v, H))}" class="res-body" style="stroke:${c}"/>`;
+    return s + '</g>';
   }
 
   function led(u, v) {
@@ -736,8 +752,8 @@
     const PIR_AT = [102, 10.5];
     const parking = hw.includes('ultrasonic') || hw.includes('traffic');
     if (hw.includes('led') || hw.includes('button') || hw.includes('pir') || !(net || hw.includes('web') || parking)) {
-      front += led(LED_AT[0], LED_AT[1]);
-      wires.push(wire(piPinUV('GPIO17'), bbHole(2, 4), 'w-led', 46, 'sc-w-led'));
+      front += resistor() + led(LED_AT[0], LED_AT[1]);
+      wires.push(wire(piPinUV('GPIO17'), bbHole(0, 4), 'w-led', 46, 'sc-w-led'));
       wires.push(wire(piPinUV('GND'), bbHole(3, 4), 'w-gnd', 30));
       labels.push(callout(P(LED_AT[0], LED_AT[1], 14), -30, -96, 'LED · GPIO 17', null, 'led'));
     }
@@ -847,8 +863,8 @@
     const SEN_AT = [116, 10];
     // Το LED μπαίνει στα μαθήματα που δεν έχουν αισθητήρα απόστασης/φανάρι (ή όταν το ζητούν ρητά).
     if (hw.includes('led') || !(hw.includes('ultrasonic') || hw.includes('traffic'))) {
-      front += led(LED_AT[0], LED_AT[1]);
-      wires.push(wire(espPinUV('D2'), bbHole(2, 4), 'w-led', 46, 'sc-w-led'));
+      front += resistor() + led(LED_AT[0], LED_AT[1]);
+      wires.push(wire(espPinUV('D2'), bbHole(0, 4), 'w-led', 46, 'sc-w-led'));
       wires.push(wire(espPinUV('GND2'), bbHole(3, 4), 'w-gnd', 30));
       labels.push(callout(P(LED_AT[0], LED_AT[1], 14), 26, -92, 'LED · GPIO 2', null, 'led'));
     }

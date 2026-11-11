@@ -20,6 +20,8 @@
     button: { name: 'κουμπί', gen: 'του κουμπιού', legs: (u, v) => [{ u: u - 2.54, v, role: 'sig', label: 'πόδι 1' }, { u: u + 2.54, v, role: 'gnd', label: 'πόδι 2' }], top: 4, input: true },
     buzzer: { name: 'buzzer', gen: 'του buzzer', legs: (u, v) => [{ u: u - 1.27, v, role: 'sig', label: '+' }, { u: u + 1.27, v, role: 'gnd', label: '−' }], top: 4 },
     rgb: { name: 'LED RGB', gen: 'του LED RGB', legs: (u, v) => [{ u: u - 3.81, v, role: 'sig', label: 'πόδι R (κόκκινο)' }, { u: u - 1.27, v, role: 'gnd', label: 'κοινό −' }, { u: u + 1.27, v, role: 'sig', label: 'πόδι G (πράσινο)' }, { u: u + 3.81, v, role: 'sig', label: 'πόδι B (μπλε)' }], top: 6 },
+    // pass: πόδια που απλώς περνούν το ρεύμα (σε σειρά με το εξάρτημα της ίδιας στήλης)
+    resistor: { name: 'αντίσταση', gen: 'της αντίστασης', legs: (u, v) => [{ u: u - 2.54, v, role: 'pass', label: 'αριστερό πόδι' }, { u: u + 2.54, v, role: 'pass', label: 'δεξί πόδι' }], top: 3.6 },
     pir: { name: 'PIR', gen: 'του PIR', legs: (u, v) => [{ u: u - 6.07, v: v + 5.03, role: 'sig', label: 'pin OUT' }], top: 3.4, input: true },
     // χωρίς u, v στο manifest: οι θέσεις έρχονται από το scene.js (US, TL)
     ultrasonic: { name: 'HC-SR04', gen: 'του αισθητήρα απόστασης', top: 6, legs: (u, v, S) => ['VCC', 'TRIG', 'ECHO', 'GND'].map((n, i) => ({ u: S.US.u + 6.5 + i * 2.54, v: S.US.v + 2.6 + 2.54, role: n === 'GND' ? 'gnd' : n === 'VCC' ? 'pwr' : 'sig', label: 'pin ' + n, input: n === 'ECHO' })) },
@@ -63,9 +65,23 @@
     const chains = [];
     for (const p of parts) {
       const g = p.legs.find(l => l.role === 'gnd' && l.wire);
-      for (const l of p.legs) if (l.role === 'sig' && l.wire) chains.push({ part: p, sig: l, gnd: g || null, wire: l.wire, gndWire: g ? g.wire : null, input: p.input || !!l.input });
+      for (const l of p.legs) {
+        if (l.role !== 'sig') continue;
+        let wire = l.wire, via = null;
+        if (!wire) { // χωρίς δικό του καλώδιο: ίσως μέσα από αντίσταση στην ίδια στήλη
+          const q = passAt(parts, p, l.i);
+          const other = q && q.part.legs.find(x => x !== q.leg && x.role === 'pass');
+          if (other && other.wire) { wire = other.wire; via = { part: q.part, a: other, b: q.leg }; }
+        }
+        if (wire) chains.push({ part: p, sig: l, gnd: g || null, wire, gndWire: g ? g.wire : null, input: p.input || !!l.input, via });
+      }
     }
     return { parts, chains, wires };
+  }
+
+  function passAt(parts, not, i) {
+    for (const r of parts) if (r !== not) for (const q of r.legs) if (q.role === 'pass' && q.i === i) return { part: r, leg: q };
+    return null;
   }
 
   // Προτάσεις για κάθε στήλη που χρησιμοποιείται: «Στήλη 3: GPIO 2 και το + πόδι του LED».
@@ -78,6 +94,12 @@
       out.push({ col: l.i + 1, text: same
         ? `Στήλη ${l.i + 1}: το καλώδιο ${lab(l.wire)}${lab(l.wire) ? ' ' : ''}και το ${l.label} ${p.gen} είναι στην ίδια στήλη, άρα ενώνονται.`
         : `Το καλώδιο ${lab(l.wire)} πάει κατευθείαν στο ${l.label} ${p.gen}.` });
+    }
+    // πόδια αντίστασης χωρίς καλώδιο: ενώνονται με το πόδι άλλου εξαρτήματος στην ίδια στήλη
+    for (const p of n.parts) for (const l of p.legs) {
+      if (l.role !== 'pass' || l.wire) continue;
+      const mate = n.parts.filter(o => o !== p).flatMap(o => o.legs.filter(x => x.i === l.i).map(x => ({ x, o })))[0];
+      if (mate) out.push({ col: l.i + 1, text: `Στήλη ${l.i + 1}: το ${l.label} ${p.gen} και το ${mate.x.label} ${mate.o.gen} είναι στην ίδια στήλη. Έτσι το ρεύμα περνά πρώτα από την αντίσταση, που το περιορίζει για να μην καεί ${mate.o.gen.replace(/^του /, 'το ').replace(/^της /, 'η ')}.` });
     }
     return out.sort((a, b) => a.col - b.col);
   }
@@ -97,6 +119,7 @@
     const n = nets(manifest, S);
     const used = new Map(); // στήλη → χρώμα του καλωδίου της
     for (const p of n.parts) for (const l of p.legs) if (l.wire && l.wire.hole && l.wire.hole.i === l.i) used.set(l.i, WIRE_COL[l.wire.cls] || '#e8892f');
+    for (const c of n.chains) if (c.via && !used.has(c.sig.i)) used.set(c.sig.i, WIRE_COL[c.wire.cls] || '#e8892f');
     let s = `<svg class="bd-svg" viewBox="0 0 ${W} ${H}" role="img" aria-labelledby="bd-title"><title id="bd-title">Σχέδιο του breadboard από πάνω: εξαρτήματα πάνω, καλώδια κάτω</title>`;
     s += `<rect x="${X0 - 30}" y="${BOARD_Y}" width="${(COLS - 1) * C + 54}" height="${BOARD_B - BOARD_Y}" rx="10" class="bd-board"/>`;
     for (let i = 0; i < COLS; i++) {
@@ -113,6 +136,14 @@
       const xs = p.legs.map(l => hx(l.i));
       const cx = (Math.min(...xs) + Math.max(...xs)) / 2;
       s += `<g class="bd-part bd-${p.t}">`;
+      if (p.t === 'resistor') { // ξαπλωμένη πάνω από τη σειρά a, πόδια λοξά προς τις τρύπες
+        const RY = BOARD_Y - 14, x0 = Math.min(...xs), x1 = Math.max(...xs);
+        for (const l of p.legs) s += `<path d="M${hx(l.i) + (hx(l.i) === x0 ? 8 : -8)},${RY} L${hx(l.i)},${hy(l.j)}" class="bd-leg"/><circle cx="${hx(l.i)}" cy="${hy(l.j)}" r="4.5" class="bd-foot"/>`;
+        s += `<rect x="${x0 + 6}" y="${RY - 6}" width="${x1 - x0 - 12}" height="12" rx="6" class="bd-res"/>`;
+        s += [['#c0392b', 0.3], ['#c0392b', 0.42], ['#7a4a26', 0.54], ['#c9a227', 0.72]].map(([c, f]) => `<rect x="${x0 + 6 + (x1 - x0 - 12) * f - 2}" y="${RY - 6}" width="4" height="12" style="fill:${c}"/>`).join('');
+        s += `<text x="${cx}" y="${RY - 12}" class="bd-pm sm">220 Ω</text></g>`;
+        continue;
+      }
       for (const l of p.legs) {
         s += `<line x1="${hx(l.i)}" y1="${BODY + 8}" x2="${hx(l.i)}" y2="${hy(l.j)}" class="bd-leg"/><circle cx="${hx(l.i)}" cy="${hy(l.j)}" r="4.5" class="bd-foot"/>`;
       }

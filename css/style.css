@@ -1091,6 +1091,7 @@ code .gl-term { font-family: var(--font-code); }
 .bd-led.lit { fill: #ff6a4d; filter: drop-shadow(0 0 6px #ff6a4d); }
 .bd-pm { font: 800 13px var(--font-label); fill: var(--ink); text-anchor: middle; }
 .bd-btn { fill: #2a2a2d; stroke: #1c2130; }
+.bd-res { fill: #d9b77e; stroke: #3a2f22; stroke-width: 1.2; }
 .bd-btn-cap { fill: #d4472f; }
 .bd-buz { fill: #1d1f24; }
 .bd-rgb { fill: #e8eef2; stroke: #1c2130; stroke-width: 1.5; }

@@ -26,9 +26,12 @@
 .sc-esp.asleep .zzz { opacity: 1; animation: zfloat 2.4s ease-in-out infinite; }
 @keyframes zfloat { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-4px); } }
 
-.bb .f-t { fill: #f5f0e4; } .bb .f-l { fill: #d6cdb8; } .bb .f-r { fill: #e6dece; }
+.bb .f-t { fill: #f4f3ef; } .bb .f-l { fill: #cfccc4; } .bb .f-r { fill: #e2dfd8; }
 .bb-holes rect { fill: #8f8878; }
-.rail-r { fill: #d9534f; } .rail-b { fill: #3c6fd6; } .bb-gap { fill: #e0d7c4; }
+.rail-r { fill: #d9534f; } .rail-b { fill: #3c6fd6; }
+.rail-sign { fill: none; stroke-width: 0.4; stroke-linecap: round; } .rail-sign.r { stroke: #d9534f; } .rail-sign.b { stroke: #3c6fd6; }
+.res-ol { stroke: #3a2f22; stroke-width: 6.4; stroke-linecap: round; fill: none; }
+.res-body { stroke-width: 4.6; fill: none; } .bb-gap { fill: #e0d7c4; }
 
 .legs { stroke: #a2a8ad; stroke-width: 1.5; fill: none; }
 .led-body { fill: #b8352a; }

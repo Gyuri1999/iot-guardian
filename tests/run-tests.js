@@ -897,7 +897,7 @@ test('δάσκαλος: αποθήκευση ψευδωνύμου', () => {
         const n = BV.nets(SC.manifest);
         const owner = new Map();
         for (const p of n.parts) for (const l of p.legs) {
-          assert(!owner.has(l.i) || owner.get(l.i) === p, `${make} ${c}: στήλη ${l.i + 1} μοιράζεται (${p.t} και ${owner.get(l.i) && owner.get(l.i).t})`);
+          assert(!owner.has(l.i) || owner.get(l.i) === p || l.role === 'pass' || owner.get(l.i).legs.some(x => x.i === l.i && x.role === 'pass'), `${make} ${c}: στήλη ${l.i + 1} μοιράζεται (${p.t} και ${owner.get(l.i) && owner.get(l.i).t})`);
           owner.set(l.i, p);
           if (l.wire) assert(l.wire.hole.i === l.i, `${make} ${c}: το ${l.wire.cls} δεν είναι στη στήλη του ποδιού`);
         }
@@ -910,9 +910,12 @@ test('δάσκαλος: αποθήκευση ψευδωνύμου', () => {
   test('breadboard: προτάσεις και σχέδιο', () => {
     SC.labScene(['led', 'button'], {});
     const v = BV.svg(SC.manifest, { 'w-led': 'GPIO 2', 'w-gnd': 'GND', 'w-btn': 'GPIO 15' });
-    eq(v.sentences.map(x => x.col), [3, 4, 5]);
-    assert(/GPIO 2/.test(v.sentences[0].text) && /LED/.test(v.sentences[0].text), v.sentences[0].text);
-    assert((v.html.match(/class="bd-col used"/g) || []).length === 3, 'τρεις χρωματιστές στήλες');
+    eq(v.sentences.map(x => x.col), [1, 3, 4, 5]);
+    assert(/GPIO 2/.test(v.sentences[0].text) && /αντίστασης/.test(v.sentences[0].text), v.sentences[0].text);
+    assert(/αντίσταση/.test(v.sentences[1].text) && /LED/.test(v.sentences[1].text) && /καεί το LED/.test(v.sentences[1].text), v.sentences[1].text);
+    assert((v.html.match(/class="bd-col used"/g) || []).length === 4, 'τέσσερις χρωματιστές στήλες');
+    const ch = v.nets.chains.find(c => c.part.t === 'led');
+    assert(ch && ch.via && ch.via.part.t === 'resistor' && ch.wire.cls === 'w-led' && ch.gndWire && ch.gndWire.cls === 'w-gnd', 'LED μέσα από αντίσταση');
     assert(!/undefined|NaN/.test(v.html), 'το σχέδιο έχει undefined/NaN');
   });  test('breadboard: άσκηση «σύνδεσέ το μόνος σου» — μηνύματα και θέσεις', () => {
     const BP = bctx.IoTBBPractice;
@@ -921,8 +924,9 @@ test('δάσκαλος: αποθήκευση ψευδωνύμου', () => {
     const byCol = new Map();
     for (const p of n.parts) for (const l of p.legs) { if (!byCol.has(l.i)) byCol.set(l.i, []); byCol.get(l.i).push({ leg: l, part: p }); }
     const led = n.parts.find(p => p.t === 'led');
-    const target = { leg: led.legs[0], part: led };
-    const ok = BP.explain(led.legs[0].i, 'GPIO 2', target, byCol);
+    const res = n.parts.find(p => p.t === 'resistor');
+    const target = { leg: res.legs[0], part: res };
+    const ok = BP.explain(res.legs[0].i, 'GPIO 2', target, byCol);
     assert(ok.ok && /ίδια στήλη/.test(ok.text), ok.text);
     const other = BP.explain(led.legs[1].i, 'GPIO 2', target, byCol);
     assert(!other.ok && /κοντό πόδι/.test(other.text), other.text);

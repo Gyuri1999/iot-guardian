@@ -336,11 +336,15 @@
   function breadboard(k, M, S) {
     const { u, v, du, dv } = S.BB;
     const g = k.group(k.scene, 'breadboard');
-    const shell = k.mat(0xf5f0e4, { r: 0.8, unique: true });
+    const shell = k.mat(0xf2f1ec, { r: 0.8, unique: true });
     const body = k.B(g, u, v, 0, du, dv, 2.4, shell, { r: 0.6 });
     const top = k.decal(g, u, v, 2.4, du, dv, c => {
-      c.fillStyle = '#d9534f'; c.fillRect(u + 1, v + 1.3, du - 2, 0.25); c.fillRect(u + 1, v + dv - 6.6, du - 2, 0.25);
-      c.fillStyle = '#3c6fd6'; c.fillRect(u + 1, v + 6.2, du - 2, 0.25); c.fillRect(u + 1, v + dv - 1.6, du - 2, 0.25);
+      // γραμμές τροφοδοσίας: κόκκινη (+) και μπλε (−) σε κάθε μακριά άκρη
+      c.fillStyle = '#d9534f'; c.fillRect(u + 2.6, v + 1.1, du - 4, 0.5); c.fillRect(u + 2.6, v + dv - 6.8, du - 4, 0.5);
+      c.fillRect(u + 0.6, v + 1.1, 1.4, 0.45); c.fillRect(u + 1.08, v + 0.65, 0.45, 1.4);
+      c.fillRect(u + 0.6, v + dv - 6.8, 1.4, 0.45); c.fillRect(u + 1.08, v + dv - 7.25, 0.45, 1.4);
+      c.fillStyle = '#3c6fd6'; c.fillRect(u + 2.6, v + 6.1, du - 4, 0.5); c.fillRect(u + 2.6, v + dv - 1.7, du - 4, 0.5);
+      c.fillRect(u + 0.6, v + 6.1, 1.4, 0.45); c.fillRect(u + 0.6, v + dv - 1.7, 1.4, 0.45);
       c.fillStyle = '#8f8878';
       for (let x = 3; x < du - 2; x += 2.54) {
         const ys = [2.2, 4.6, dv - 5.5, dv - 3.1];
@@ -373,6 +377,27 @@
     g.userData.glow = [red];
     g.userData.anchor = new THREE.Vector3(u, 12.6, v);
     g.userData.legs = { sig: [{ u: u - 1.2, v, top: 6 }], gnd: { u: u + 1.2, v, top: 6 } };
+    return g;
+  }
+
+  // Αντίσταση 220 Ω ξαπλωμένη (άξονας u): μπεζ σώμα με χρωματιστές ρίγες, πόδια λυγισμένα στις τρύπες.
+  function resistor(k, M, o) {
+    const g = k.group(k.scene, 'resistor');
+    const { u, v } = o;
+    const H = 3.6;
+    for (const s of [-1, 1]) {
+      k.cylH(g, u + s * 2.54, v, 2.4, 0.22, H - 2.4 + 0.2, M.pin, { ol: false, seg: 8 });
+      k.B(g, Math.min(u + s * 2.54, u + s * 1.6) - 0.1, v - 0.2, H - 0.2, Math.abs(2.54 - 1.6) + 0.2, 0.4, 0.4, M.pin, { ol: false, cast: false });
+    }
+    const along = (len, r, mat, at, ol) => {
+      const m = k.mesh(g, k.keep(new THREE.CylinderGeometry(r, r, len, 18)), mat, { ol, cast: true });
+      m.rotation.z = Math.PI / 2;
+      m.position.set(u + at, H, v);
+      return m;
+    };
+    along(3.5, 0.72, k.mat(0xd9b77e, { r: 0.6 }), 0, true);
+    for (const [c, at] of [[0xc0392b, -1.1], [0xc0392b, -0.45], [0x7a4a26, 0.2], [0xc9a227, 1.05]]) along(0.3, 0.75, k.mat(c, { r: 0.5 }), at, false);
+    g.userData.anchor = new THREE.Vector3(u, H + 1, v);
     return g;
   }
 
@@ -775,6 +800,7 @@
         case 'pi5': g = pi5(k, M, S); break;
         case 'led': g = objs.led = led(k, M, o); break;
         case 'button': g = objs.button = button(k, M, o); break;
+        case 'resistor': g = objs.resistor = resistor(k, M, o); break;
         case 'pir': g = objs.pir = pir(k, M, o); break;
         case 'sensor': g = sensor(k, M, o); break;
         case 'router': g = router(k, M, o); break;
@@ -1016,7 +1042,12 @@
     for (const c of model.chains) {
       const w = byRec.get(c.wire);
       if (!w) continue;
-      let pts = leg2end(c.sig, c.wire.b).concat([V3(c.sig.u, c.sig.v, c.part.top)]);
+      let pts;
+      if (c.via) { // σε σειρά: καλώδιο → αντίσταση → (ίδια στήλη) → πόδι του εξαρτήματος
+        const a = c.via.a, b = c.via.b, rt = c.via.part.top;
+        bar(b, c.sig);
+        pts = leg2end(a, c.wire.b).concat([V3(a.u, a.v, rt), V3(b.u, b.v, rt), V3(b.u, b.v, BAR_H), V3(c.sig.u, c.sig.v, BAR_H), V3(c.sig.u, c.sig.v, c.part.top)]);
+      } else pts = leg2end(c.sig, c.wire.b).concat([V3(c.sig.u, c.sig.v, c.part.top)]);
       const gw = c.gndWire && byRec.get(c.gndWire);
       if (gw) {
         const back = leg2end(c.gnd, c.gndWire.b);
