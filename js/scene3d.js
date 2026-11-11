@@ -339,7 +339,6 @@
     const shell = k.mat(0xf5f0e4, { r: 0.8, unique: true });
     const body = k.B(g, u, v, 0, du, dv, 2.4, shell, { r: 0.6 });
     const top = k.decal(g, u, v, 2.4, du, dv, c => {
-      c.fillStyle = '#e0d7c4'; c.fillRect(u + 1, v + dv / 2 - 0.6, du - 2, 1.2);
       c.fillStyle = '#d9534f'; c.fillRect(u + 1, v + 1.3, du - 2, 0.25); c.fillRect(u + 1, v + dv - 6.6, du - 2, 0.25);
       c.fillStyle = '#3c6fd6'; c.fillRect(u + 1, v + 6.2, du - 2, 0.25); c.fillRect(u + 1, v + dv - 1.6, du - 2, 0.25);
       c.fillStyle = '#8f8878';
@@ -364,8 +363,8 @@
   function led(k, M, o) {
     const g = k.group(k.scene, 'led');
     const { u, v } = o;
-    k.cylH(g, u - 1.2, v, 2.4, 0.25, 3.6, M.pin, { ol: false, seg: 8 });
-    k.cylH(g, u + 1.2, v, 2.4, 0.25, 4.1, M.pin, { ol: false, seg: 8 });
+    k.cylH(g, u - 1.27, v, 2.4, 0.25, 4.1, M.pin, { ol: false, seg: 8 });
+    k.cylH(g, u + 1.27, v, 2.4, 0.25, 3.6, M.pin, { ol: false, seg: 8 });
     const red = k.mat(0xc93a2d, { r: 0.28, unique: true });
     k.cylH(g, u, v, 5.8, 2.15, 0.6, red);
     k.cylH(g, u, v, 6.4, 1.8, 5.8, red);
@@ -579,7 +578,7 @@
   function rgb3d(k, M, o) {
     const g = k.group(k.scene, 'rgb');
     const { u, v } = o;
-    for (const d of [-1.9, -0.63, 0.63, 1.9]) k.cylH(g, u + d, v, 2.4, 0.22, 3.8, M.pin, { ol: false, seg: 8 });
+    for (const d of [-3.81, -1.27, 1.27, 3.81]) k.cylH(g, u + d, v, 2.4, 0.22, 3.8, M.pin, { ol: false, seg: 8 });
     const lens = k.mat(0xe8eef2, { r: 0.18, op: 0.92, unique: true });
     k.cylH(g, u, v, 5.8, 2.15, 0.6, lens);
     k.cylH(g, u, v, 6.4, 1.8, 5.8, lens);
@@ -789,7 +788,7 @@
       case 'rgb': g = objs.rgb = rgb3d(k, M, o); break;
       case 'servo': g = objs.servo = servo3d(k, M, o); break;
       case 'oled': g = objs.oled = oled3d(k, M, o); break;
-        case 'wire': g = wire(k, M, o, S.K); objs.wires.push(g); break;
+        case 'wire': g = wire(k, M, o, S.K); g.userData.rec = o; objs.wires.push(g); break;
       }
       if (g) g.userData.top = true;
     }
@@ -994,49 +993,39 @@
   const BAR_H = 1.15;
   function nets() {
     if (cur.nets) return cur.nets;
-    const S = root.IoTScene;
     const { objs, k } = cur;
-    const bb = S.BB;
-    const onBB = e => e && e.u >= bb.u && e.u <= bb.u + bb.du && e.v >= bb.v && e.v <= bb.v + bb.dv && e.h < 4;
-    const railV = bb.v + bb.dv - 3.1 + 0.45; // ράγα GND (κάτω, δίπλα στη μπλε γραμμή)
-    const parts = cur.scene.children.filter(o => o.userData.legs);
-    const gndWire = objs.wires.find(w => w.userData.cls === 'w-gnd' && onBB(w.userData.end) && w.userData.end.v - bb.v > bb.dv - 7);
+    const model = root.IoTBBView ? root.IoTBBView.nets(cur.manifest) : { chains: [] };
     const hot = k.mat(0xffa040, { r: 0.3, m: 0.3, e: 0xff7a00, unique: true });
     hot.emissiveIntensity = 0.9;
     const group = k.group(objs.bb);
     group.visible = false;
-    const bar = (a, b) => { // οριζόντια λωρίδα από a σε b (ευθυγραμμισμένη σε u ή v)
+    const bar = (a, b) => { // λωρίδα από a σε b (ευθυγραμμισμένη σε u ή v)
       const u0 = Math.min(a.u, b.u), v0 = Math.min(a.v, b.v);
       k.B(group, u0 - 0.75, v0 - 0.75, BAR_H - 0.4, Math.abs(a.u - b.u) + 1.5, Math.abs(a.v - b.v) + 1.5, 0.85, hot, { ol: false, cast: false });
     };
     const V3 = (u, v, h) => new THREE.Vector3(u, h, v);
-    const list = [];
-    for (const w of objs.wires) {
-      const e = w.userData.end;
-      if (!onBB(e) || w === gndWire) continue;
-      let best = null, bd = 14;
-      for (const p of parts) for (const leg of p.userData.legs.sig) {
-        const d = Math.hypot(leg.u - e.u, leg.v - e.v);
-        if (d < bd) { bd = d; best = { p, leg }; }
-      }
-      if (!best) continue;
-      const { p, leg } = best;
+    const byRec = new Map(objs.wires.map(w => [w.userData.rec, w]));
+    // από την άκρη του καλωδίου ως το πόδι: πρώτα κατά μήκος της στήλης (v), μετά (αν χρειάζεται) πλάγια
+    const leg2end = (leg, e) => {
       const corner = { u: e.u, v: leg.v };
       bar(e, corner);
-      bar(corner, leg);
-      let pts = [V3(e.u, e.v, e.h), V3(e.u, e.v, BAR_H), V3(corner.u, corner.v, BAR_H), V3(leg.u, leg.v, BAR_H), V3(leg.u, leg.v, leg.top)];
-      const gl = p.userData.legs.gnd;
-      if (gl && gndWire) {
-        const ge = gndWire.userData.end;
-        const r = { u: gl.u, v: railV };
-        bar(gl, r);
-        bar(r, { u: ge.u, v: railV });
-        pts = pts.concat([V3(gl.u, gl.v, gl.top), V3(gl.u, gl.v, BAR_H), V3(r.u, r.v, BAR_H), V3(ge.u, railV, BAR_H), V3(ge.u, ge.v, BAR_H), V3(ge.u, ge.v, ge.h)]);
+      if (Math.abs(corner.u - leg.u) > 0.05) bar(corner, leg);
+      return [V3(e.u, e.v, e.h), V3(e.u, e.v, BAR_H), V3(corner.u, corner.v, BAR_H), V3(leg.u, leg.v, BAR_H)];
+    };
+    const list = [];
+    for (const c of model.chains) {
+      const w = byRec.get(c.wire);
+      if (!w) continue;
+      let pts = leg2end(c.sig, c.wire.b).concat([V3(c.sig.u, c.sig.v, c.part.top)]);
+      const gw = c.gndWire && byRec.get(c.gndWire);
+      if (gw) {
+        const back = leg2end(c.gnd, c.gndWire.b);
+        pts = pts.concat([V3(c.gnd.u, c.gnd.v, c.part.top)], back.reverse());
       }
-      if (p.userData.legs.input) pts.reverse();
+      if (c.input) pts.reverse();
       const path = new THREE.CurvePath();
       for (let i = 1; i < pts.length; i++) if (pts[i].distanceTo(pts[i - 1]) > 0.01) path.add(new THREE.LineCurve3(pts[i - 1], pts[i]));
-      list.push({ wire: w, path, gnd: gl && gndWire ? gndWire : null, len: path.getLength() });
+      if (path.curves.length) list.push({ wire: w, path, gnd: gw || null, len: path.getLength() });
     }
     cur.nets = { list, group };
     return cur.nets;

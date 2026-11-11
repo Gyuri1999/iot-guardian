@@ -272,6 +272,8 @@
 
   // Breadboard στα δεξιά της πλακέτας.
   const BB = { u: 62, v: 2, du: 60, dv: 26 };
+  // Κέντρο τρύπας: στήλη i (0 = αριστερά), σειρά j (0–4 = a–e). Οι 5 τρύπες μιας στήλης είναι ενωμένες.
+  const bbHole = (i, j) => ({ u: BB.u + 3.45 + i * 2.54, v: BB.v + 8.45 + j * 2.54, h: 2.4 });
   function breadboard() {
     const { u, v, du, dv } = BB;
     rec({ t: 'bb' });
@@ -286,8 +288,7 @@
       <rect x="${u + 1}" y="${v + 1.3}" width="${du - 2}" height="0.25" class="rail-r"/>
       <rect x="${u + 1}" y="${v + 6.2}" width="${du - 2}" height="0.25" class="rail-b"/>
       <rect x="${u + 1}" y="${v + dv - 6.6}" width="${du - 2}" height="0.25" class="rail-r"/>
-      <rect x="${u + 1}" y="${v + dv - 1.6}" width="${du - 2}" height="0.25" class="rail-b"/>
-      <rect x="${u + 1}" y="${v + dv / 2 - 0.6}" width="${du - 2}" height="1.2" class="bb-gap"/></g></g>`;
+      <rect x="${u + 1}" y="${v + dv - 1.6}" width="${du - 2}" height="0.25" class="rail-b"/></g></g>`;
     return s;
   }
 
@@ -297,7 +298,7 @@
     const top = P(u, v, 14);
     const sh = P(u + 4, v - 1, 2.4);
     return `<ellipse cx="${sh[0].toFixed(1)}" cy="${sh[1].toFixed(1)}" rx="9" ry="4.5" class="shadow"/><g id="sc-led" class="sc-led" data-part="led">
-      <path d="M${pt(P(u - 1.2, v, 2.4))} L${pt(P(u - 1.2, v, 6))} M${pt(P(u + 1.2, v, 2.4))} L${pt(P(u + 1.2, v, 6.5))}" class="legs"/>
+      <path d="M${pt(P(u - 1.27, v, 2.4))} L${pt(P(u - 1.27, v, 6.5))} M${pt(P(u + 1.27, v, 2.4))} L${pt(P(u + 1.27, v, 6))}" class="legs"/>
       <circle cx="${top[0].toFixed(1)}" cy="${top[1].toFixed(1)}" r="36" class="halo red" id="sc-led-halo"/>
       <rect x="${(top[0] - 7).toFixed(1)}" y="${top[1].toFixed(1)}" width="14" height="${(base[1] - top[1] - 12).toFixed(1)}" class="led-body"/>
       <ellipse cx="${top[0].toFixed(1)}" cy="${(base[1] - 12).toFixed(1)}" rx="8.4" ry="3.6" class="led-rim"/>
@@ -521,8 +522,9 @@
   }
 
   // ------------------------------------------------------------ buzzer, LED RGB, servo, OLED
-  const BUZ = { u: 112, v: 22 };
-  const RGBL = { u: 94, v: 22 };
+  // στήλες στο breadboard: LED 3–4, κουμπί 5 και 7, LED RGB 9–12, PIR 13, buzzer 19–20 (καμία δεν μοιράζεται)
+  const BUZ = { u: bbHole(18, 1).u + 1.27, v: bbHole(18, 1).v };
+  const RGBL = { u: bbHole(8, 1).u + 3.81, v: bbHole(8, 1).v };
   const SERVO = { u: 104, v: -15 };
   const OLED = { u: 124, v: 38 };
   // όρθιος κύλινδρος σε 2D (σώμα + πάνω έλλειψη)
@@ -542,14 +544,14 @@
     s += `<g id="sc-buzz-waves" class="bz-waves" transform="translate(${top[0].toFixed(1)},${(top[1] - 4).toFixed(1)})"><path d="M-6,-4 q6,-7 12,0"/><path d="M-10,-9 q10,-11 20,0"/><path d="M-14,-14 q14,-15 28,0"/></g>`;
     return s + '</g>';
   }
-  const buzPin = () => ({ u: BUZ.u - 1.27, v: BUZ.v + 2.54, h: 2.4 });
+  const buzPin = () => bbHole(18, 4);
   function rgbLed() {
     const { u, v } = RGBL;
     rec({ t: 'rgb', u, v });
     const top = P(u, v, 14);
     const base = P(u, v, 2.4);
     let s = '<g id="sc-rgb" class="sc-rgb" data-part="rgb">';
-    s += `<path d="M${[-1.9, -0.63, 0.63, 1.9].map(d => `M${pt(P(u + d, v, 2.4))} L${pt(P(u + d, v, 6.2))}`).join(' ').slice(1)}" class="legs"/>`;
+    s += `<path d="M${[-3.81, -1.27, 1.27, 3.81].map(d => `M${pt(P(u + d, v, 2.4))} L${pt(P(u + d, v, 6.2))}`).join(' ').slice(1)}" class="legs"/>`;
     s += `<circle cx="${top[0].toFixed(1)}" cy="${top[1].toFixed(1)}" r="34" class="rgb-halo" id="sc-rgb-halo"/>`;
     s += `<rect x="${(top[0] - 7).toFixed(1)}" y="${top[1].toFixed(1)}" width="14" height="${(base[1] - top[1] - 12).toFixed(1)}" class="rgb-body" id="sc-rgb-body"/>`;
     s += `<ellipse cx="${top[0].toFixed(1)}" cy="${(base[1] - 12).toFixed(1)}" rx="8.4" ry="3.6" class="led-rim"/>`;
@@ -557,7 +559,7 @@
     s += `<ellipse cx="${(top[0] - 2.4).toFixed(1)}" cy="${(top[1] + 3).toFixed(1)}" rx="1.8" ry="3.6" class="led-shine"/>`;
     return s + '</g>';
   }
-  const rgbPin = i => ({ u: RGBL.u - 1.9 + [0, 2.54, 3.8][i], v: RGBL.v + 2.54, h: 2.4 });
+  const rgbPin = i => bbHole([8, 10, 11][i], 4); // R, G, B (το κοινό − είναι στη στήλη 10)
   // Μπράτσο του servo: γωνία 0–180° στο πάνω επίπεδο, γύρω από τον άξονα
   function servoHorn(angle) {
     const cu = SERVO.u + 3.2, cv = SERVO.v + 3, h = 11.2;
@@ -728,24 +730,25 @@
     const labels = [callout(P(28, 16, 4), -20, 104, net ? 'RASPBERRY PI · BROKER + PYTHON' : 'RASPBERRY PI', null, 'pi'), callout(piPin('GPIO26'), -10, -96, 'GPIO HEADER · 40 PINS', null, 'pi-gpio')];
     const wires = [];
     mid += breadboard();
-    const LED_AT = [72, 15];
-    const BTN_AT = [86, 15];
-    const PIR_AT = [102, 15];
+    // θέσεις πάνω στις τρύπες: κάθε καλώδιο μπαίνει στην ίδια στήλη με το πόδι του εξαρτήματος
+    const LED_AT = [bbHole(2, 1).u + 1.27, bbHole(2, 1).v];
+    const BTN_AT = [bbHole(4, 1).u + 2.54, bbHole(4, 1).v];
+    const PIR_AT = [102, 10.5];
     const parking = hw.includes('ultrasonic') || hw.includes('traffic');
     if (hw.includes('led') || hw.includes('button') || hw.includes('pir') || !(net || hw.includes('web') || parking)) {
       front += led(LED_AT[0], LED_AT[1]);
-      wires.push(wire(piPinUV('GPIO17'), { u: LED_AT[0] - 2.54, v: LED_AT[1] + 2.54, h: 2.4 }, 'w-led', 46, 'sc-w-led'));
-      wires.push(wire(piPinUV('GND'), { u: LED_AT[0] + 2.54, v: BB.v + BB.dv - 2, h: 2.4 }, 'w-gnd', 30));
+      wires.push(wire(piPinUV('GPIO17'), bbHole(2, 4), 'w-led', 46, 'sc-w-led'));
+      wires.push(wire(piPinUV('GND'), bbHole(3, 4), 'w-gnd', 30));
       labels.push(callout(P(LED_AT[0], LED_AT[1], 14), -30, -96, 'LED · GPIO 17', null, 'led'));
     }
     if (hw.includes('button')) {
       front += button(BTN_AT[0], BTN_AT[1]);
-      wires.push(wire(piPinUV('GPIO27'), { u: BTN_AT[0] - 5.1, v: BTN_AT[1] + 2.54, h: 2.4 }, 'w-btn', 54, 'sc-w-btn'));
+      wires.push(wire(piPinUV('GPIO27'), bbHole(4, 4), 'w-btn', 54, 'sc-w-btn'));
       labels.push(callout(P(BTN_AT[0], BTN_AT[1], 5), 10, -66, 'ΚΟΥΜΠΙ · GPIO 27', null, 'button'));
     }
     if (hw.includes('pir')) {
       front += pir(PIR_AT[0], PIR_AT[1]);
-      wires.push(wire(piPinUV('GPIO4'), { u: PIR_AT[0] - 8.9, v: PIR_AT[1] + 5, h: 2.4 }, 'w-pir', 62, 'sc-w-pir'));
+      wires.push(wire(piPinUV('GPIO4'), bbHole(12, 4), 'w-pir', 62, 'sc-w-pir'));
       labels.push(callout(P(PIR_AT[0] + 4, PIR_AT[1], 4), 34, -28, 'PIR · GPIO 4', null, 'pir'));
     }
     // HC-SR04, αυτοκινητάκι και φανάρι (Rust στο Raspberry Pi): ίδιες θέσεις με του ESP32, καλώδια από το header του Pi
@@ -837,25 +840,26 @@
     mid += breadboard();
     // καλώδια από τα pins στο breadboard
     const wires = [];
-    const LED_AT = [72, 15];
-    const BTN_AT = [86, 15];
-    const PIR_AT = [102, 15];
+    // θέσεις πάνω στις τρύπες: κάθε καλώδιο μπαίνει στην ίδια στήλη με το πόδι του εξαρτήματος
+    const LED_AT = [bbHole(2, 1).u + 1.27, bbHole(2, 1).v];
+    const BTN_AT = [bbHole(4, 1).u + 2.54, bbHole(4, 1).v];
+    const PIR_AT = [102, 10.5];
     const SEN_AT = [116, 10];
     // Το LED μπαίνει στα μαθήματα που δεν έχουν αισθητήρα απόστασης/φανάρι (ή όταν το ζητούν ρητά).
     if (hw.includes('led') || !(hw.includes('ultrasonic') || hw.includes('traffic'))) {
       front += led(LED_AT[0], LED_AT[1]);
-      wires.push(wire(espPinUV('D2'), { u: LED_AT[0] - 2.54, v: LED_AT[1] + 2.54, h: 2.4 }, 'w-led', 46, 'sc-w-led'));
-      wires.push(wire(espPinUV('GND2'), { u: LED_AT[0] + 2.54, v: BB.v + BB.dv - 2, h: 2.4 }, 'w-gnd', 30));
+      wires.push(wire(espPinUV('D2'), bbHole(2, 4), 'w-led', 46, 'sc-w-led'));
+      wires.push(wire(espPinUV('GND2'), bbHole(3, 4), 'w-gnd', 30));
       labels.push(callout(P(LED_AT[0], LED_AT[1], 14), 26, -92, 'LED · GPIO 2', null, 'led'));
     }
     if (hw.includes('button')) {
       front += button(BTN_AT[0], BTN_AT[1]);
-      wires.push(wire(espPinUV('D15'), { u: BTN_AT[0] - 5.1, v: BTN_AT[1] + 2.54, h: 2.4 }, 'w-btn', 54, 'sc-w-btn'));
+      wires.push(wire(espPinUV('D15'), bbHole(4, 4), 'w-btn', 54, 'sc-w-btn'));
       labels.push(callout(P(BTN_AT[0], BTN_AT[1], 5), 10, -66, 'ΚΟΥΜΠΙ · GPIO 15', null, 'button'));
     }
     if (hw.includes('pir')) {
       front += pir(PIR_AT[0], PIR_AT[1]);
-      wires.push(wire(espPinUV('D4'), { u: PIR_AT[0] - 8.9, v: PIR_AT[1] + 5, h: 2.4 }, 'w-pir', 62, 'sc-w-pir'));
+      wires.push(wire(espPinUV('D4'), bbHole(12, 4), 'w-pir', 62, 'sc-w-pir'));
       labels.push(callout(P(PIR_AT[0] + 4, PIR_AT[1], 4), hw.includes('sensor') ? 70 : 34, hw.includes('sensor') ? -78 : -28, 'PIR · GPIO 4', null, 'pir'));
     }
     if (hw.includes('sensor')) {
@@ -1141,5 +1145,5 @@
     });
   }
 
-  root.IoTScene = { servoHorn, oledSVG, BUZ, RGBL, SERVO, OLED, RIGHT_ROW, LEFT_ROW, PI_ODD, PI_EVEN, K, ESP, PCB_TOP, PIN_U, PI_T, PI_PIN_L, PI_PIN_TOP, BB, TL, manifest: null, buildIn, carOffset, carV, dragToCm, CAR, US, P, labScene, piScene, homeScene, piHomeScene, netScene, attachPanZoom, animatePacket, NET_NODES };
+  root.IoTScene = { bbHole, servoHorn, oledSVG, BUZ, RGBL, SERVO, OLED, RIGHT_ROW, LEFT_ROW, PI_ODD, PI_EVEN, K, ESP, PCB_TOP, PIN_U, PI_T, PI_PIN_L, PI_PIN_TOP, BB, TL, manifest: null, buildIn, carOffset, carV, dragToCm, CAR, US, P, labScene, piScene, homeScene, piHomeScene, netScene, attachPanZoom, animatePacket, NET_NODES };
 })(typeof window !== 'undefined' ? window : globalThis);

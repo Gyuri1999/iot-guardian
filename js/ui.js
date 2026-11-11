@@ -305,31 +305,50 @@
     return svg;
   }
 
-  // ---------- «Μέσα»: ακτινογραφία του breadboard (μεταλλικές λωρίδες και ρεύμα που κυλά).
+  // ---------- «Μέσα»: τι ενώνεται μέσα στο breadboard. Σχέδιο από πάνω (js/bbview.js) και, με WebGL, 3D ακτινογραφία.
+  function wireLabels() {
+    const pi = isPi();
+    const g = n => 'GPIO ' + n;
+    return { 'w-led': g(pi ? 17 : 2), 'w-gnd': 'GND', 'w-btn': g(pi ? 27 : 15), 'w-pir': g(4), 'w-buz': g(pi ? 22 : 23), 'w-rgbr': g(pi ? 5 : 32), 'w-rgbg': g(pi ? 6 : 33), 'w-rgbb': g(pi ? 13 : 14) };
+  }
   function bindXray(wrap, has3d) {
     const D3 = window.IoTScene3D;
+    const BV = window.IoTBBView;
     const ctl = wrap.querySelector('.scene-ctl');
     const old = wrap.querySelector('#sc-xray');
     if (old) old.remove();
-    if (!ctl || !has3d || !D3.xray || !D3.hasBoard()) { const n = wrap.parentElement.querySelector('.xray-note'); if (n) n.hidden = true; return; }
-    ctl.insertAdjacentHTML('beforeend', `<button class="sc-b sc-3d" id="sc-xray" aria-pressed="false" title="Δες μέσα στο breadboard: ποιες τρύπες ενώνονται και πώς κυλά το ρεύμα" aria-label="Δες μέσα στο breadboard">${icon('xray')}<span>Μέσα</span></button>`);
+    const oldNote = wrap.parentElement.querySelector('.xray-note');
+    if (oldNote) oldNote.remove();
+    S.bbv = null;
+    const man = window.IoTScene.manifest;
+    if (!ctl || !BV || !man || !man.some(o => o.t === 'bb')) return;
+    const view = BV.svg(man, wireLabels());
+    if (!view.nets.parts.length) return;
+    ctl.insertAdjacentHTML('beforeend', `<button class="sc-b sc-3d" id="sc-xray" aria-pressed="false" title="Δες τι ενώνεται μέσα στο breadboard" aria-label="Δες τι ενώνεται μέσα στο breadboard">${icon('xray')}<span>Μέσα</span></button>`);
     const btn = $('#sc-xray');
-    let note = wrap.parentElement.querySelector('.xray-note');
-    if (!note) {
-      wrap.insertAdjacentHTML('afterend', `<div class="xray-note" hidden><strong>Μέσα στο breadboard</strong>
-        <ul><li>Κάθε <b>στήλη από 5 τρύπες</b> ενώνεται από κάτω με μια <b>μεταλλική λωρίδα</b>. Ό,τι μπαίνει στην ίδια στήλη είναι συνδεδεμένο.</li>
-        <li>Οι μακριές λωρίδες πάνω και κάτω είναι οι <b>ράγες ρεύματος</b>: η κόκκινη για το +, η μπλε για τη γείωση (GND).</li>
-        <li>Οι <b>πορτοκαλί</b> λωρίδες είναι αυτές που χρησιμοποιεί το κύκλωμά σου. Όταν τρέχει ο κώδικας, οι <b>κίτρινες κουκκίδες</b> δείχνουν πώς κυλά το ρεύμα: από το pin, μέσα από το εξάρτημα, στη γείωση.</li></ul></div>`);
-      note = wrap.parentElement.querySelector('.xray-note');
-    }
+    wrap.insertAdjacentHTML('afterend', `<div class="xray-note" hidden>
+      <div class="xn-head"><strong>Μέσα στο breadboard: τι ενώνεται;</strong><span class="spacer"></span>${window.IoTSpeak && window.IoTSpeak.supported() ? `<button class="btn quiet sm" id="xn-say">${icon('speaker')} Άκουσε</button>` : ''}</div>
+      <p class="xn-rule">Κάθε <b>στήλη</b> έχει 5 τρύπες (a–e) που είναι <b>ενωμένες από κάτω</b> με μια μεταλλική λωρίδα. Ό,τι μπαίνει στην <b>ίδια στήλη</b> συνδέεται. Οι στήλες μεταξύ τους δεν συνδέονται.</p>
+      <div class="bd-wrap">${view.html}</div>
+      <ol class="xn-list">${view.sentences.map(x => `<li>${esc(x.text)}</li>`).join('')}</ol>
+      <p class="muted xn-foot">Πάτα ή πέρνα το ποντίκι πάνω από μια στήλη για να δεις τις 5 ενωμένες τρύπες. Όταν τρέχει ο κώδικας, οι κουκκίδες δείχνουν πώς κυλά το ρεύμα: από το pin, μέσα από το εξάρτημα, στη γείωση (GND).${has3d ? ' Στην 3D σκηνή το breadboard γίνεται διάφανο και φαίνονται οι λωρίδες.' : ''}</p></div>`);
+    const note = wrap.parentElement.querySelector('.xray-note');
+    const bvEl = note.querySelector('.bd-wrap');
+    S.bbv = { el: bvEl, nets: view.nets };
+    if ($('#xn-say')) $('#xn-say').onclick = () => window.IoTSpeak.say(note.querySelector('.xn-rule').textContent + ' ' + view.sentences.map(x => x.text).join(' '));
     const show = on => {
-      D3.xray(on);
+      if (has3d && D3.xray && D3.hasBoard()) D3.xray(on);
       S.xray = on;
       btn.setAttribute('aria-pressed', String(on));
       btn.classList.toggle('on', on);
-      if (note) note.hidden = !on;
+      note.hidden = !on;
+      if (on) BV.sync(bvEl, S.scene, view.nets, wiredCls);
     };
-    btn.onclick = () => { show(!D3.xrayOn()); announce(D3.xrayOn() ? 'Βλέπεις μέσα στο breadboard: τις μεταλλικές λωρίδες και το ρεύμα.' : 'Κανονική όψη του breadboard.'); };
+    btn.onclick = () => {
+      show(!S.xray);
+      announce(S.xray ? 'Βλέπεις τι ενώνεται μέσα στο breadboard.' : 'Κανονική όψη του breadboard.');
+      if (S.xray) note.scrollIntoView({ block: 'nearest', behavior: motionOK() ? 'smooth' : 'auto' });
+    };
     if (S.xray) show(true);
   }
 
@@ -3492,6 +3511,7 @@
       cls('#sc-w-btn', 'on', S.inputs.button);
       cls('#sc-pir', 'on', S.inputs.pir);
       cls('#sc-w-pir', 'on', S.inputs.pir);
+      if (S.bbv && S.xray) window.IoTBBView.sync(S.bbv.el, sc, S.bbv.nets, wiredCls);
       cls('#sc-router', 'on', S.inputs.router);
       const sleeping = !!(b && b.sleep);
       cls('#sc-esp', 'asleep', sleeping);

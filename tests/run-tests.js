@@ -879,5 +879,43 @@ test('δάσκαλος: αποθήκευση ψευδωνύμου', () => {
   assert(!/[<>]/.test(nick) && nick.length <= 24, nick);
 });
 
+// ------------------------------------------------------------ μέσα στο breadboard (js/scene.js + js/bbview.js)
+{
+  const bctx = vm.createContext({ console, Math, JSON, Object, Array, Number, String, Set, Map });
+  bctx.globalThis = bctx;
+  for (const f of ['scene.js', 'bbview.js']) vm.runInContext(fs.readFileSync(path.join(ROOT, 'js', f), 'utf8'), bctx, { filename: f });
+  const SC = bctx.IoTScene, BV = bctx.IoTBBView;
+  const combos = new Set();
+  for (const l of IoTLessons.lessons) combos.add(JSON.stringify((l.hardware || []).slice().sort()));
+  [['led', 'button'], ['button', 'buzzer'], ['rgb', 'button', 'pir'], ['rgb', 'sensor'], ['pir'], ['led', 'pir']].forEach(h => combos.add(JSON.stringify(h.sort())));
+  test('breadboard: κάθε καλώδιο μπαίνει στη στήλη ενός ποδιού και κανένα εξάρτημα δεν μοιράζεται στήλη', () => {
+    let checked = 0;
+    for (const c of combos) {
+      const hw = JSON.parse(c);
+      for (const make of ['labScene', 'piScene']) {
+        try { SC[make](hw, {}); } catch (e) { continue; }
+        const n = BV.nets(SC.manifest);
+        const owner = new Map();
+        for (const p of n.parts) for (const l of p.legs) {
+          assert(!owner.has(l.i) || owner.get(l.i) === p, `${make} ${c}: στήλη ${l.i + 1} μοιράζεται (${p.t} και ${owner.get(l.i) && owner.get(l.i).t})`);
+          owner.set(l.i, p);
+          if (l.wire) assert(l.wire.hole.i === l.i, `${make} ${c}: το ${l.wire.cls} δεν είναι στη στήλη του ποδιού`);
+        }
+        for (const w of n.wires) assert(n.parts.some(p => p.legs.some(l => l.wire === w)), `${make} ${c}: το ${w.cls} δεν συνδέεται με κανένα πόδι`);
+        checked++;
+      }
+    }
+    assert(checked >= 30, 'λίγες σκηνές: ' + checked);
+  });
+  test('breadboard: προτάσεις και σχέδιο', () => {
+    SC.labScene(['led', 'button'], {});
+    const v = BV.svg(SC.manifest, { 'w-led': 'GPIO 2', 'w-gnd': 'GND', 'w-btn': 'GPIO 15' });
+    eq(v.sentences.map(x => x.col), [3, 4, 5]);
+    assert(/GPIO 2/.test(v.sentences[0].text) && /LED/.test(v.sentences[0].text), v.sentences[0].text);
+    assert((v.html.match(/class="bd-col used"/g) || []).length === 3, 'τρεις χρωματιστές στήλες');
+    assert(!/undefined|NaN/.test(v.html), 'το σχέδιο έχει undefined/NaN');
+  });
+}
+
 console.log(`\n${passed} πέρασαν, ${failed} απέτυχαν\n`);
 process.exit(failed ? 1 : 0);

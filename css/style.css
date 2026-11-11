@@ -1063,3 +1063,54 @@ code .gl-term { font-family: var(--font-code); }
 /* ------------------------------------------------------------ ακτινογραφία του breadboard */
 .xray-note { margin: 0.6rem 0 0; padding: 0.7rem 0.9rem; border-left: 5px solid #e8892f; border-radius: 10px; background: var(--surface-2); }
 .xray-note ul { margin: 0.4rem 0 0; padding-left: 1.2rem; display: grid; gap: 0.3rem; }
+.xn-head { display: flex; align-items: center; gap: 0.5rem; }
+.xn-rule { margin: 0.4rem 0 0.6rem; font-size: 1.05rem; }
+.bd-wrap { background: var(--surface); border-radius: 10px; padding: 0.4rem; overflow-x: auto; }
+.bd-svg { display: block; width: 100%; min-width: 34rem; height: auto; }
+.xn-list { margin: 0.7rem 0 0.3rem; padding-left: 1.4rem; display: grid; gap: 0.35rem; font-size: 1.02rem; }
+.xn-foot { margin: 0.3rem 0 0; font-size: 0.92rem; }
+.bd-board { fill: #f3ecdc; stroke: #cfc3a8; stroke-width: 1.5; }
+.bd-hole { fill: #8f8878; }
+.bd-rail { stroke-width: 2; }
+.bd-rail.r { stroke: #d9534f; }
+.bd-rail.b { stroke: #3c6fd6; }
+.bd-sign { font: 700 15px var(--font-label); text-anchor: middle; }
+.bd-sign.r { fill: #d9534f; }
+.bd-sign.b { fill: #3c6fd6; }
+.bd-num { font: 600 10px var(--font-label); fill: #7b7362; text-anchor: middle; }
+.bd-row { font: 600 12px var(--font-label); fill: #7b7362; text-anchor: middle; }
+.bd-col { cursor: pointer; outline: none; }
+.bd-band { fill: transparent; stroke: transparent; stroke-width: 2; transition: fill 0.2s, stroke 0.2s; }
+.bd-col:hover .bd-band, .bd-col:focus-visible .bd-band { fill: rgba(232, 137, 47, 0.18); stroke: #e8892f; stroke-dasharray: 4 3; }
+.bd-col.used .bd-band { fill: color-mix(in srgb, var(--c) 28%, transparent); stroke: var(--c); stroke-dasharray: none; }
+.bd-col.used .bd-num { fill: #1f2a44; font-size: 12px; font-weight: 800; }
+.bd-col.used.on .bd-band { animation: bd-glow 1.2s ease-in-out infinite; }
+@keyframes bd-glow { 50% { fill: color-mix(in srgb, var(--c) 48%, transparent); } }
+.bd-leg { stroke: #9aa2ab; stroke-width: 3; stroke-linecap: round; }
+.bd-led { fill: #c93a2d; stroke: #1c2130; stroke-width: 1.5; transition: fill 0.2s; }
+.bd-led.lit { fill: #ff6a4d; filter: drop-shadow(0 0 6px #ff6a4d); }
+.bd-pm { font: 800 13px var(--font-label); fill: var(--ink); text-anchor: middle; }
+.bd-btn { fill: #2a2a2d; stroke: #1c2130; }
+.bd-btn-cap { fill: #d4472f; }
+.bd-buz { fill: #1d1f24; }
+.bd-rgb { fill: #e8eef2; stroke: #1c2130; stroke-width: 1.5; }
+.bd-pir { fill: #1f7247; stroke: #1c2130; }
+.bd-pname { font: 700 13px var(--font-body); fill: var(--ink); text-anchor: middle; }
+.bd-wline { fill: none; stroke-width: 6; stroke-linecap: round; }
+.bd-flow { fill: none; stroke: #fff6c8; stroke-width: 3; stroke-linecap: round; stroke-dasharray: 2 14; opacity: 0; }
+.bd-wire.on .bd-flow { opacity: 1; animation: bd-flow 0.9s linear infinite; }
+.bd-wire.gnd.on .bd-flow, .bd-wire.in.on .bd-flow { animation-direction: reverse; }
+.bd-mod { fill: #3557b8; stroke: #1c2130; }
+.bd-mod-traffic { fill: #2a2a2d; }
+@keyframes bd-flow { to { stroke-dashoffset: -16; } }
+.bd-plug { stroke: #1c2130; stroke-width: 1.5; }
+.bd-tag { fill: #fdf9f0; stroke-width: 2.5; }
+.bd-tag-t { font: 700 11px var(--font-label); fill: #1f2a44; text-anchor: middle; }
+@media (prefers-reduced-motion: reduce) { .bd-wire.on .bd-flow, .bd-col.used.on .bd-band { animation: none; } }
+:root[data-reduced-motion="true"] .bd-wire.on .bd-flow, :root[data-reduced-motion="true"] .bd-col.used.on .bd-band { animation: none; }
+.bd-foot { fill: #9aa2ab; stroke: #1c2130; stroke-width: 1; }
+.bd-pm.sm { font-size: 10px; }
+.bd-pir-dome { fill: #f8f6f0; }
+.bd-from { font: 600 11px var(--font-label); fill: var(--muted); }
+.bd-wire.unwired .bd-wline, .bd-wire.unwired .bd-plug { opacity: 0.18; }
+.bd-wire.unwired .bd-tag { stroke-dasharray: 4 3; }
