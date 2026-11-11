@@ -327,14 +327,46 @@
     ctl.insertAdjacentHTML('beforeend', `<button class="sc-b sc-3d" id="sc-xray" aria-pressed="false" title="Δες τι ενώνεται μέσα στο breadboard" aria-label="Δες τι ενώνεται μέσα στο breadboard">${icon('xray')}<span>Μέσα</span></button>`);
     const btn = $('#sc-xray');
     wrap.insertAdjacentHTML('afterend', `<div class="xray-note" hidden>
-      <div class="xn-head"><strong>Μέσα στο breadboard: τι ενώνεται;</strong><span class="spacer"></span>${window.IoTSpeak && window.IoTSpeak.supported() ? `<button class="btn quiet sm" id="xn-say">${icon('speaker')} Άκουσε</button>` : ''}</div>
+      <div class="xn-head"><strong>Μέσα στο breadboard: τι ενώνεται;</strong><span class="spacer"></span>${window.IoTBBPractice ? `<button class="btn sm" id="xn-practice" aria-pressed="false">✋ Σύνδεσέ το μόνος σου</button>` : ''}${window.IoTSpeak && window.IoTSpeak.supported() ? `<button class="btn quiet sm" id="xn-say">${icon('speaker')} Άκουσε</button>` : ''}</div>
       <p class="xn-rule">Κάθε <b>στήλη</b> έχει 5 τρύπες (a–e) που είναι <b>ενωμένες από κάτω</b> με μια μεταλλική λωρίδα. Ό,τι μπαίνει στην <b>ίδια στήλη</b> συνδέεται. Οι στήλες μεταξύ τους δεν συνδέονται.</p>
+      <p class="bp-msg" id="bp-msg" role="status" aria-live="polite" hidden></p>
       <div class="bd-wrap">${view.html}</div>
       <ol class="xn-list">${view.sentences.map(x => `<li>${esc(x.text)}</li>`).join('')}</ol>
       <p class="muted xn-foot">Πάτα ή πέρνα το ποντίκι πάνω από μια στήλη για να δεις τις 5 ενωμένες τρύπες. Όταν τρέχει ο κώδικας, οι κουκκίδες δείχνουν πώς κυλά το ρεύμα: από το pin, μέσα από το εξάρτημα, στη γείωση (GND).${has3d ? ' Στην 3D σκηνή το breadboard γίνεται διάφανο και φαίνονται οι λωρίδες.' : ''}</p></div>`);
     const note = wrap.parentElement.querySelector('.xray-note');
     const bvEl = note.querySelector('.bd-wrap');
     S.bbv = { el: bvEl, nets: view.nets };
+    const pBtn = $('#xn-practice'), pMsg = $('#bp-msg');
+    const stopPractice = () => {
+      if (!S.bbv || !S.bbv.practice) return;
+      S.bbv.practice.destroy();
+      S.bbv.practice = null;
+      pMsg.hidden = true;
+      pBtn.setAttribute('aria-pressed', 'false');
+      pBtn.textContent = '✋ Σύνδεσέ το μόνος σου';
+      note.classList.remove('practicing');
+      BV.sync(bvEl, S.scene, view.nets, wiredCls);
+    };
+    const startPractice = () => {
+      stopPractice();
+      pMsg.hidden = false;
+      note.classList.add('practicing');
+      S.bbv.practice = window.IoTBBPractice.mount(bvEl, view, {
+        labels: wireLabels(),
+        sfx,
+        reducedMotion: () => !motionOK(),
+        message: t => { pMsg.textContent = t; pMsg.classList.remove('pop'); void pMsg.offsetWidth; pMsg.classList.add('pop'); },
+        onWin: () => { pBtn.textContent = '↻ Ξανά'; }
+      });
+      pBtn.setAttribute('aria-pressed', 'true');
+      pBtn.textContent = '✕ Τέλος άσκησης';
+    };
+    if (pBtn) pBtn.onclick = () => {
+      const p = S.bbv && S.bbv.practice;
+      if (p && p.done()) startPractice();
+      else if (p) stopPractice();
+      else startPractice();
+    };
     if ($('#xn-say')) $('#xn-say').onclick = () => window.IoTSpeak.say(note.querySelector('.xn-rule').textContent + ' ' + view.sentences.map(x => x.text).join(' '));
     const show = on => {
       if (has3d && D3.xray && D3.hasBoard()) D3.xray(on);
@@ -342,6 +374,7 @@
       btn.setAttribute('aria-pressed', String(on));
       btn.classList.toggle('on', on);
       note.hidden = !on;
+      if (!on) stopPractice();
       if (on) BV.sync(bvEl, S.scene, view.nets, wiredCls);
     };
     btn.onclick = () => {
@@ -3511,7 +3544,7 @@
       cls('#sc-w-btn', 'on', S.inputs.button);
       cls('#sc-pir', 'on', S.inputs.pir);
       cls('#sc-w-pir', 'on', S.inputs.pir);
-      if (S.bbv && S.xray) window.IoTBBView.sync(S.bbv.el, sc, S.bbv.nets, wiredCls);
+      if (S.bbv && S.xray && !S.bbv.practice) window.IoTBBView.sync(S.bbv.el, sc, S.bbv.nets, wiredCls);
       cls('#sc-router', 'on', S.inputs.router);
       const sleeping = !!(b && b.sleep);
       cls('#sc-esp', 'asleep', sleeping);

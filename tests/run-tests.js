@@ -883,7 +883,7 @@ test('δάσκαλος: αποθήκευση ψευδωνύμου', () => {
 {
   const bctx = vm.createContext({ console, Math, JSON, Object, Array, Number, String, Set, Map });
   bctx.globalThis = bctx;
-  for (const f of ['scene.js', 'bbview.js']) vm.runInContext(fs.readFileSync(path.join(ROOT, 'js', f), 'utf8'), bctx, { filename: f });
+  for (const f of ['scene.js', 'bbview.js', 'bbpractice.js']) vm.runInContext(fs.readFileSync(path.join(ROOT, 'js', f), 'utf8'), bctx, { filename: f });
   const SC = bctx.IoTScene, BV = bctx.IoTBBView;
   const combos = new Set();
   for (const l of IoTLessons.lessons) combos.add(JSON.stringify((l.hardware || []).slice().sort()));
@@ -914,6 +914,27 @@ test('δάσκαλος: αποθήκευση ψευδωνύμου', () => {
     assert(/GPIO 2/.test(v.sentences[0].text) && /LED/.test(v.sentences[0].text), v.sentences[0].text);
     assert((v.html.match(/class="bd-col used"/g) || []).length === 3, 'τρεις χρωματιστές στήλες');
     assert(!/undefined|NaN/.test(v.html), 'το σχέδιο έχει undefined/NaN');
+  });  test('breadboard: άσκηση «σύνδεσέ το μόνος σου» — μηνύματα και θέσεις', () => {
+    const BP = bctx.IoTBBPractice;
+    SC.labScene(['led', 'button'], {});
+    const n = BV.nets(SC.manifest);
+    const byCol = new Map();
+    for (const p of n.parts) for (const l of p.legs) { if (!byCol.has(l.i)) byCol.set(l.i, []); byCol.get(l.i).push({ leg: l, part: p }); }
+    const led = n.parts.find(p => p.t === 'led');
+    const target = { leg: led.legs[0], part: led };
+    const ok = BP.explain(led.legs[0].i, 'GPIO 2', target, byCol);
+    assert(ok.ok && /ίδια στήλη/.test(ok.text), ok.text);
+    const other = BP.explain(led.legs[1].i, 'GPIO 2', target, byCol);
+    assert(!other.ok && /κοντό πόδι/.test(other.text), other.text);
+    const empty = BP.explain(20, 'GPIO 2', target, byCol);
+    assert(!empty.ok && /άδεια/.test(empty.text), empty.text);
+    for (const t of [ok, other, empty]) assert(!/undefined/.test(t.text), t.text);
+    for (const k of [1, 3, 8, 12]) {
+      const sl = BP.shuffledSlots(k, BV.GEO, Math.random);
+      eq(sl.length, k);
+      for (const p of sl) assert(p.x >= 30 && p.x <= BV.GEO.W - 30 && p.y >= BV.GEO.TAG_Y && p.y <= BV.GEO.H, JSON.stringify(p));
+      for (let a = 0; a < k; a++) for (let b = a + 1; b < k; b++) assert(Math.abs(sl[a].x - sl[b].x) >= 60 || Math.abs(sl[a].y - sl[b].y) >= 22, 'ετικέτες πάνω η μία στην άλλη');
+    }
   });
 }
 

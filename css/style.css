@@ -1114,3 +1114,37 @@ code .gl-term { font-family: var(--font-code); }
 .bd-from { font: 600 11px var(--font-label); fill: var(--muted); }
 .bd-wire.unwired .bd-wline, .bd-wire.unwired .bd-plug { opacity: 0.18; }
 .bd-wire.unwired .bd-tag { stroke-dasharray: 4 3; }
+
+/* «Σύνδεσέ το μόνος σου»: σύρσιμο καλωδίων στο σχέδιο του breadboard (js/bbpractice.js) */
+.bp-msg { margin: 0.4rem 0; padding: 0.55rem 0.8rem; border-radius: 10px; background: color-mix(in srgb, var(--accent, #e8892f) 14%, var(--surface)); color: var(--ink); font-weight: 600; min-height: 1.4em; }
+.bp-msg.pop { animation: bp-pop 0.3s ease-out; }
+@keyframes bp-pop { from { transform: scale(0.97); opacity: 0.5; } }
+.bp-on { touch-action: none; user-select: none; -webkit-user-select: none; }
+.bp-on .bd-wire.bp-loose { cursor: grab; outline: none; }
+.bp-on .bd-wire.bp-loose .bd-tag { animation: bp-wiggle 2.4s ease-in-out infinite; transform-box: fill-box; transform-origin: center; }
+.bp-on .bd-wire.bp-loose:nth-of-type(2n) .bd-tag { animation-delay: -1.2s; }
+@keyframes bp-wiggle { 0%, 80%, 100% { transform: none; } 86% { transform: rotate(-4deg); } 93% { transform: rotate(4deg); } }
+.bp-on .bd-wire.bp-loose:hover .bd-tag, .bp-on .bd-wire.bp-loose:focus-visible .bd-tag, .bp-on .bd-wire.bp-sel .bd-tag { fill: #fff3d6; stroke-width: 4; animation: none; }
+.bp-on .bd-wire.bp-sel .bd-plug { animation: bp-beat 0.8s ease-in-out infinite; transform-box: fill-box; transform-origin: center; }
+.bp-on .bd-wire.bp-drag { cursor: grabbing; }
+.bp-on .bd-wire.bp-drag .bd-wline { stroke-dasharray: 10 6; animation: bd-flow 0.5s linear infinite; filter: drop-shadow(0 3px 3px rgba(0, 0, 0, 0.35)); }
+.bp-on .bd-wire.bp-drag .bd-plug { r: 8; filter: drop-shadow(0 3px 4px rgba(0, 0, 0, 0.4)); }
+@keyframes bp-beat { 50% { transform: scale(1.4); } }
+.bp-on .bd-col.bp-hover .bd-band { fill: rgba(232, 137, 47, 0.3); stroke: #e8892f; stroke-width: 3; stroke-dasharray: none; }
+.bp-on .bd-col.bp-hover .bd-hole { fill: #e8892f; }
+.bp-on .bd-col.bp-snap .bd-band { animation: bp-snap 0.6s ease-out; }
+@keyframes bp-snap { 0% { fill: color-mix(in srgb, var(--c) 80%, white); } }
+.bp-on .bd-col.bp-wrong { animation: bp-shake 0.45s; }
+.bp-on .bd-col.bp-wrong .bd-band { fill: rgba(217, 83, 79, 0.28); stroke: #d9534f; stroke-dasharray: none; }
+@keyframes bp-shake { 20%, 60% { transform: translateX(-3px); } 40%, 80% { transform: translateX(3px); } }
+.bp-on .bd-col.bp-hint:not(.used) .bd-band { animation: bp-hint 1s ease-in-out infinite; stroke: #e8892f; stroke-dasharray: none; }
+@keyframes bp-hint { 50% { fill: rgba(232, 137, 47, 0.4); } }
+.bp-ripple { fill: none; stroke-width: 3; animation: bp-ripple 0.65s ease-out forwards; pointer-events: none; }
+@keyframes bp-ripple { to { r: 26; opacity: 0; stroke-width: 1; } }
+.bp-on .bd-wire.bp-done .bd-tag { stroke-dasharray: none; }
+.bp-win .bd-led.lit { animation: bp-led 1.2s ease-in-out infinite; }
+@keyframes bp-led { 50% { filter: drop-shadow(0 0 14px #ff6a4d); } }
+.xray-note.practicing .xn-list, .xray-note.practicing .xn-foot { display: none; }
+#xn-practice[aria-pressed="true"] { background: var(--accent, #e8892f); color: #fff; }
+@media (prefers-reduced-motion: reduce) { .bp-on .bd-wire .bd-tag, .bp-on .bd-wire .bd-plug, .bp-on .bd-wire.bp-drag .bd-wline, .bp-on .bd-col, .bp-on .bd-col .bd-band, .bp-win .bd-led.lit, .bp-msg.pop { animation: none !important; } }
+:root[data-reduced-motion="true"] .bp-on .bd-wire .bd-tag, :root[data-reduced-motion="true"] .bp-on .bd-wire .bd-plug, :root[data-reduced-motion="true"] .bp-on .bd-wire.bp-drag .bd-wline, :root[data-reduced-motion="true"] .bp-on .bd-col, :root[data-reduced-motion="true"] .bp-on .bd-col .bd-band, :root[data-reduced-motion="true"] .bp-win .bd-led.lit { animation: none !important; }

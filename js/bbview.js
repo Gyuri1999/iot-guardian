@@ -101,7 +101,7 @@
     s += `<rect x="${X0 - 30}" y="${BOARD_Y}" width="${(COLS - 1) * C + 54}" height="${BOARD_B - BOARD_Y}" rx="10" class="bd-board"/>`;
     for (let i = 0; i < COLS; i++) {
       const col = used.get(i);
-      s += `<g class="bd-col${col ? ' used' : ''}" tabindex="0" aria-label="Στήλη ${i + 1}: οι 5 τρύπες a έως e είναι ενωμένες"><title>Στήλη ${i + 1}: οι 5 τρύπες (a–e) είναι ενωμένες από κάτω</title>`;
+      s += `<g class="bd-col${col ? ' used' : ''}" data-i="${i}" tabindex="0" aria-label="Στήλη ${i + 1}: οι 5 τρύπες a έως e είναι ενωμένες"><title>Στήλη ${i + 1}: οι 5 τρύπες (a–e) είναι ενωμένες από κάτω</title>`;
       s += `<rect x="${hx(i) - 10}" y="${hy(0) - 12}" width="20" height="${(ROWS - 1) * C + 24}" rx="10" class="bd-band"${col ? ` style="--c:${col}"` : ''}/>`;
       for (let j = 0; j < ROWS; j++) s += `<rect x="${hx(i) - 4}" y="${hy(j) - 4}" width="8" height="8" rx="2" class="bd-hole"/>`;
       s += `<text x="${hx(i)}" y="${NUM_Y}" class="bd-num">${i + 1}</text></g>`;
@@ -136,7 +136,8 @@
       placed.push(x);
       const ty = TAG_Y + level * 26;
       const d = `M${x},${ty - 9} L${x},${y}`;
-      s += `<g class="bd-wire${w.cls === 'w-gnd' ? ' gnd' : ''}${inputs.has(w) ? ' in' : ''}"${w.id ? ` data-w="${esc(w.id)}"` : ''}>` +
+      const leg = n.parts.flatMap(p => p.legs).find(l => l.wire === w);
+      s += `<g class="bd-wire${w.cls === 'w-gnd' ? ' gnd' : ''}${inputs.has(w) ? ' in' : ''}"${w.id ? ` data-w="${esc(w.id)}"` : ''} data-tx="${x}" data-ty="${ty}" data-hy="${y}" data-col="${leg ? leg.i : -1}" data-color="${col}">` +
         `<path d="${d}" class="bd-wline" style="stroke:${col}"/><path d="${d}" class="bd-flow"/>` +
         `<circle cx="${x}" cy="${y}" r="5.5" class="bd-plug" style="fill:${col}"/>` +
         `<g transform="translate(${x},${ty})"><rect x="-30" y="-10" width="60" height="20" rx="10" class="bd-tag" style="stroke:${col}"/><text y="4" class="bd-tag-t">${esc((labels && labels[w.cls]) || w.cls)}</text></g></g>`;
@@ -161,5 +162,5 @@
     if (led) led.classList.toggle('lit', on('sc-led'));
   }
 
-  root.IoTBBView = { PARTS, COLS, ROWS, nets, sentences, svg, sync };
+  root.IoTBBView = { PARTS, COLS, ROWS, nets, sentences, svg, sync, GEO: { C, X0, ROW0, BOARD_Y, BOARD_B, TAG_Y, W, H, hx, hy } };
 })(typeof window !== 'undefined' ? window : globalThis);
