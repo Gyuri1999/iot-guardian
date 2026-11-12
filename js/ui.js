@@ -1243,6 +1243,7 @@
       ta.value = typeof P.drafts[l.id] === 'string' ? P.drafts[l.id] : l.initialCode;
       ta.addEventListener('input', onCodeInput);
       ta.addEventListener('scroll', syncScroll);
+      if (window.ResizeObserver) new ResizeObserver(() => syncScroll()).observe(ta);
       ta.addEventListener('keydown', onEditorKey);
       $('#b-reset').onclick = doReset;
     }
@@ -2843,9 +2844,19 @@
   function syncScroll() {
     const ta = $('#code');
     if (!ta) return;
-    $('#hl').scrollTop = ta.scrollTop;
-    $('#hl').scrollLeft = ta.scrollLeft;
-    $('#gutter').scrollTop = ta.scrollTop;
+    const hl = $('#hl'), gut = $('#gutter');
+    // Το textarea έχει μπάρες κύλισης, το χρωματιστό κείμενο (pre) όχι. Αν δεν αφήσουμε τον ίδιο χώρο,
+    // το pre κυλά λιγότερο και ο κέρσορας «φεύγει» από τα γράμματα όταν φτάσεις στο τέλος.
+    const sbW = ta.offsetWidth - ta.clientWidth, sbH = ta.offsetHeight - ta.clientHeight;
+    if (hl.dataset.sb !== sbW + ',' + sbH) {
+      hl.dataset.sb = sbW + ',' + sbH;
+      hl.style.right = sbW + 'px';
+      hl.style.bottom = sbH + 'px';
+      if (gut) gut.style.paddingBottom = `calc(0.6rem + ${sbH}px)`;
+    }
+    hl.scrollTop = ta.scrollTop;
+    hl.scrollLeft = ta.scrollLeft;
+    if (gut) gut.scrollTop = ta.scrollTop;
   }
 
   function insertText(ta, text) {
