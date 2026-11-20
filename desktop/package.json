@@ -4,6 +4,7 @@
   "version": "1.0.0",
   "description": "IoT Guardian ως εφαρμογή υπολογιστή (Tauri / Rust)",
   "scripts": {
+    "tauri": "tauri",
     "web": "node copy-web.js",
     "dev": "tauri dev",
     "build": "tauri build",
