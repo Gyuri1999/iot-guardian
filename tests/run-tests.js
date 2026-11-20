@@ -942,5 +942,22 @@ test('δάσκαλος: αποθήκευση ψευδωνύμου', () => {
   });
 }
 
+{
+  const fsx = require('fs'), px = require('path'), cx = require('crypto');
+  const RT = px.join(__dirname, '..');
+  test('index.html / iot-guardian.html: το ?v= ταιριάζει με τα αρχεία (τρέξε node tools/write-html.js)', () => {
+    for (const page of ['index.html', 'iot-guardian.html']) {
+      const html = fsx.readFileSync(px.join(RT, page), 'utf8');
+      const refs = [...html.matchAll(/(?:src|href)="((?:js|css)\/[^"?]+)\?v=([0-9a-f]{8})"/g)];
+      assert(refs.length > 40, page + ': λίγα αρχεία με ?v=');
+      assert(!/(?:src|href)="(?:js|css)\/[^"?]+"/.test(html), page + ': αρχείο χωρίς ?v=');
+      for (const [, f, v] of refs) {
+        const h = cx.createHash('sha1').update(fsx.readFileSync(px.join(RT, f))).digest('hex').slice(0, 8);
+        assert(h === v, `${page}: ${f} έχει παλιό ?v= (τρέξε node tools/write-html.js)`);
+      }
+    }
+  });
+}
+
 console.log(`\n${passed} πέρασαν, ${failed} απέτυχαν\n`);
 process.exit(failed ? 1 : 0);
