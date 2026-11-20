@@ -233,7 +233,7 @@
 
   // ------------------------------------------------------------ αντικείμενα
 
-  function esp32(k, M, S) {
+  function esp32(k, M, S, onBB) {
     const g = k.group(k.scene, 'esp32');
     const { u, v } = S.ESP;
     const H = S.ESP.h;
@@ -244,7 +244,9 @@
     const legs = [];
     for (const vv of [0.4, 25.6]) {
       k.B(under, u + 1.3, v + vv, H - 2.5, 48.8, 2, 2.5, M.black, { r: 0.25 });
-      for (let i = 0; i < 19; i++) legs.push({ x: u + PIN_U(i), y: (H - 2.5) / 2 + 0.15, z: v + vv + 1, sy: H - 2.5 - 0.3 });
+      // στο breadboard οι ακίδες χάνονται μέσα στις τρύπες του (πάνω πλευρά στο 2,4)
+      const foot = onBB ? 2.4 : 0.3;
+      for (let i = 0; i < 19; i++) legs.push({ x: u + PIN_U(i), y: (H - 2.5 + foot) / 2, z: v + vv + 1, sy: H - 2.5 - foot });
     }
     k.instances(under, new THREE.CylinderGeometry(0.32, 0.32, 1, 8), M.pin, legs);
     // PCB
@@ -333,8 +335,9 @@
     return g;
   }
 
-  function breadboard(k, M, S) {
-    const { u, v, du, dv } = S.BB;
+  function breadboard(k, M, S, vis) {
+    const { u, v, du, dv } = vis || S.BB;
+    const L = S.BB; // οι μεταλλικές λωρίδες της «ακτινογραφίας» μένουν στο κομμάτι των εξαρτημάτων
     const g = k.group(k.scene, 'breadboard');
     const shell = k.mat(0xf2f1ec, { r: 0.8, unique: true });
     const body = k.B(g, u, v, 0, du, dv, 2.4, shell, { r: 0.6 });
@@ -356,8 +359,8 @@
     const copper = k.group(g);
     copper.visible = false;
     const dim = k.mat(0xa39d92, { r: 0.45, m: 0.35 });
-    for (let x = 3; x < du - 2; x += 2.54) k.B(copper, u + x - 0.15, v + 7.6, 0.9, 1.2, 18.16 - 7.6 + 1.3, 0.55, dim, { ol: false, cast: false });
-    for (const y of [2.2, 4.6, dv - 5.5, dv - 3.1]) k.B(copper, u + 1.2, v + y - 0.15, 0.9, du - 2.4, 1.2, 0.55, dim, { ol: false, cast: false });
+    for (let x = 3; x < L.du - 2; x += 2.54) k.B(copper, L.u + x - 0.15, L.v + 7.6, 0.9, 1.2, 18.16 - 7.6 + 1.3, 0.55, dim, { ol: false, cast: false });
+    for (const y of [2.2, 4.6, L.dv - 5.5, L.dv - 3.1]) k.B(copper, L.u + 1.2, L.v + y - 0.15, 0.9, L.du - 2.4, 1.2, 0.55, dim, { ol: false, cast: false });
     g.userData.shell = [shell, top.material];
     g.userData.copper = copper;
     g.userData.bodyOl = body.children;
@@ -795,8 +798,8 @@
     for (const o of manifest) {
       let g = null;
       switch (o.t) {
-        case 'esp32': g = esp32(k, M, S); break;
-        case 'bb': g = objs.bb = breadboard(k, M, S); break;
+        case 'esp32': g = esp32(k, M, S, o.onBB); break;
+        case 'bb': g = objs.bb = breadboard(k, M, S, o.vis); break;
         case 'pi5': g = pi5(k, M, S); break;
         case 'led': g = objs.led = led(k, M, o); break;
         case 'button': g = objs.button = button(k, M, o); break;
