@@ -1,7 +1,7 @@
 {
   "name": "iot-guardian-desktop",
   "private": true,
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "IoT Guardian ως εφαρμογή υπολογιστή (Tauri / Rust)",
   "scripts": {
     "tauri": "tauri",

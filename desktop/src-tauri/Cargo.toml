@@ -1,6 +1,6 @@
 [package]
 name = "iot-guardian"
-version = "1.0.0"
+version = "1.0.1"
 description = "IoT Guardian: μάθε IoT και ασφάλεια, ως εφαρμογή υπολογιστή"
 license = "MIT"
 edition = "2021"
