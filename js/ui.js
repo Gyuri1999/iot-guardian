@@ -184,6 +184,8 @@
     plus: '<path d="M12 5v14M5 12h14"/>',
     minus: '<path d="M5 12h14"/>',
     fit: '<path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/>',
+    grow: '<path d="M14 4h6v6M10 20H4v-6M20 4l-6.5 6.5M4 20l6.5-6.5"/>',
+    shrink: '<path d="M20 10h-6V4M4 14h6v6M14 10l6.5-6.5M10 14l-6.5 6.5"/>',
     orbit: '<ellipse cx="12" cy="12" rx="9" ry="4"/><path d="M12 3v18"/><path d="M18.5 6.5l2.2 1.2-.6 2.4"/>',
     star: '<path d="M12 3l2.7 5.6 6.1.9-4.4 4.3 1 6.1L12 17l-5.4 2.9 1-6.1-4.4-4.3 6.1-.9z"/>',
     lang: '<path d="M8 8l-4 4 4 4M16 8l4 4-4 4M13.5 5l-3 14"/>'
@@ -1170,6 +1172,7 @@
       tryCard = `<div class="card try">
         <div class="try-head"><h3>${isConfig ? (l.system ? 'Ρυθμίσεις του Pi' : 'Ρυθμίσεις broker') : 'Δοκίμασέ το'}</h3>
           <div class="try-btns" role="toolbar" aria-label="Χειριστήρια">
+            <button class="ib grow" id="b-focus" aria-pressed="false" title="Μεγάλωσε τον κώδικα, με τους στόχους δίπλα"></button>
             <button class="ib" id="b-reset" title="Επαναφορά άσκησης" aria-label="Επαναφορά άσκησης">${icon('reset')}</button>
             <button class="ib" id="b-help" title="Βοήθεια" aria-label="Βοήθεια">${icon('help')}</button>
             ${isConfig ? '' : `<button class="ib" id="b-step" title="Ένα βήμα (Ctrl+Shift+Enter)" aria-label="Ένα βήμα">${icon('step')}</button>
@@ -1213,7 +1216,7 @@
     app().innerHTML = `<div class="app">${rail(l.sandbox ? 'sandbox' : 'lab')}
       <div class="main">
         ${header(l.sandbox ? 'Ελεύθερο εργαστήριο · χωρίς ασκήσεις' : `Κεφ. ${chNum(l.chapter)} · ${ch.title}`, doneCh, ls.length, 'Εικονικός χρόνος', '00:00.000')}
-        <div class="ws">
+        <div class="ws${S.codeFocus && mode !== 'analysis' ? ' focus' : ''}">
           <section class="stage" aria-label="Σκηνή εργαστηρίου">
             ${missionHTML(l)}
             ${l.sandbox ? benchHTML(l) : ''}
@@ -1246,6 +1249,8 @@
       if (window.ResizeObserver) new ResizeObserver(() => syncScroll()).observe(ta);
       ta.addEventListener('keydown', onEditorKey);
       $('#b-reset').onclick = doReset;
+      $('#b-focus').onclick = () => setCodeFocus(!S.codeFocus, true);
+      setCodeFocus(!!S.codeFocus, false);
     }
     if (mode === 'code') {
       $('#b-run').onclick = () => (S.runState === 'running' ? doStop() : doRun());
@@ -1289,6 +1294,25 @@
     if (!P.tours.lab && !l.sandbox && !l.challenge) setTimeout(() => { if (S.task === l) startTour('lab'); }, 900);
     updateAll();
     window.scrollTo(0, 0);
+  }
+
+  // Μεγάλος κώδικας: κρύβει τη σκηνή, μεγαλώνει τον editor και κρατά δίπλα
+  // την αποστολή (τι πρέπει να γίνει) και τα βήματα.
+  function setCodeFocus(on, user) {
+    const ws = $('.ws');
+    const b = $('#b-focus');
+    if (!ws || !b) return;
+    S.codeFocus = on;
+    ws.classList.toggle('focus', on);
+    b.setAttribute('aria-pressed', String(on));
+    b.title = on ? 'Μίκρυνε τον κώδικα και δείξε ξανά τη σκηνή (Esc)' : 'Μεγάλωσε τον κώδικα, με τους στόχους δίπλα';
+    b.innerHTML = `${icon(on ? 'shrink' : 'grow')}<span>${on ? 'Μίκρυνε' : 'Μεγάλωσε'}</span>`;
+    if (!user) return;
+    if (on && S.infoTab === 'lesson') showInfo('steps', true);
+    syncScroll();
+    if (on) ws.scrollIntoView({ block: 'start', behavior: P.settings.reducedMotion ? 'auto' : 'smooth' });
+    else window.dispatchEvent(new Event('resize'));
+    b.focus();
   }
 
   function showInfo(tab, silent) {
@@ -4230,6 +4254,7 @@
     applySettings();
     buildDialogs();
     document.addEventListener('keydown', e => {
+      if (e.key === 'Escape' && S.codeFocus && e.target.id !== 'code' && $('.ws.focus') && !document.querySelector('dialog[open]')) { setCodeFocus(false, true); return; }
       if (!S.task || e.target.id === 'code' || modeOf(S.task) !== 'code') return;
       if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) { e.preventDefault(); if (e.shiftKey) doStep(); else doRun(); }
     });

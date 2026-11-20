@@ -1149,3 +1149,22 @@ code .gl-term { font-family: var(--font-code); }
 #xn-practice[aria-pressed="true"] { background: var(--accent, #e8892f); color: #fff; }
 @media (prefers-reduced-motion: reduce) { .bp-on .bd-wire .bd-tag, .bp-on .bd-wire .bd-plug, .bp-on .bd-wire.bp-drag .bd-wline, .bp-on .bd-col, .bp-on .bd-col .bd-band, .bp-win .bd-led.lit, .bp-msg.pop { animation: none !important; } }
 :root[data-reduced-motion="true"] .bp-on .bd-wire .bd-tag, :root[data-reduced-motion="true"] .bp-on .bd-wire .bd-plug, :root[data-reduced-motion="true"] .bp-on .bd-wire.bp-drag .bd-wline, :root[data-reduced-motion="true"] .bp-on .bd-col, :root[data-reduced-motion="true"] .bp-on .bd-col .bd-band, :root[data-reduced-motion="true"] .bp-win .bd-led.lit { animation: none !important; }
+
+/* ---------- μεγάλος κώδικας: ο editor μεγαλώνει, δίπλα μένουν η αποστολή και τα βήματα */
+.ib.grow[aria-pressed="true"] { border-color: var(--teal); color: var(--teal); background: color-mix(in srgb, var(--teal) 10%, var(--surface)); }
+.ws.focus { grid-template-columns: minmax(16rem, 0.75fr) minmax(0, 2fr); grid-template-areas: "ms try" "info try"; grid-template-rows: auto 1fr; }
+.ws.focus .side { display: contents; }
+.ws.focus .stage { grid-area: ms; }
+.ws.focus .stage > :not(.mission) { display: none; }
+.ws.focus .card.info { grid-area: info; align-self: start; }
+.ws.focus .card.try { grid-area: try; position: sticky; top: 0.5rem; }
+.ws.focus .editor { height: clamp(22rem, calc(100vh - 15rem), 64rem); font-size: 1.02rem; }
+.ws.focus .mm-body { max-height: 9rem; }
+@media (max-width: 1100px) {
+  .ws.focus { grid-template-columns: minmax(0, 1fr); grid-template-areas: "ms" "try" "info"; grid-template-rows: auto; }
+  .ws.focus .card.try { position: static; }
+  .ws.focus .editor { height: clamp(20rem, 70vh, 48rem); font-size: 0.98rem; }
+}
+@media (max-width: 720px) {
+  .ib.grow span { display: none; }
+}

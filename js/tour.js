@@ -28,6 +28,8 @@
     if (!cur) return;
     const st = cur.steps[cur.i];
     const el = document.querySelector(st.sel);
+    // η οθόνη άλλαξε κάτω από την ξενάγηση: κλείσ' την αντί να σκάει
+    if (!el) { end(false); return; }
     const r = el.getBoundingClientRect();
     const pad = 6;
     Object.assign(cur.hole.style, { left: `${r.left - pad}px`, top: `${r.top - pad}px`, width: `${r.width + pad * 2}px`, height: `${r.height + pad * 2}px` });
