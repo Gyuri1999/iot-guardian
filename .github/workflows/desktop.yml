@@ -12,7 +12,29 @@ permissions:
   contents: write
 
 jobs:
+  # Ένα μόνο πρόχειρο Release για όλα τα λειτουργικά (αλλιώς τα 4 builds φτιάχνουν το καθένα δικό του).
+  release:
+    runs-on: ubuntu-latest
+    outputs:
+      id: ${{ steps.mk.outputs.id }}
+    steps:
+      - uses: actions/checkout@v4
+      - id: mk
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          VER=$(node -p "require('./desktop/src-tauri/tauri.conf.json').version")
+          TAG=${{ github.ref_type == 'tag' && github.ref_name || 'desktop-v$VER' }}
+          TAG=$(eval echo "$TAG")
+          ID=$(gh api repos/${{ github.repository }}/releases --jq ".[] | select(.draft and .tag_name==\"$TAG\") | .id" | head -1)
+          if [ -z "$ID" ]; then
+            ID=$(gh api repos/${{ github.repository }}/releases -f tag_name="$TAG" -f target_commitish="${{ github.sha }}" -f name="IoT Guardian v$VER" -F draft=true \
+              -f body='Κατέβασε το αρχείο για τον υπολογιστή σου (macOS: .dmg, Windows: .msi ή .exe, Linux: .AppImage ή .deb). Δεν χρειάζεται internet για να παίξεις.' --jq .id)
+          fi
+          echo "id=$ID" >> "$GITHUB_OUTPUT"
+
   build:
+    needs: release
     strategy:
       fail-fast: false
       matrix:
@@ -52,9 +74,5 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           projectPath: desktop
-          tagName: ${{ github.ref_type == 'tag' && github.ref_name || 'desktop-v__VERSION__' }}
-          releaseName: 'IoT Guardian v__VERSION__'
-          releaseBody: 'Κατέβασε το αρχείο για τον υπολογιστή σου (macOS: .dmg, Windows: .msi ή .exe, Linux: .AppImage ή .deb). Δεν χρειάζεται internet για να παίξεις.'
-          releaseDraft: true
-          prerelease: false
+          releaseId: ${{ needs.release.outputs.id }}
           args: ${{ matrix.args }}

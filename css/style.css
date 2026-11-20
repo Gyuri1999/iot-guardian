@@ -1201,3 +1201,21 @@ code .gl-term { font-family: var(--font-code); }
   :root:not([data-reduced-motion="true"]) #results-slot li:nth-child(4) { animation-delay: 0.15s; }
   :root:not([data-reduced-motion="true"]) #results-slot li:nth-child(n+5) { animation-delay: 0.2s; }
 }
+
+/* ---------- πλακέτα + breadboard μαζί (bbview.js) και «Δες πώς συνδέεται» (bbassemble.js) */
+.bd-mcu-pcb { fill: #1d2b4a; stroke: #0f172a; stroke-width: 1.5; }
+.bd-mcu.pi .bd-mcu-pcb { fill: #1f6b3a; stroke: #0f3a1f; }
+.bd-mcu-hdr { fill: #0b0f19; }
+.bd-mcu-pin { fill: #d9b45a; }
+.bd-mcu-chip { fill: #b9bec6; stroke: #6b7280; }
+.bd-mcu-can { fill: #d6d9de; stroke: #8a9099; }
+.bd-mcu.pi .bd-mcu-chip { fill: #2a2a2d; stroke: #111; }
+.bd-mcu-usb { fill: #c7ccd3; stroke: #6b7280; }
+.bd-mcu-name { font: 700 12px var(--font-label); fill: #e8edf7; letter-spacing: 0.04em; }
+.bd-tag-pin { fill: #d9b45a; stroke: #6b5520; stroke-width: 0.8; }
+.bd-cap { margin: 0 0 0.5rem; padding: 0.5rem 0.75rem; border-left: 4px solid var(--teal); border-radius: 6px; background: color-mix(in srgb, var(--teal) 9%, var(--surface)); font-weight: 600; min-height: 2.6em; }
+.bd-cap.pop { animation: story-pop 0.3s ease-out; }
+.bd-assembling .bd-plug, .bd-assembling .bd-tag { transform-box: fill-box; transform-origin: center; }
+.bd-wire.bd-now .bd-tag { fill: #fff3d6; stroke-width: 4; }
+.bd-wire.bd-now .bd-wline { filter: drop-shadow(0 0 4px rgba(255, 220, 120, 0.9)); }
+:root[data-reduced-motion="true"] .bd-cap.pop { animation: none; }

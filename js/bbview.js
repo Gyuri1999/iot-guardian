@@ -110,12 +110,15 @@
   const C = 26;
   const X0 = 46;
   const BOARD_Y = 96, NUM_Y = BOARD_Y + 20, ROW0 = BOARD_Y + 40;
-  const BOARD_B = ROW0 + (ROWS - 1) * C + 22, TAG_Y = BOARD_B + 34;
-  const W = X0 + (COLS - 1) * C + 36, H = TAG_Y + 2 * 26 + 18;
+  const BOARD_B = ROW0 + (ROWS - 1) * C + 22, TAG_Y = BOARD_B + 46;
+  const MCU_Y = TAG_Y - 24, MCU_B = TAG_Y + 2 * 26 + 40;
+  const W = X0 + (COLS - 1) * C + 36, H = MCU_B + 8;
   const hx = i => X0 + i * C, hy = j => ROW0 + j * C;
   const WIRE_COL = { 'w-led': '#e8892f', 'w-btn': '#18a196', 'w-pir': '#e2b52d', 'w-gnd': '#34383f', 'w-buz': '#8e5bd0', 'w-rgbr': '#e0503f', 'w-rgbg': '#3fae55', 'w-rgbb': '#3d8fd6', 'w-trig': '#3fae55', 'w-echo': '#f2c230', 'w-red': '#e0503f', 'w-yel': '#f2c230', 'w-grn': '#3fae55' };
 
-  function svg(manifest, labels, S) {
+  // opts.board: 'esp32' (προεπιλογή) ή 'pi': ποια πλακέτα σχεδιάζεται κάτω από το breadboard.
+  function svg(manifest, labels, S, opts) {
+    const pi = !!(opts && opts.board === 'pi');
     const n = nets(manifest, S);
     const used = new Map(); // στήλη → χρώμα του καλωδίου της
     for (const p of n.parts) for (const l of p.legs) if (l.wire && l.wire.hole && l.wire.hole.i === l.i) used.set(l.i, WIRE_COL[l.wire.cls] || '#e8892f');
@@ -156,6 +159,16 @@
       else s += `<rect x="${cx - span / 2 - 14}" y="${BODY - 14}" width="${span + 28}" height="24" rx="4" class="bd-mod bd-mod-${p.t}"/>`;
       s += `<text x="${cx}" y="${BODY - 26}" class="bd-pname">${esc(p.name)}</text></g>`;
     }
+    // η πλακέτα κάτω από το breadboard: οι ετικέτες των καλωδίων είναι τα pins της
+    const MX = X0 - 30, MW = (COLS - 1) * C + 54;
+    s += `<g class="bd-mcu${pi ? ' pi' : ''}" aria-hidden="true">` +
+      `<rect x="${MX}" y="${MCU_Y}" width="${MW}" height="${MCU_B - MCU_Y}" rx="10" class="bd-mcu-pcb"/>` +
+      `<rect x="${MX + 8}" y="${MCU_Y + 6}" width="${MW - 16}" height="6" rx="3" class="bd-mcu-hdr"/>` +
+      Array.from({ length: COLS }, (_, i) => `<rect x="${hx(i) - 2.5}" y="${MCU_Y + 6.5}" width="5" height="5" rx="1" class="bd-mcu-pin"/>`).join('') +
+      (pi
+        ? `<rect x="${MX + MW - 64}" y="${MCU_B - 34}" width="52" height="26" rx="3" class="bd-mcu-chip"/><rect x="${MX + MW - 6}" y="${MCU_B - 46}" width="10" height="20" rx="2" class="bd-mcu-usb"/>`
+        : `<rect x="${MX + MW - 78}" y="${MCU_B - 36}" width="60" height="28" rx="3" class="bd-mcu-chip"/><rect x="${MX + MW - 72}" y="${MCU_B - 30}" width="48" height="16" rx="2" class="bd-mcu-can"/><rect x="${MX + MW - 6}" y="${MCU_B - 30}" width="12" height="16" rx="2" class="bd-mcu-usb"/>`) +
+      `<text x="${MX + 12}" y="${MCU_B - 12}" class="bd-mcu-name">${pi ? 'Raspberry Pi · pins GPIO' : 'ESP32 DevKit · pins GPIO'}</text></g>`;
     // καλώδια από κάτω: ετικέτα με το pin της πλακέτας → ευθεία πάνω στην τρύπα
     const inputs = new Set(n.chains.filter(c => c.input).map(c => c.wire));
     const placed = [];
@@ -169,11 +182,11 @@
       const d = `M${x},${ty - 9} L${x},${y}`;
       const leg = n.parts.flatMap(p => p.legs).find(l => l.wire === w);
       s += `<g class="bd-wire${w.cls === 'w-gnd' ? ' gnd' : ''}${inputs.has(w) ? ' in' : ''}"${w.id ? ` data-w="${esc(w.id)}"` : ''} data-tx="${x}" data-ty="${ty}" data-hy="${y}" data-col="${leg ? leg.i : -1}" data-color="${col}">` +
-        `<path d="${d}" class="bd-wline" style="stroke:${col}"/><path d="${d}" class="bd-flow"/>` +
+        `<path d="${d}" class="bd-wline" pathLength="1" style="stroke:${col}"/><path d="${d}" class="bd-flow"/>` +
         `<circle cx="${x}" cy="${y}" r="5.5" class="bd-plug" style="fill:${col}"/>` +
-        `<g transform="translate(${x},${ty})"><rect x="-30" y="-10" width="60" height="20" rx="10" class="bd-tag" style="stroke:${col}"/><text y="4" class="bd-tag-t">${esc((labels && labels[w.cls]) || w.cls)}</text></g></g>`;
+        `<g transform="translate(${x},${ty})"><rect x="-30" y="-10" width="60" height="20" rx="10" class="bd-tag" style="stroke:${col}"/><rect x="-3" y="-13" width="6" height="5" rx="1" class="bd-tag-pin"/><text y="4" class="bd-tag-t">${esc((labels && labels[w.cls]) || w.cls)}</text></g></g>`;
     }
-    s += `<text x="${X0 - 30}" y="${H - 4}" class="bd-from">↑ καλώδια από την πλακέτα</text>`;
+    s += `<text x="${X0 - 30}" y="${MCU_Y - 6}" class="bd-from">↑ καλώδια από την πλακέτα στο breadboard</text>`;
     s += '</svg>';
     return { html: s, sentences: sentences(n, labels), nets: n };
   }
@@ -193,5 +206,5 @@
     if (led) led.classList.toggle('lit', on('sc-led'));
   }
 
-  root.IoTBBView = { PARTS, COLS, ROWS, nets, sentences, svg, sync, GEO: { C, X0, ROW0, BOARD_Y, BOARD_B, TAG_Y, W, H, hx, hy } };
+  root.IoTBBView = { PARTS, COLS, ROWS, nets, sentences, svg, sync, GEO: { C, X0, ROW0, BOARD_Y, BOARD_B, TAG_Y, MCU_Y, MCU_B, W, H, hx, hy } };
 })(typeof window !== 'undefined' ? window : globalThis);

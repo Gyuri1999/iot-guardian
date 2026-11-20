@@ -325,14 +325,15 @@
     S.bbv = null;
     const man = window.IoTScene.manifest;
     if (!ctl || !BV || !man || !man.some(o => o.t === 'bb')) return;
-    const view = BV.svg(man, wireLabels());
+    const view = BV.svg(man, wireLabels(), undefined, { board: isPi() ? 'pi' : 'esp32' });
     if (!view.nets.parts.length) return;
     ctl.insertAdjacentHTML('beforeend', `<button class="sc-b sc-3d" id="sc-xray" aria-pressed="false" title="Δες τι ενώνεται μέσα στο breadboard" aria-label="Δες τι ενώνεται μέσα στο breadboard">${icon('xray')}<span>Μέσα</span></button>`);
     const btn = $('#sc-xray');
     wrap.insertAdjacentHTML('afterend', `<div class="xray-note" hidden>
-      <div class="xn-head"><strong>Μέσα στο breadboard: τι ενώνεται;</strong><span class="spacer"></span>${window.IoTBBPractice ? `<button class="btn sm" id="xn-practice" aria-pressed="false">✋ Σύνδεσέ το μόνος σου</button>` : ''}${window.IoTSpeak && window.IoTSpeak.supported() ? `<button class="btn quiet sm" id="xn-say">${icon('speaker')} Άκουσε</button>` : ''}</div>
+      <div class="xn-head"><strong>Μέσα στο breadboard: τι ενώνεται;</strong><span class="spacer"></span>${window.IoTBBAssemble ? `<button class="btn sm" id="xn-build">▶ Δες πώς συνδέεται</button>` : ''}${window.IoTBBPractice ? `<button class="btn sm" id="xn-practice" aria-pressed="false">✋ Σύνδεσέ το μόνος σου</button>` : ''}${window.IoTSpeak && window.IoTSpeak.supported() ? `<button class="btn quiet sm" id="xn-say">${icon('speaker')} Άκουσε</button>` : ''}</div>
       <p class="xn-rule">Κάθε <b>στήλη</b> έχει 5 τρύπες (a–e) που είναι <b>ενωμένες από κάτω</b> με μια μεταλλική λωρίδα. Ό,τι μπαίνει στην <b>ίδια στήλη</b> συνδέεται. Οι στήλες μεταξύ τους δεν συνδέονται.</p>
       <p class="bp-msg" id="bp-msg" role="status" aria-live="polite" hidden></p>
+      <p class="bd-cap" id="bd-cap" aria-live="polite" hidden></p>
       <div class="bd-wrap">${view.html}</div>
       <ol class="xn-list">${view.sentences.map(x => `<li>${esc(x.text)}</li>`).join('')}</ol>
       <p class="muted xn-foot">Πάτα ή πέρνα το ποντίκι πάνω από μια στήλη για να δεις τις 5 ενωμένες τρύπες. Όταν τρέχει ο κώδικας, οι κουκκίδες δείχνουν πώς κυλά το ρεύμα: από το pin, μέσα από το εξάρτημα, στη γείωση (GND).${has3d ? ' Στην 3D σκηνή το breadboard γίνεται διάφανο και φαίνονται οι λωρίδες.' : ''}</p></div>`);
@@ -340,6 +341,30 @@
     const bvEl = note.querySelector('.bd-wrap');
     S.bbv = { el: bvEl, nets: view.nets };
     const pBtn = $('#xn-practice'), pMsg = $('#bp-msg');
+    const bBtn = $('#xn-build'), cap = $('#bd-cap');
+    const stopBuild = () => {
+      if (!S.bbv || !S.bbv.build) return;
+      S.bbv.build.stop();
+      S.bbv.build = null;
+      cap.hidden = true;
+      if (bBtn) bBtn.textContent = '▶ Δες πώς συνδέεται';
+      BV.sync(bvEl, S.scene, view.nets, wiredCls);
+    };
+    const startBuild = () => {
+      if (!window.IoTBBAssemble) return;
+      stopBuild();
+      stopPractice();
+      cap.hidden = false;
+      bBtn.textContent = '■ Σταμάτα';
+      S.bbv.build = window.IoTBBAssemble.play(bvEl, view, {
+        labels: wireLabels(),
+        sfx,
+        reducedMotion: () => !motionOK(),
+        say: t => { cap.textContent = t; cap.classList.remove('pop'); void cap.offsetWidth; cap.classList.add('pop'); },
+        onEnd: () => { if (S.bbv) S.bbv.build = null; bBtn.textContent = '↻ Ξανά: πώς συνδέεται'; BV.sync(bvEl, S.scene, view.nets, wiredCls); }
+      });
+    };
+    if (bBtn) bBtn.onclick = () => (S.bbv && S.bbv.build ? stopBuild() : startBuild());
     const stopPractice = () => {
       if (!S.bbv || !S.bbv.practice) return;
       S.bbv.practice.destroy();
@@ -351,6 +376,7 @@
       BV.sync(bvEl, S.scene, view.nets, wiredCls);
     };
     const startPractice = () => {
+      stopBuild();
       stopPractice();
       pMsg.hidden = false;
       note.classList.add('practicing');
@@ -377,8 +403,10 @@
       btn.setAttribute('aria-pressed', String(on));
       btn.classList.toggle('on', on);
       note.hidden = !on;
-      if (!on) stopPractice();
+      if (!on) { stopPractice(); stopBuild(); }
       if (on) BV.sync(bvEl, S.scene, view.nets, wiredCls);
+      // την πρώτη φορά σε κάθε επίσκεψη: δείξε μόνο του πώς συνδέονται πλακέτα και breadboard
+      if (on && !S.bbBuildSeen && window.IoTBBAssemble && motionOK()) { S.bbBuildSeen = true; startBuild(); }
     };
     btn.onclick = () => {
       show(!S.xray);
@@ -3583,7 +3611,7 @@
       cls('#sc-w-btn', 'on', S.inputs.button);
       cls('#sc-pir', 'on', S.inputs.pir);
       cls('#sc-w-pir', 'on', S.inputs.pir);
-      if (S.bbv && S.xray && !S.bbv.practice) window.IoTBBView.sync(S.bbv.el, sc, S.bbv.nets, wiredCls);
+      if (S.bbv && S.xray && !S.bbv.practice && !S.bbv.build) window.IoTBBView.sync(S.bbv.el, sc, S.bbv.nets, wiredCls);
       cls('#sc-router', 'on', S.inputs.router);
       const sleeping = !!(b && b.sleep);
       cls('#sc-esp', 'asleep', sleeping);
