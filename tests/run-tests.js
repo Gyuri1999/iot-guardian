@@ -959,5 +959,22 @@ test('δάσκαλος: αποθήκευση ψευδωνύμου', () => {
   });
 }
 
+test('juice.js: φορτώνει χωρίς DOM και δεν κάνει τίποτα χωρίς κίνηση', () => {
+  require('../js/juice.js');
+  const J = globalThis.IoTJuice;
+  assert(J && ['nudge', 'launch', 'burst', 'bars', 'motionOK'].every(k => typeof J[k] === 'function'), 'λείπει API');
+  eq(J.motionOK(), false);
+  J.nudge(null); J.launch(null); J.burst(null);
+  const html = require('fs').readFileSync(require('path').join(__dirname, '..', 'index.html'), 'utf8');
+  assert(html.indexOf('js/juice.js') > 0 && html.indexOf('js/juice.js') < html.indexOf('js/ui.js'), 'το juice.js πριν από το ui.js');
+});
+test('desktop: Tauri ρυθμίσεις δείχνουν στο dist και δεν παίρνουν real-lab', () => {
+  const fs = require('fs'), path = require('path');
+  const conf = JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'desktop', 'src-tauri', 'tauri.conf.json'), 'utf8'));
+  eq(conf.build.frontendDist, '../dist');
+  const cp = fs.readFileSync(path.join(__dirname, '..', 'desktop', 'copy-web.js'), 'utf8');
+  assert(!/real-lab|secrets/.test(cp.replace(/\/\*[\s\S]*?\*\//, '')), 'το copy-web δεν πρέπει να αντιγράφει real-lab');
+});
+
 console.log(`\n${passed} πέρασαν, ${failed} απέτυχαν\n`);
 process.exit(failed ? 1 : 0);

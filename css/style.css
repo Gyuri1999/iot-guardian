@@ -1168,3 +1168,36 @@ code .gl-term { font-family: var(--font-code); }
 @media (max-width: 720px) {
   .ib.grow span { display: none; }
 }
+
+/* ---------- ζωντάνια (js/juice.js): μικρές, σύντομες κινήσεις — καμία με «λιγότερη κίνηση» */
+.jc-ring { position: fixed; z-index: 60; border-radius: 10px; border: 2px solid var(--teal); pointer-events: none; transform: translate(-50%, -50%); }
+.jc-dot { position: fixed; z-index: 60; width: 6px; height: 6px; border-radius: 50%; pointer-events: none; transform: translate(-50%, -50%); }
+@media (prefers-reduced-motion: no-preference) {
+  :root:not([data-reduced-motion="true"]) {
+    /* ελατήριο σε καθαρό CSS (linear() easing) */
+    --spring: linear(0, 0.21 6%, 0.66 15%, 1.04 26%, 1.13 32%, 1.12 38%, 1.02 50%, 0.98 60%, 1 75%, 1);
+  }
+  /* κάθε νέα σελίδα μπαίνει απαλά: πρώτα η σκηνή, μετά τα πλάγια */
+  :root:not([data-reduced-motion="true"]) .main > .ws > * { animation: jc-in 0.32s cubic-bezier(.16,1,.3,1) both; }
+  :root:not([data-reduced-motion="true"]) .main > .ws > :nth-child(2) { animation-delay: 0.06s; }
+  :root:not([data-reduced-motion="true"]) .main > .strip { animation: jc-in 0.32s 0.12s cubic-bezier(.16,1,.3,1) both; }
+  @keyframes jc-in { from { opacity: 0; transform: translateY(8px); } }
+  /* κουμπιά: «πατιούνται» και επανέρχονται με ελατήριο */
+  :root:not([data-reduced-motion="true"]) :is(.ib, .btn, .rail-btn, .strip-card, .chip, .cm-b) { transition: transform 0.35s var(--spring), background-color 0.15s, border-color 0.15s; }
+  :root:not([data-reduced-motion="true"]) :is(.ib, .btn, .rail-btn, .chip, .cm-b):active:not(:disabled) { transform: scale(0.93); transition-duration: 0.08s; }
+  :root:not([data-reduced-motion="true"]) .strip-card:active:not(:disabled) { transform: scale(0.97); transition-duration: 0.08s; }
+  /* «boop»: τα εικονίδια της μπάρας γέρνουν λίγο όταν περνά το ποντίκι */
+  :root:not([data-reduced-motion="true"]) .rail-btn:hover .ic { animation: jc-boop 0.45s var(--spring); }
+  @keyframes jc-boop { 40% { transform: rotate(-12deg) scale(1.15); } }
+  /* ο στόχος που μόλις έγινε: το ✓ «ζωγραφίζεται» από αριστερά */
+  :root:not([data-reduced-motion="true"]) .ms-goals li.just .ms-box { animation: jc-box 0.4s var(--spring); }
+  :root:not([data-reduced-motion="true"]) .ms-goals li.just .ms-box::after { animation: jc-draw 0.3s 0.1s ease-out both; }
+  @keyframes jc-box { from { transform: scale(0.4); } }
+  @keyframes jc-draw { from { clip-path: inset(0 0 100% 0); } to { clip-path: inset(0 0 0 0); } }
+  /* τα αποτελέσματα του ελέγχου εμφανίζονται ένα-ένα */
+  :root:not([data-reduced-motion="true"]) #results-slot li { animation: jc-in 0.3s cubic-bezier(.16,1,.3,1) both; }
+  :root:not([data-reduced-motion="true"]) #results-slot li:nth-child(2) { animation-delay: 0.05s; }
+  :root:not([data-reduced-motion="true"]) #results-slot li:nth-child(3) { animation-delay: 0.1s; }
+  :root:not([data-reduced-motion="true"]) #results-slot li:nth-child(4) { animation-delay: 0.15s; }
+  :root:not([data-reduced-motion="true"]) #results-slot li:nth-child(n+5) { animation-delay: 0.2s; }
+}

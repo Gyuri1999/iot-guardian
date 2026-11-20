@@ -1,0 +1,60 @@
+# Φτιάχνει την εφαρμογή υπολογιστή (Tauri / Rust) για macOS, Windows και Linux
+# και τη βάζει σε ένα πρόχειρο (draft) Release στο GitHub.
+# Ξεκινά όταν ανέβει tag της μορφής v1.2.3, ή με το χέρι από την καρτέλα Actions.
+name: Desktop app
+
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: macos-latest
+            args: --target aarch64-apple-darwin
+          - platform: macos-latest
+            args: --target x86_64-apple-darwin
+          - platform: ubuntu-22.04
+            args: ''
+          - platform: windows-latest
+            args: ''
+    runs-on: ${{ matrix.platform }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Linux: βιβλιοθήκες για το WebView
+        if: matrix.platform == 'ubuntu-22.04'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.platform == 'macos-latest' && 'aarch64-apple-darwin,x86_64-apple-darwin' || '' }}
+
+      - name: Tauri CLI
+        working-directory: desktop
+        run: npm ci
+
+      - uses: tauri-apps/tauri-action@action-v0.6.2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          projectPath: desktop
+          tagName: ${{ github.ref_type == 'tag' && github.ref_name || 'desktop-v__VERSION__' }}
+          releaseName: 'IoT Guardian v__VERSION__'
+          releaseBody: 'Κατέβασε το αρχείο για τον υπολογιστή σου (macOS: .dmg, Windows: .msi ή .exe, Linux: .AppImage ή .deb). Δεν χρειάζεται internet για να παίξεις.'
+          releaseDraft: true
+          prerelease: false
+          args: ${{ matrix.args }}

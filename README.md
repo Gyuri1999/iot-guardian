@@ -197,6 +197,20 @@ python3 -m http.server 8000
 
 και άνοιγμα του `http://localhost:8000`.
 
+## Εφαρμογή υπολογιστή (Rust / Tauri)
+
+Το παιχνίδι υπάρχει και ως εφαρμογή για macOS, Windows και Linux, χωρίς browser και χωρίς internet. Είναι ένα μικρό πρόγραμμα σε Rust ([Tauri 2](https://tauri.app)) που ανοίγει τα ίδια αρχεία HTML/CSS/JS σε δικό του παράθυρο. Η πρόοδος μένει στον υπολογιστή.
+
+- **Κατέβασμα:** από τα [Releases](https://github.com/Gyuri1999/iot-guardian/releases). Τα αρχεία φτιάχνονται αυτόματα από το GitHub Actions ([.github/workflows/desktop.yml](.github/workflows/desktop.yml)) όταν ανέβει tag `v…`, ή με το χέρι από την καρτέλα Actions.
+- **Πρώτο άνοιγμα:** η εφαρμογή δεν είναι υπογεγραμμένη. Στο macOS κάνε δεξί κλικ → «Άνοιγμα». Στα Windows πάτα «Περισσότερες πληροφορίες» → «Εκτέλεση».
+- **Build μόνος σου** (χρειάζεται [Rust](https://rustup.rs) και Node):
+
+```bash
+cd desktop && npm ci && npm run build
+```
+
+Το `desktop/copy-web.js` αντιγράφει μόνο το `index.html`, το `css/` και το `js/` στο `desktop/dist`. Τα tests, τα docs και ο real-lab δεν μπαίνουν στην εφαρμογή. Στο macOS βγαίνει το `desktop/src-tauri/target/release/bundle/macos/IoT Guardian.app` (~4 MB). Οι γραμματοσειρές έρχονται από το Google Fonts όταν υπάρχει internet, αλλιώς χρησιμοποιούνται του συστήματος.
+
 ## Αληθινό ESP32 και αληθινός broker (προαιρετικό)
 
 Ο ίδιος κώδικας φλασάρεται σε αληθινό ESP32 και τα μηνύματα περνούν από αληθινό Mosquitto στον υπολογιστή σου. Τρέξε μία φορά το `node real-lab/helper.js --setup` και μετά το `node real-lab/helper.js`. Άνοιξε το `http://localhost:8787`. Οδηγίες και συνδεσμολογία υπάρχουν στο [real-lab/README.md](real-lab/README.md).

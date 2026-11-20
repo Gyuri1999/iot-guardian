@@ -1,0 +1,41 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "IoT Guardian",
+  "version": "1.0.0",
+  "identifier": "io.github.gyuri1999.iotguardian",
+  "build": {
+    "frontendDist": "../dist",
+    "beforeDevCommand": "node copy-web.js",
+    "beforeBuildCommand": "node copy-web.js"
+  },
+  "app": {
+    "windows": [
+      {
+        "title": "IoT Guardian",
+        "width": 1400,
+        "height": 900,
+        "minWidth": 380,
+        "minHeight": 560,
+        "center": true
+      }
+    ],
+    "security": {
+      "csp": "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: blob:; media-src 'self' data: blob:; connect-src 'self' http://localhost:* http://127.0.0.1:*"
+    }
+  },
+  "bundle": {
+    "active": true,
+    "targets": "all",
+    "category": "Education",
+    "shortDescription": "Μάθε IoT (ESP32, Raspberry Pi) και ασφάλεια παίζοντας",
+    "longDescription": "Ελληνικό εκπαιδευτικό παιχνίδι για C++, MicroPython, Python και Rust σε ESP32 και Raspberry Pi, με αμυντική ασφάλεια IoT.",
+    "copyright": "© Gyuri1999",
+    "icon": [
+      "icons/32x32.png",
+      "icons/128x128.png",
+      "icons/128x128@2x.png",
+      "icons/icon.icns",
+      "icons/icon.ico"
+    ]
+  }
+}

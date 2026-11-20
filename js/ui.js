@@ -127,6 +127,7 @@
   }
   const motionOK = () => !P.settings.reducedMotion && !matchMedia('(prefers-reduced-motion: reduce)').matches;
   const sfx = n => { if (window.IoTSfx) window.IoTSfx.play(n); };
+  const juice = (fn, ...a) => { if (window.IoTJuice) window.IoTJuice[fn](...a); };
 
 
   // ------------------------------------------------------------ Πρόοδος
@@ -264,7 +265,7 @@
       <span class="spacer"></span>
       <div class="pill progress-pill" title="${esc(progressLabel)}">
         ${icon('book')}
-        <div class="pp-body"><div class="pp-label">${esc(progressLabel)}</div><div class="pp-bar"><i style="width:${pct}%"></i></div></div>
+        <div class="pp-body"><div class="pp-label">${esc(progressLabel)}</div><div class="pp-bar"><i style="width:${pct}%" data-pct="${pct}"></i></div></div>
         <div class="pp-num">${done}/${total}</div>
       </div>
       <div class="pill clock"><div class="pp-label">${esc(clockLabel)}</div><div class="clock-v" id="hdr-clock">${esc(clockValue)}</div></div>
@@ -2806,7 +2807,7 @@
     let ticked = false;
     el.querySelectorAll('li').forEach((li, i) => {
       const ok = !!(res && res[i] && res[i].pass);
-      if (ok && !li.classList.contains('done') && S.msPrev) { li.classList.add('just'); ticked = true; }
+      if (ok && !li.classList.contains('done') && S.msPrev) { li.classList.add('just'); ticked = true; juice('burst', li.querySelector('.ms-box')); }
       li.classList.toggle('done', ok);
       li.querySelector('.ms-sr').textContent = ok ? ' · έγινε' : ' · δεν έχει γίνει ακόμα';
       if (ok) n++;
@@ -3071,6 +3072,7 @@
     S.error = e;
     S.runState = 'error';
     sfx('err');
+    juice('nudge', $('.editor'));
     gardi(e.line ? `Κάτι δεν πάει καλά στη γραμμή ${e.line}. Διάβασε το κόκκινο κουτί κάτω από τον κώδικα: λέει τι βρέθηκε και τι να κάνεις.` : 'Κάτι δεν πάει καλά. Διάβασε το κόκκινο κουτί κάτω από τον κώδικα.', 'worried', e.line ? [{ label: `Πήγαινε στη γραμμή ${e.line}`, run: () => gotoLine(e.line) }] : null);
     updateAll();
     announce(`Σφάλμα${e.line ? ' στη γραμμή ' + e.line : ''}: ${e.message}`);
@@ -3086,6 +3088,7 @@
     updateAll();
     announce('Η εκτέλεση ξεκίνησε.');
     S.raf = schedule(frame);
+    juice('launch', $('#b-run'));
   }
 
   function frame(now) {
@@ -3242,6 +3245,7 @@
     renderResults();
     const passCount = res.filter(r => r.pass).length;
     announce(allPass ? 'Όλοι οι έλεγχοι πέρασαν.' : `Πέρασαν ${passCount} από ${res.length} ελέγχους.`);
+    if (!allPass) juice('nudge', $('#b-check'));
     if (!allPass) gardi(`Πέρασαν ${passCount} από ${res.length} ελέγχους. Κοίτα ποιος έμεινε με ✗: γράφει τι περίμενε και τι βρήκε.`, 'think', [{ label: 'Μια βοήθεια', run: () => { showNextHint(); showInfo('help'); } }]);
     const slot = $('#results-slot');
     if (slot && slot.firstElementChild) slot.firstElementChild.focus();
