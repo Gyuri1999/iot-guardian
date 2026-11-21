@@ -13,13 +13,14 @@ self.addEventListener('fetch', e => {
   const r = e.request;
   if (r.method !== 'GET') return;
   const u = new URL(r.url);
+  // η σελίδα: πρώτα το δίκτυο (για νέες εκδόσεις), αλλιώς από τη συσκευή
   if (r.mode === 'navigate') {
     e.respondWith(fetch(r).then(res => { const cp = res.clone(); caches.open(CACHE).then(c => c.put('./', cp)); return res; })
       .catch(() => caches.match('./').then(h => h || caches.match('index.html'))));
     return;
   }
   const fonts = /^fonts\.(googleapis|gstatic)\.com$/.test(u.hostname);
-  if (u.origin !== location.origin && !fonts) return;
+  if (u.origin !== location.origin && !fonts) return; // π.χ. ο τοπικός βοηθός real-lab: ποτέ από cache
   e.respondWith(caches.match(r).then(hit => hit || fetch(r).then(res => {
     if (res.ok || res.type === 'opaque') { const cp = res.clone(); caches.open(CACHE).then(c => c.put(r, cp)); }
     return res;
