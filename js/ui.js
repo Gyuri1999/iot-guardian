@@ -327,6 +327,10 @@
     if (!ctl || !BV || !man || !man.some(o => o.t === 'bb')) return;
     const view = BV.svg(man, wireLabels(), undefined, { board: isPi() ? 'pi' : 'esp32' });
     if (!view.nets.parts.length) return;
+    if (has3d && !isPi() && window.IoT3DBreadboard) {
+      ctl.insertAdjacentHTML('beforeend', '<button class="sc-b sc-3d sc-breadboard" id="sc-breadboard" title="Άνοιγμα ανεξάρτητου 3D εργαστηρίου breadboard" aria-label="Άνοιγμα 3D εργαστηρίου breadboard"><span aria-hidden="true">▦</span><span>Breadboard</span></button>');
+      $('#sc-breadboard').onclick = () => window.IoT3DBreadboard.open({ sfx, reducedMotion: () => !motionOK() });
+    }
     ctl.insertAdjacentHTML('beforeend', `<button class="sc-b sc-3d" id="sc-xray" aria-pressed="false" title="Δες τι ενώνεται μέσα στο breadboard" aria-label="Δες τι ενώνεται μέσα στο breadboard">${icon('xray')}<span>Μέσα</span></button>`);
     // «Πάγκος» (js/bench.js): εικονογράφηση της συναρμολόγησης σε 4 βήματα, για το ESP32
     const bench = !!(window.IoTBench && !isPi());
