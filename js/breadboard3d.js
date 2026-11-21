@@ -27,7 +27,7 @@
         <div class="iot3dbb-tools">
           <label>Τύπος πλακέτας <select data-size><option value="mini">Mini breadboard</option><option value="full">Full-size breadboard</option></select></label>
           <label>Χρώμα καλωδίου <select data-color>${COLORS.map((c,i)=>`<option value="${i}">${c.name}</option>`).join('')}</select></label>
-          <button type="button" class="iot3dbb-add">+ Νέο καλώδιο</button>
+          <button type="button" class="iot3dbb-add">Πώς συνδέω</button>
           <button type="button" class="iot3dbb-reset">Επαναφορά</button>
         </div>
         <div class="iot3dbb-stage"><div class="iot3dbb-canvas"></div>
@@ -84,7 +84,7 @@
       if(board) { scene.remove(board); disposeTree(board); }
       holeMeshes=[]; pinMeshes=[]; wires=[];
       board=new THREE.Group(); scene.add(board);
-      const full=sizeSelect.value==='full', cols=full?52:17, rows=10;
+      const full=sizeSelect.value==='full', cols=full?63:17, rows=10;
       board.userData={cols,rows,full};
       const width=(cols-1)*1.1+5, depth=rows*1.1+7;
       addBox(board,0,0,0,width,.9,depth,material(0xe9e7df,.85));
@@ -218,11 +218,11 @@
       const sig=byPin('GPIO 2'), ground=byPin('GND'), circuit=board.userData.circuit;
       const hasR=!!(sig&&sig.net===circuit.signalNet);
       const hasLed=!!(ground&&ground.net===circuit.groundNet);
-      const valid=!!(hasR&&hasLed);
+      const valid=!!(hasR&&hasLed&&wires.length===2);
       ledLens.material.emissive.setHex(valid?0xff382c:0);
       ledLens.material.emissiveIntensity=valid?1.6:0;
       if(valid){setStatus('Κύκλωμα σωστό! GPIO 2 → 220 Ω → LED → GND. Το LED άναψε.','ok');startParticles();}
-      else if(wires.length){setStatus('Η σύνδεση καταγράφηκε, αλλά το κύκλωμα δεν είναι ακόμη σωστό. Έλεγξε αντίσταση, LED και GND.','warn');stopParticles();}
+      else if(wires.length){setStatus('Η σύνδεση καταγράφηκε, αλλά το κύκλωμα δεν είναι ακόμη σωστό. Χρειάζεται μόνο GPIO 2 και GND στις σωστές λωρίδες. Αν έβαλες λάθος καλώδιο, πάτα Επαναφορά.','warn');stopParticles();}
     }
     function startParticles(){
       if(liveParticles.length)return;
