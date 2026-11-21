@@ -98,7 +98,6 @@
         for(let r=0;r<rows;r++){
           const z=(r<5 ? -3.2+r*1.1 : 3.2+(r-5)*1.1);
           const hole=new THREE.Mesh(new THREE.CylinderGeometry(.19,.19,.12,16),material(0x544f48,.75));
-          hole.rotation.x=Math.PI/2; // cylinder axis y remains vertical (no-op visual alignment)
           hole.position.set(x,.49,z); hole.userData={type:'hole',col:c,row:r,net:r<5?'a'+c:'b'+c};
           board.add(hole); holeMeshes.push(hole);
           const rim=new THREE.Mesh(new THREE.TorusGeometry(.18,.035,6,20),material(0xb6b0a4,.5,.25));rim.rotation.x=Math.PI/2;rim.position.set(x,.55,z);board.add(rim);
@@ -122,18 +121,19 @@
         const cap=addBox(esp,x,2.35,z,.95,.25,.95,material(0x111821,.5));
         cap.userData={type:'pin-cap',name}; cap.userData.pin=pin;
       });
-      // LED and resistor are visual learning targets with legs inserted into distinct hole groups.
-      const ledX=centerX+2*1.1, ledZ=1.1;
-      const leadA=V(ledX-.55,.6,ledZ), leadB=V(ledX+.55,.6,ledZ);
-      const leg1=new THREE.Mesh(new THREE.CylinderGeometry(.055,.055,1,8),material(0xb6bfc6,.3,.8));leg1.position.set(leadA.x,.9,leadA.z);board.add(leg1);
-      const leg2=leg1.clone();leg2.position.x=leadB.x;board.add(leg2);
-      const shell=addBox(board,ledX,2.3,ledZ,1.1,2.2,1.1,material(0xc3423b,.3,.15));
-      const lens=new THREE.Mesh(new THREE.SphereGeometry(.62,20,14),new THREE.MeshStandardMaterial({color:0xff4a3c,emissive:0x000000,roughness:.2,metalness:.05}));
-      lens.position.set(ledX,3.3,ledZ);board.add(lens);ledLens=lens;
-      // 220-ohm resistor across a different pair of columns. Ends map to holes.
-      const rx=centerX+1.1, rz=-3.2+3*1.1;
-      const body=addBox(board,rx,1.2,rz,2.3,.65,.65,material(0xd8bd93,.55));
-      for(let i=0;i<4;i++){const stripe=addBox(board,rx-0.75+i*.5,1.54,rz,.12,.08,.68,material([0xc0392b,0xc0392b,0x7a4a26,0xc9a227][i],.4));}
+      // Physical path: GPIO2 → resistor across the centre gap → LED → GND.
+      const c0=full?Math.floor((cols-9)/2):1;
+      const holeAt=(col,row)=>V(centerX+col*1.1,.55,row<5?-3.2+row*1.1:3.2+(row-5)*1.1);
+      const upperSignal=holeAt(c0+1,4), lowerAfterRes=holeAt(c0+3,5), lowerGround=holeAt(c0+4,6);
+      const addLead=(a,b)=>{const d=b.clone().sub(a),m=new THREE.Mesh(new THREE.CylinderGeometry(.055,.055,d.length(),8),material(0xb6bfc6,.3,.8));m.position.copy(a).add(b).multiplyScalar(.5);m.quaternion.setFromUnitVectors(V(0,1,0),d.normalize());board.add(m);};
+      addLead(upperSignal,V(upperSignal.x,1.65,upperSignal.z)); addLead(lowerAfterRes,V(lowerAfterRes.x,1.65,lowerAfterRes.z));
+      const rStart=V(upperSignal.x,1.65,upperSignal.z),rEnd=V(lowerAfterRes.x,1.65,lowerAfterRes.z),rd=rEnd.clone().sub(rStart);
+      const resistorBody=new THREE.Mesh(new THREE.CylinderGeometry(.42,.42,rd.length()*.72,18),material(0xd8bd93,.55));resistorBody.position.copy(rStart).add(rEnd).multiplyScalar(.5);resistorBody.quaternion.setFromUnitVectors(V(0,1,0),rd.normalize());board.add(resistorBody);
+      const LEDx=(lowerAfterRes.x+lowerGround.x)/2, LEDz=lowerAfterRes.z;
+      addLead(V(lowerAfterRes.x,.55,LEDz),V(lowerAfterRes.x,1.45,LEDz)); addLead(V(lowerGround.x,.55,LEDz),V(lowerGround.x,1.45,LEDz));
+      addBox(board,LEDx,2.1,LEDz,1.05,1.5,.85,material(0xc3423b,.3,.15));
+      const lens=new THREE.Mesh(new THREE.SphereGeometry(.62,20,14),new THREE.MeshStandardMaterial({color:0xff4a3c,emissive:0x000000,roughness:.2,metalness:.05}));lens.position.set(LEDx,3.0,LEDz);board.add(lens);ledLens=lens;
+      board.userData.circuit={signalNet:'a'+(c0+1),groundNet:'b'+(c0+4)};
       const rails = addBox(board,0,.7,-depth/2+1.05,width-2,.15,.35,material(0xd84b47,.5)); rails.visible=false;
       setStatus('Διάλεξε GPIO και σύρε το βύσμα στην οπή που θέλεις.','');
       setCount();
@@ -168,12 +168,12 @@
     function onPointerDown(e){
       if(e.button!==0)return;
       const pinHit=pick(e,pinMeshes);
-      if(pinHit){const pin=pinHit.object;drag={pin:pin.userData.name,color:COLORS[+colorSelect.value].hex,points:[pin.position.clone()],mesh:makeLoose(pin),pointer:e.pointerId};renderer.domElement.setPointerCapture(e.pointerId);setStatus(`Καλώδιο από ${drag.pin}: σύρε το στην επιθυμητή οπή.`,'');return;}
+      if(pinHit){const pin=pinHit.object;drag={pin:pin.userData.name,color:COLORS[+colorSelect.value].hex,mesh:makeLoose(pin),pointer:e.pointerId};renderer.domElement.setPointerCapture(e.pointerId);setStatus(`Καλώδιο από ${drag.pin}: σύρε το στην επιθυμητή οπή.`,'');return;}
       orbit={x:e.clientX,y:e.clientY,yaw,pitch};
       renderer.domElement.setPointerCapture(e.pointerId);
     }
     function onPointerMove(e){
-      if(drag&&drag.pointer===e.pointerId){setPointer(e);const hit=raycaster.intersectObjects(holeMeshes,false)[0];drag.target=hit?hit.object:null;if(drag.target){drag.mesh.position.copy(hit.point);drag.mesh.position.y=.85;}else{const v=rayOnBoard(e);drag.mesh.position.copy(v);}setStatus(drag.target?`Οπή ${String.fromCharCode(65+drag.target.userData.row)}${drag.target.userData.col+1} · άφησε για σύνδεση.`:'Σύρε το βύσμα πάνω στο breadboard.','');return;}
+      if(drag&&drag.pointer===e.pointerId){setPointer(e);const hit=raycaster.intersectObjects(holeMeshes,false)[0];drag.target=hit?hit.object:null;updateLoose(drag,hit?hit.point:rayOnBoard(e));setStatus(drag.target?`Οπή ${String.fromCharCode(65+drag.target.userData.row)}${drag.target.userData.col+1} · άφησε για σύνδεση.`:'Σύρε το βύσμα πάνω στο breadboard.','');return;}
       if(orbit){yaw=orbit.yaw-(e.clientX-orbit.x)*.009;pitch=Math.max(.18,Math.min(1.45,orbit.pitch+(e.clientY-orbit.y)*.006));}
     }
     function onPointerUp(e){
@@ -187,24 +187,26 @@
     }
     function makeLoose(pin){
       const group=new THREE.Group();board.add(group);
-      const color=new THREE.Color(COLORS[+colorSelect.value].hex);
-      const a=pin.position.clone();a.y+=.7;
-      const b=a.clone();
-      const mesh=new THREE.Mesh(new THREE.TubeGeometry(new THREE.CatmullRomCurve3([a,a.clone().add(V(0,5,0)),b]),40,.13,8,false),material(color,.35,.15));
-      group.add(mesh);return group;
+      const start=pin.getWorldPosition(V(0,0,0));start.y+=.7;
+      const mesh=new THREE.Mesh(new THREE.BufferGeometry(),material(COLORS[+colorSelect.value].hex,.35,.15));group.add(mesh);
+      const d={mesh:group,start,pin:pin.userData.name,color:COLORS[+colorSelect.value].hex};updateLoose(d,start.clone().add(V(0,1,0)));return group;
+    }
+    function updateLoose(d,end){
+      const curve=new THREE.CatmullRomCurve3([d.start,d.start.clone().add(V(0,4,0)),end.clone().add(V(0,3,0)),end]);
+      const child=d.mesh.children[0],old=child.geometry;child.geometry=new THREE.TubeGeometry(curve,48,.13,8,false);old.dispose();child.material.color.set(d.color);
     }
     function commitWire(d,hole){
       const from=pinMeshes.find(p=>p.userData.name===d.pin);
       if(wires.some(w=>w.pin===d.pin)){board.remove(d.mesh);setStatus('Αυτό το GPIO έχει ήδη καλώδιο. Επίλεξε άλλο pin.','err');return;}
-      const start=from.position.clone();start.y+=.7;
-      const end=hole.position.clone();end.y+=.24;
+      const start=from.getWorldPosition(V(0,0,0));start.y+=.7;
+      const end=hole.getWorldPosition(V(0,0,0));end.y+=.24;
       const mid1=start.clone().add(V(0,5,0)),mid2=end.clone().add(V(0,5,0));
       const curve=new THREE.CatmullRomCurve3([start,mid1,mid2,end]);
       const m=new THREE.Mesh(new THREE.TubeGeometry(curve,60,.14,8,false),material(d.color,.32,.1));m.castShadow=true;
       board.remove(d.mesh);board.add(m);
       const plug=new THREE.Mesh(new THREE.CylinderGeometry(.23,.23,.34,12),material(d.color,.32));
       plug.position.copy(end);board.add(plug);
-      wires.push({pin:d.pin,net:hole.userData.net,hole:hole.userData,col:d.color,curve,mesh:m,plug});
+      wires.push({pin:d.pin,net:(hole.userData.row<5?'a':'b')+hole.userData.col,hole:hole.userData,col:d.color,curve,mesh:m,plug});
       setStatus(`✓ ${d.pin} συνδέθηκε στην οπή ${String.fromCharCode(65+hole.userData.row)}${hole.userData.col+1}.`,'ok');
       validateCircuit();setCount();
       animateConnection(curve);
@@ -216,11 +218,9 @@
     }
     function validateCircuit(){
       const byPin=pin=>wires.find(w=>w.pin===pin);
-      const sig=byPin('GPIO 2'), ground=byPin('GND');
-      const resistorEndNets = [ 'a1','a3' ];
-      const ledSignal='b2', ledGround='b3';
-      const hasR = sig && sig.net==='a1' && wires.some(w=>w.net==='a3');
-      const hasLed = wires.some(w=>w.net===ledSignal) && ground && ground.net===ledGround;
+      const sig=byPin('GPIO 2'), ground=byPin('GND'), circuit=board.userData.circuit;
+      const hasR=!!(sig&&sig.net===circuit.signalNet);
+      const hasLed=!!(ground&&ground.net===circuit.groundNet);
       const valid=!!(hasR&&hasLed);
       ledLens.material.emissive.setHex(valid?0xff382c:0);
       ledLens.material.emissiveIntensity=valid?1.6:0;
@@ -234,7 +234,7 @@
     }
     function stopParticles(){liveParticles.forEach(p=>board.remove(p.dot));liveParticles=[];}
     function updateParticles(){if(!liveParticles.length)return;const t=performance.now()*.0006;liveParticles.forEach(p=>p.curve.getPointAt((t+p.offset)%1,p.dot.position));}
-    function addWire(){pinSelect.value='GPIO 2';setStatus('Σύρε το pin GPIO 2 προς την αντίστοιχη οπή για να ξεκινήσεις.','');}
+    function addWire(){setStatus(`Επίλεξε pin από τη λίστα και σύρε το αντίστοιχο pin της πλακέτας στο breadboard. Χρώμα: ${COLORS[+colorSelect.value].name}.`,'');}
     function clearWires(){wires.forEach(w=>{board.remove(w.mesh,w.plug);});wires=[];stopParticles();if(ledLens){ledLens.material.emissive.setHex(0);ledLens.material.emissiveIntensity=0;}setCount();}
     function reset(){clearWires();setStatus('Οι συνδέσεις καθαρίστηκαν. Ξεκίνα ξανά από το GPIO 2.','');}
     function setCount(){count.textContent=wires.length+' συνδέσεις';}
