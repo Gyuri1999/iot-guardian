@@ -8,7 +8,7 @@ const ROOT = path.join(__dirname, '..');
 // ?v=<hash του αρχείου>: ο browser παίρνει το νέο αρχείο μόλις αλλάξει, αντί για το παλιό από την cache.
 const ver = f => f + '?v=' + crypto.createHash('sha1').update(fs.readFileSync(path.join(ROOT, f))).digest('hex').slice(0, 8);
 const lessonFiles = fs.readdirSync(path.join(ROOT, 'js', 'lessons')).filter(f => f.endsWith('.js')).sort().map(f => 'js/lessons/' + f);
-const scriptFiles = ['js/interpreter.js', 'js/pyinterp.js', 'js/pyweb.js', 'js/pymicro.js', 'js/pyparts.js', 'js/device.js', 'js/network.js', 'js/validator.js', 'js/pisys.js', 'js/rsinterp.js', 'js/rsruntime.js', 'js/rslib.js', 'js/rscheck.js', 'js/vendor/three.min.js', 'js/scene.js', 'js/bbview.js', 'js/bbassemble.js', 'js/bench.js', 'js/bbpractice.js', 'js/scene3d.js', 'js/parts.js', 'js/themes.js', 'js/sfx.js', 'js/juice.js', 'js/housemap.js', 'js/speak.js', 'js/learn.js', 'js/wiring.js', 'js/gardi.js', 'js/challenge.js', 'js/sandbox.js', 'js/blocks.js', 'js/tour.js', 'js/cases.js', 'js/cases-data.js', 'js/intruder.js', 'js/teacher.js', 'js/stories.js', 'js/lessons.js', ...lessonFiles, 'js/storage.js', 'js/real.js', 'js/ui.js'];
+const scriptFiles = ['js/interpreter.js', 'js/pyinterp.js', 'js/pyweb.js', 'js/pymicro.js', 'js/pyparts.js', 'js/device.js', 'js/network.js', 'js/validator.js', 'js/pisys.js', 'js/rsinterp.js', 'js/rsruntime.js', 'js/rslib.js', 'js/rscheck.js', 'js/vendor/three.min.js', 'js/scene.js', 'js/bbview.js', 'js/bbassemble.js', 'js/bench.js', 'js/bbpractice.js', 'js/scene3d.js', 'js/breadboard3d.js', 'js/parts.js', 'js/themes.js', 'js/sfx.js', 'js/juice.js', 'js/housemap.js', 'js/speak.js', 'js/learn.js', 'js/wiring.js', 'js/gardi.js', 'js/challenge.js', 'js/sandbox.js', 'js/blocks.js', 'js/tour.js', 'js/cases.js', 'js/cases-data.js', 'js/intruder.js', 'js/teacher.js', 'js/stories.js', 'js/lessons.js', ...lessonFiles, 'js/storage.js', 'js/real.js', 'js/ui.js'];
 const scripts = scriptFiles.map(s => `<script src="${ver(s)}"></script>`).join('\n');
 const favicon = 'data:image/svg+xml,' + encodeURIComponent(fs.readFileSync(path.join(ROOT, 'favicon.svg'), 'utf8').replace(/\s+/g, ' '));
 const fonts = `<link rel="icon" type="image/svg+xml" href="${favicon}">
@@ -23,7 +23,7 @@ const pwa = `<link rel="manifest" href="manifest.webmanifest">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-title" content="IoT Guardian">
 <script>if ('serviceWorker' in navigator && location.protocol === 'https:' && !/tauri/.test(location.hostname)) addEventListener('load', () => navigator.serviceWorker.register('sw.js').catch(() => {}));</script>`;
-const assets = ['./', 'index.html', 'manifest.webmanifest', 'icons/icon-192.png', 'icons/icon-512.png', 'icons/apple-touch-icon.png', ver('css/style.css'), ver('css/scene.css'), ...scriptFiles.map(ver)];
+const assets = ['./', 'index.html', 'manifest.webmanifest', 'icons/icon-192.png', 'icons/icon-512.png', 'icons/apple-touch-icon.png', ver('css/style.css'), ver('css/scene.css'), ver('css/guardian-polish.css'), ...scriptFiles.map(ver)];
 const cacheName = 'iotg-' + crypto.createHash('sha1').update(assets.join('|')).digest('hex').slice(0, 10);
 fs.writeFileSync(path.join(ROOT, 'sw.js'), `/* IoT Guardian — service worker (γράφεται από το tools/write-html.js, μην το αλλάζεις με το χέρι).
    Κρατά όλο το παιχνίδι στη συσκευή, ώστε να παίζει και χωρίς internet. Τα αρχεία έχουν ?v=<hash>,
@@ -62,7 +62,7 @@ fs.writeFileSync(path.join(ROOT, 'index.html'), `<!doctype html>
 <title>IoT Guardian</title>
 ${fonts}
 <link rel="stylesheet" href="${ver('css/style.css')}">
-<link rel="stylesheet" href="${ver('css/scene.css')}">
+<link rel="stylesheet" href="${ver('css/scene.css')}">\n<link rel="stylesheet" href="${ver('css/guardian-polish.css')}">
 ${pwa}
 </head>
 <body>
@@ -74,7 +74,7 @@ ${scripts}
 fs.writeFileSync(path.join(ROOT, 'iot-guardian.html'), `<title>IoT Guardian</title>
 ${fonts}
 <link rel="stylesheet" href="${ver('css/style.css')}">
-<link rel="stylesheet" href="${ver('css/scene.css')}">
+<link rel="stylesheet" href="${ver('css/scene.css')}">\n<link rel="stylesheet" href="${ver('css/guardian-polish.css')}">
 <script>document.documentElement.lang = 'el';</script>
 <div id="app"><p style="padding:16px">Φόρτωση του IoT Guardian…</p></div>
 ${scripts}
