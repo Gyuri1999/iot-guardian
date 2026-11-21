@@ -62,7 +62,8 @@ fs.writeFileSync(path.join(ROOT, 'index.html'), `<!doctype html>
 <title>IoT Guardian</title>
 ${fonts}
 <link rel="stylesheet" href="${ver('css/style.css')}">
-<link rel="stylesheet" href="${ver('css/scene.css')}">\n<link rel="stylesheet" href="${ver('css/guardian-polish.css')}">
+<link rel="stylesheet" href="${ver('css/scene.css')}">
+<link rel="stylesheet" href="${ver('css/guardian-polish.css')}">
 ${pwa}
 </head>
 <body>
@@ -74,7 +75,8 @@ ${scripts}
 fs.writeFileSync(path.join(ROOT, 'iot-guardian.html'), `<title>IoT Guardian</title>
 ${fonts}
 <link rel="stylesheet" href="${ver('css/style.css')}">
-<link rel="stylesheet" href="${ver('css/scene.css')}">\n<link rel="stylesheet" href="${ver('css/guardian-polish.css')}">
+<link rel="stylesheet" href="${ver('css/scene.css')}">
+<link rel="stylesheet" href="${ver('css/guardian-polish.css')}">
 <script>document.documentElement.lang = 'el';</script>
 <div id="app"><p style="padding:16px">Φόρτωση του IoT Guardian…</p></div>
 ${scripts}
