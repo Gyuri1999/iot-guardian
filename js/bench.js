@@ -102,8 +102,9 @@
     let s = '';
     for (let c = 0; c < cols; c++) {
       if (c >= 3 && c <= 11) continue; // κάτω από το ESP32
-      for (const y of Object.values(ROW)) s += `<rect x="${cx(c) - 4}" y="${y - 4}" width="8" height="8" rx="1.6" class="bn-hole"/>`;
-      if (c % 6 !== 5) for (const y of Object.values(RAIL)) s += `<rect x="${cx(c) - 4}" y="${y - 4}" width="8" height="8" rx="1.6" class="bn-hole"/>`;
+      const h = y => `<rect x="${cx(c) - 4.5}" y="${y - 4.5}" width="9" height="9" rx="1.8" class="bn-hole"/><rect x="${cx(c) - 3}" y="${y - 3}" width="6" height="3" rx="1" class="bn-hole-d"/>`;
+      for (const y of Object.values(ROW)) s += h(y);
+      if (c % 6 !== 5) for (const y of Object.values(RAIL)) s += h(y);
     }
     return s;
   }
@@ -126,36 +127,41 @@
     return s;
   }
 
+  const PIN_NAME = n => n.replace(/^GND\d$/, 'GND');
   function esp32() {
     const { x, w, y, b } = ESP;
     let s = `<g class="bn-esp" data-st="1">`;
-    s += `<rect x="${x + 8}" y="${y + 14}" width="${w}" height="${b - y}" rx="14" class="bn-esp-shadow"/>`;
-    s += `<rect x="${x}" y="${y}" width="${w}" height="${b - y}" rx="14" class="bn-pcb"/>`;
+    s += `<rect x="${x}" y="${y}" width="${w}" height="${b - y}" rx="14" class="bn-pcb" filter="url(#bn-sh)"/>`;
+    s += `<rect x="${x + 3}" y="${y + 3}" width="${w - 6}" height="${b - y - 6}" rx="12" class="bn-pcb-edge"/>`;
     for (const [hx, hy] of [[x + 18, y + 18], [x + w - 18, y + 18], [x + 18, b - 18], [x + w - 18, b - 18]]) s += `<circle cx="${hx}" cy="${hy}" r="9" class="bn-mhole"/>`;
-    // κεραία (χρυσό ζιγκ-ζαγκ)
-    const ax = x + 46;
-    s += `<path d="M${ax},${y + 54} v-26 h18 v18 h18 v-18 h18 v18 h18 v-18 h18 v18 h14 v-18" class="bn-ant"/>`;
-    // μεταλλικό κουτί με το Wi-Fi
-    const mx = x + 40, my = y + 66, mw = w - 80, mh = 150;
-    for (let k = 0; k < 9; k++) s += `<rect x="${mx - 8}" y="${my + 10 + k * 15}" width="6" height="8" class="bn-pad"/><rect x="${mx + mw + 2}" y="${my + 10 + k * 15}" width="6" height="8" class="bn-pad"/>`;
-    for (let k = 0; k < 7; k++) s += `<rect x="${mx + 10 + k * 15}" y="${my + mh + 2}" width="8" height="7" class="bn-pad"/>`;
-    s += `<rect x="${mx}" y="${my}" width="${mw}" height="${mh}" rx="6" class="bn-can"/><rect x="${mx + 5}" y="${my + 5}" width="${mw - 10}" height="${mh - 10}" rx="4" class="bn-can-in"/>`;
-    const wx = mx + mw / 2, wy = my + 54;
-    s += `<path d="M${wx - 24},${wy - 8} q24,-22 48,0 M${wx - 16},${wy} q16,-14 32,0 M${wx - 8},${wy + 8} q8,-7 16,0" class="bn-wifi"/><circle cx="${wx}" cy="${wy + 15}" r="3.6" class="bn-wifi-dot"/>`;
-    s += `<text x="${wx}" y="${my + 104}" class="bn-esp-t">ESP32</text><text x="${wx}" y="${my + 128}" class="bn-esp-s">Wi-Fi + Bluetooth</text>`;
+    // κεραία (χρυσό ζιγκ-ζαγκ πάνω στην πλακέτα)
+    const ax = x + 48;
+    s += `<path d="M${ax},${y + 56} v-28 h18 v18 h18 v-18 h18 v18 h18 v-18 h18 v18 h12 v-18" class="bn-ant"/>`;
+    // μεταλλικό κουτί (το «μυαλό» με Wi-Fi), με γυαλάδα και σκιά
+    const mx = x + 56, my = y + 66, mw = w - 112, mh = 150;
+    for (let k = 0; k < 6; k++) s += `<rect x="${mx + 6 + k * 14}" y="${my + mh + 3}" width="8" height="8" rx="1" class="bn-pad"/>`;
+    s += `<rect x="${mx}" y="${my}" width="${mw}" height="${mh}" rx="6" class="bn-can" filter="url(#bn-sh-s)"/><rect x="${mx}" y="${my}" width="${mw}" height="${mh}" rx="6" class="bn-can-sheen"/><rect x="${mx + 5}" y="${my + 5}" width="${mw - 10}" height="${mh - 10}" rx="4" class="bn-can-in"/>`;
+    const wx = mx + mw / 2, wy = my + 50;
+    s += `<path d="M${wx - 22},${wy - 8} q22,-20 44,0 M${wx - 14},${wy} q14,-13 28,0 M${wx - 7},${wy + 8} q7,-6 14,0" class="bn-wifi"/><circle cx="${wx}" cy="${wy + 15}" r="3.4" class="bn-wifi-dot"/>`;
+    s += `<text x="${wx}" y="${my + 100}" class="bn-esp-t">ESP32</text><text x="${wx}" y="${my + 122}" class="bn-esp-s">Wi-Fi + Bluetooth</text>`;
+    s += `<text x="${x + w / 2}" y="${y + 262}" class="bn-silk">ESP32-DevKitC</text>`;
     // μικρά τσιπάκια, λυχνία ρεύματος, κουμπιά EN/BOOT, USB-C
-    s += `<rect x="${x + 64}" y="${y + 268}" width="22" height="14" rx="2" class="bn-chip"/><rect x="${x + 112}" y="${y + 268}" width="14" height="14" rx="2" class="bn-chip"/>`;
-    s += `<rect x="${x + 96}" y="${y + 300}" width="12" height="18" rx="3" class="bn-pled"/>`;
-    s += `<rect x="${x + 60}" y="${y + 340}" width="30" height="30" rx="3" class="bn-chip"/><rect x="${x + 112}" y="${y + 336}" width="40" height="38" rx="3" class="bn-chip"/>`;
-    for (let k = 0; k < 4; k++) s += `<rect x="${x + 114 + k * 10}" y="${y + 378}" width="5" height="9" class="bn-pad"/>`;
-    for (const [bx, t] of [[x + 50, 'EN'], [x + w - 50, 'BOOT']]) s += `<rect x="${bx - 17}" y="${b - 92}" width="34" height="34" rx="4" class="bn-btn-base"/><circle cx="${bx}" cy="${b - 75}" r="10" class="bn-btn-cap"/><text x="${bx}" y="${b - 44}" class="bn-esp-l">${t}</text>`;
-    s += `<rect x="${x + w / 2 - 34}" y="${b - 40}" width="68" height="46" rx="12" class="bn-usb"/><rect x="${x + w / 2 - 22}" y="${b - 26}" width="44" height="14" rx="7" class="bn-usb-in"/>`;
-    // pins (δύο σειρές)
-    for (let i = 0; i < 19; i++) for (const px of [ESP.lx, ESP.rx]) s += `<circle cx="${px}" cy="${PIN_Y(i)}" r="6.2" class="bn-pin"/><circle cx="${px}" cy="${PIN_Y(i)}" r="2.6" class="bn-pin-in"/>`;
+    s += `<rect x="${x + 70}" y="${y + 282}" width="22" height="14" rx="2" class="bn-chip"/><rect x="${x + 112}" y="${y + 282}" width="14" height="14" rx="2" class="bn-chip"/>`;
+    s += `<rect x="${x + 94}" y="${y + 308}" width="12" height="16" rx="3" class="bn-pled"/><text x="${x + 100}" y="${y + 336}" class="bn-silk sm">PWR</text>`;
+    s += `<rect x="${x + 64}" y="${y + 350}" width="30" height="30" rx="3" class="bn-chip"/><rect x="${x + 106}" y="${y + 346}" width="34" height="38" rx="3" class="bn-chip"/>`;
+    for (let k = 0; k < 4; k++) s += `<rect x="${x + 108 + k * 9}" y="${y + 388}" width="5" height="8" class="bn-pad"/>`;
+    for (const [bx, t] of [[x + 70, 'EN'], [x + w - 70, 'BOOT']]) s += `<rect x="${bx - 17}" y="${b - 92}" width="34" height="34" rx="4" class="bn-btn-base"/><circle cx="${bx}" cy="${b - 75}" r="10" class="bn-btn-cap"/><text x="${bx}" y="${b - 46}" class="bn-esp-l">${t}</text>`;
+    s += `<rect x="${x + w / 2 - 34}" y="${b - 40}" width="68" height="46" rx="12" class="bn-usb" filter="url(#bn-sh-s)"/><rect x="${x + w / 2 - 22}" y="${b - 26}" width="44" height="14" rx="7" class="bn-usb-in"/>`;
+    // pins: μαύρες σειρές (headers) με ασημένια pins και το όνομα κάθε pin δίπλα
+    for (const px of [ESP.lx, ESP.rx]) s += `<rect x="${px - 10}" y="${PIN_Y(0) - 11}" width="20" height="${PIN_Y(18) - PIN_Y(0) + 22}" rx="5" class="bn-hdr"/>`;
+    for (let i = 0; i < 19; i++) {
+      for (const px of [ESP.lx, ESP.rx]) s += `<circle cx="${px}" cy="${PIN_Y(i)}" r="6.4" class="bn-pin"/><circle cx="${px}" cy="${PIN_Y(i)}" r="2.4" class="bn-pin-in"/>`;
+      s += `<text x="${ESP.lx + 13}" y="${PIN_Y(i) + 3.5}" class="bn-pinl">${PIN_NAME(LEFT_ROW[i])}</text><text x="${ESP.rx - 13}" y="${PIN_Y(i) + 3.5}" class="bn-pinl r">${PIN_NAME(RIGHT_ROW[i])}</text>`;
+    }
     return s + '</g>';
   }
 
-  function legLine(x, y0, y1, cls) { return `<line x1="${x}" y1="${y0}" x2="${x}" y2="${y1}" class="bn-leg${cls ? ' ' + cls : ''}"/><circle cx="${x}" cy="${y1}" r="4" class="bn-foot"/>`; }
+  function legLine(x, y0, y1, cls) { return `<line x1="${x}" y1="${y0}" x2="${x}" y2="${y1}" class="bn-leg${cls ? ' ' + cls : ''}"/><line x1="${x - 1}" y1="${y0}" x2="${x - 1}" y2="${y1 - 3}" class="bn-leg-hl"/><circle cx="${x}" cy="${y1}" r="4.5" class="bn-foot"/>`; }
 
   function partSvg(pl, k) {
     const p = pl.p, xs = pl.legs.map(L => cx(L.col));
@@ -163,29 +169,40 @@
     const Y = ROW.C;
     let s = `<g class="bn-part bn-${p.t}" data-st="2" data-k="${k}">`;
     const legs = top => pl.legs.map(L => legLine(cx(L.col), top, Y, L.role === 'gnd' ? 'short' : '')).join('');
+    const dome = (r, h) => `M${mid - r},${198} v-${h} a${r},${r} 0 0 1 ${2 * r},0 v${h} z`;
     if (p.t === 'led') {
+      s += `<ellipse cx="${mid}" cy="${236}" rx="84" ry="34" class="bn-spill" data-glow/>`;
       s += legs(198);
-      s += `<circle cx="${mid}" cy="${138}" r="78" class="bn-glow" data-glow/>`;
-      s += `<ellipse cx="${mid}" cy="${198}" rx="29" ry="9" class="bn-led-rim"/><path d="M${mid - 25},${198} v-56 a25,25 0 0 1 50,0 v56 z" class="bn-led" data-led/><path d="M${mid - 13},${146} q2,-18 14,-22" class="bn-shine"/>`;
+      s += `<circle cx="${mid}" cy="${150}" r="86" class="bn-glow" data-glow/>`;
+      s += `<g filter="url(#bn-sh-s)"><ellipse cx="${mid}" cy="${198}" rx="30" ry="9" class="bn-led-rim"/><path d="${dome(25, 56)}" class="bn-led"/></g>`;
+      s += `<path d="${dome(25, 56)}" class="bn-led-on" data-led/>`;
+      s += `<path d="M${mid - 8},${194} v-28 l11,-7 v35 M${mid + 6},${194} v-22" class="bn-led-die"/>`;
+      s += `<ellipse cx="${mid - 10}" cy="${152}" rx="6" ry="17" transform="rotate(16 ${mid - 10} 152)" class="bn-shine"/>`;
     } else if (p.t === 'rgb') {
       s += legs(196);
-      s += `<circle cx="${mid}" cy="${150}" r="70" class="bn-glow rgb" data-glow/>`;
-      s += `<ellipse cx="${mid}" cy="${198}" rx="25" ry="7" class="bn-led-rim"/><path d="M${mid - 22},${198} v-40 a22,22 0 0 1 44,0 v40 z" class="bn-led rgb" data-led/><path d="M${mid - 11},${150} q2,-14 12,-18" class="bn-shine"/>`;
+      s += `<circle cx="${mid}" cy="${150}" r="76" class="bn-glow rgb" data-glow/>`;
+      s += `<g filter="url(#bn-sh-s)"><ellipse cx="${mid}" cy="${198}" rx="31" ry="9" class="bn-led-rim rgb"/><path d="${dome(27, 46)}" class="bn-led rgb" data-led/></g>`;
+      s += `<ellipse cx="${mid - 11}" cy="${156}" rx="6" ry="15" transform="rotate(16 ${mid - 11} 156)" class="bn-shine"/>`;
     } else if (p.t === 'button') {
-      s += legs(210) + `<rect x="${mid - 40}" y="${176}" width="80" height="80" rx="7" class="bn-tact"/><circle cx="${mid}" cy="${216}" r="24" class="bn-tact-cap" data-press/>`;
+      s += legs(210) + `<g filter="url(#bn-sh-s)"><rect x="${mid - 40}" y="${176}" width="80" height="80" rx="7" class="bn-tact"/></g>`;
+      for (const [dx, dy] of [[-30, -30], [30, -30], [-30, 30], [30, 30]]) s += `<circle cx="${mid + dx}" cy="${216 + dy}" r="4" class="bn-tact-dot"/>`;
+      s += `<circle cx="${mid}" cy="${216}" r="25" class="bn-tact-cap" data-press/><circle cx="${mid - 7}" cy="${208}" r="8" class="bn-cap-hl"/>`;
     } else if (p.t === 'buzzer') {
-      s += legs(200) + `<g class="bn-waves" data-glow><path d="M${mid + 34},${150} q12,18 0,36 M${mid + 46},${142} q18,26 0,52"/></g><circle cx="${mid}" cy="${166}" r="36" class="bn-buz"/><circle cx="${mid}" cy="${168}" r="6" class="bn-buz-hole"/><text x="${mid - 18}" y="${150}" class="bn-mark">+</text>`;
+      s += legs(200) + `<g class="bn-waves" data-glow><path d="M${mid + 42},${148} q12,18 0,36 M${mid + 54},${140} q18,26 0,52"/></g>`;
+      s += `<circle cx="${mid}" cy="${166}" r="37" class="bn-buz" filter="url(#bn-sh-s)"/><circle cx="${mid}" cy="${166}" r="28" class="bn-buz-ring"/><circle cx="${mid}" cy="${166}" r="6" class="bn-buz-hole"/><text x="${mid - 20}" y="${148}" class="bn-mark">+</text>`;
     } else if (p.t === 'pir') {
-      s += legs(196) + `<rect x="${mid - 46}" y="${128}" width="92" height="68" rx="6" class="bn-pcb-g"/><circle cx="${mid}" cy="${162}" r="27" class="bn-dome"/><path d="M${mid - 18},${162} h36 M${mid},${144} v36" class="bn-dome-l"/>`;
+      s += legs(196) + `<rect x="${mid - 46}" y="${128}" width="92" height="68" rx="6" class="bn-pcb-g" filter="url(#bn-sh-s)"/><circle cx="${mid}" cy="${162}" r="28" class="bn-dome"/>`;
+      for (let k = -2; k <= 2; k++) s += `<path d="M${mid + k * 10},${136} q${k * 3},26 0,52" class="bn-dome-l"/>`;
+      s += `<ellipse cx="${mid - 9}" cy="${152}" rx="7" ry="11" class="bn-shine"/>`;
     } else if (p.t === 'ultrasonic') {
-      s += legs(184) + `<rect x="${mid - 82}" y="${112}" width="164" height="72" rx="6" class="bn-pcb-b"/>`;
-      for (const dx of [-46, 46]) s += `<circle cx="${mid + dx}" cy="${146}" r="28" class="bn-tx"/><circle cx="${mid + dx}" cy="${146}" r="18" class="bn-tx-in"/>`;
+      s += legs(184) + `<rect x="${mid - 82}" y="${112}" width="164" height="72" rx="6" class="bn-pcb-b" filter="url(#bn-sh-s)"/>`;
+      for (const dx of [-46, 46]) s += `<circle cx="${mid + dx}" cy="${146}" r="29" class="bn-tx"/><circle cx="${mid + dx}" cy="${146}" r="20" class="bn-tx-in"/><circle cx="${mid + dx}" cy="${146}" r="14" class="bn-tx-mesh"/>`;
       s += `<g class="bn-waves" data-glow><path d="M${mid - 20},${102} q20,-16 40,0 M${mid - 30},${90} q30,-24 60,0"/></g>`;
     } else if (p.t === 'traffic') {
-      s += legs(200) + `<rect x="${mid - 26}" y="${92}" width="52" height="112" rx="12" class="bn-tl"/>`;
-      ['r', 'y', 'g'].forEach((c, i) => { s += `<circle cx="${mid}" cy="${116 + i * 32}" r="12" class="bn-tl-l ${c}" data-tl="${i}"/>`; });
+      s += legs(200) + `<rect x="${mid - 26}" y="${92}" width="52" height="112" rx="12" class="bn-tl" filter="url(#bn-sh-s)"/>`;
+      ['r', 'y', 'g'].forEach((c, i) => { s += `<circle cx="${mid}" cy="${116 + i * 32}" r="12" class="bn-tl-l ${c}" data-tl="${i}"/><circle cx="${mid - 4}" cy="${112 + i * 32}" r="3.5" class="bn-tl-hl"/>`; });
     } else {
-      s += legs(196) + `<rect x="${mid - 40}" y="${140}" width="80" height="56" rx="6" class="bn-pcb-b"/>`;
+      s += legs(196) + `<rect x="${mid - 40}" y="${140}" width="80" height="56" rx="6" class="bn-pcb-b" filter="url(#bn-sh-s)"/>`;
     }
     // ετικέτες των ποδιών (+, −, VCC …), μικρές, κάτω από τη σειρά C
     for (const L of pl.legs) {
@@ -199,8 +216,9 @@
     const x0 = cx(r.c0), x1 = cx(r.c1), y = ROW.D, m = (x0 + x1) / 2;
     let s = `<g class="bn-part bn-res" data-st="2" data-k="r${k}">`;
     s += `<path d="M${x0},${y} L${m - 30},${y} M${m + 30},${y} L${x1},${y}" class="bn-lead"/><circle cx="${x0}" cy="${y}" r="4" class="bn-foot"/><circle cx="${x1}" cy="${y}" r="4" class="bn-foot"/>`;
-    s += `<rect x="${m - 34}" y="${y - 14}" width="68" height="28" rx="14" class="bn-resb"/>`;
+    s += `<rect x="${m - 34}" y="${y - 14}" width="68" height="28" rx="14" class="bn-resb" filter="url(#bn-sh-s)"/>`;
     s += [['#c0392b', -18], ['#c0392b', -8], ['#5a3418', 2], ['#c9a227', 18]].map(([c, dx]) => `<rect x="${m + dx - 3}" y="${y - 14}" width="6" height="28" style="fill:${c}"/>`).join('');
+    s += `<rect x="${m - 34}" y="${y - 14}" width="68" height="28" rx="14" class="bn-cyl"/>`;
     return s + `<text x="${m}" y="${y + 34}" class="bn-legl">220 Ω</text></g>`;
   }
 
@@ -223,9 +241,12 @@
   }
 
   function wireSvg(pts, color, cls, attrs) {
-    const d = rounded(pts, 14);
-    const e = pts[pts.length - 1];
-    return `<g class="bn-wire ${cls || ''}" ${attrs || ''} style="--wc:${color}"><path d="${d}" class="bn-w-ol" pathLength="1"/><path d="${d}" class="bn-w" pathLength="1"/><path d="${d}" class="bn-w-hl" pathLength="1"/><path d="${d}" class="bn-flow"/><circle cx="${e[0]}" cy="${e[1]}" r="5.5" class="bn-plug"/></g>`;
+    const d = rounded(pts, 24);
+    const e = pts[pts.length - 1], q = pts[pts.length - 2];
+    const dir = Math.sign(q[1] - e[1]) || 1; // το βύσμα (dupont) κάθεται στην τρύπα, προς τη μεριά που έρχεται το καλώδιο
+    const plug = q[0] === e[0] ? `<g class="bn-plug"><rect x="${e[0] - 6.5}" y="${dir > 0 ? e[1] + 2 : e[1] - 22}" width="13" height="20" rx="2.5" class="bn-dupont"/><rect x="${e[0] - 6.5}" y="${dir > 0 ? e[1] + 15 : e[1] - 22}" width="13" height="7" rx="2" class="bn-dupont-c"/><circle cx="${e[0]}" cy="${e[1]}" r="3.6" class="bn-dupont-pin"/></g>`
+      : `<circle cx="${e[0]}" cy="${e[1]}" r="5.5" class="bn-plug bn-plug-dot"/>`;
+    return `<g class="bn-wire ${cls || ''}" ${attrs || ''} style="--wc:${color}"><path d="${d}" class="bn-w-ol" pathLength="1"/><path d="${d}" class="bn-w" pathLength="1"/><path d="${d}" class="bn-w-hl" pathLength="1"/><path d="${d}" class="bn-flow"/>${plug}</g>`;
   }
 
   function tag(x, y, px, py, text, color, k) {
@@ -242,10 +263,31 @@
     const cols = L.cols;
     const W = cx(cols - 1) + 70, H = ESP.b + 18 + Math.max(1, L.wires.filter(w => w.from.side === 'l').length) * 12 + 20;
     let s = `<svg class="bn-svg" viewBox="0 0 ${W} ${H}" role="img" aria-labelledby="bn-title"><title id="bn-title">ESP32 πάνω σε breadboard με τα εξαρτήματα και τα καλώδια της άσκησης</title>`;
-    s += `<defs><radialGradient id="bn-glow-g"><stop offset="0" stop-color="#ff5a3a" stop-opacity="0.9"/><stop offset="0.3" stop-color="#ff3b2a" stop-opacity="0.45"/><stop offset="0.65" stop-color="#ff3b2a" stop-opacity="0.12"/><stop offset="1" stop-color="#ff3b2a" stop-opacity="0"/></radialGradient>` +
-      `<radialGradient id="bn-glow-rgb"><stop offset="0" stop-color="#7fb6ff" stop-opacity="0.85"/><stop offset="1" stop-color="#7f6bff" stop-opacity="0"/></radialGradient>` +
-      `<linearGradient id="bn-can-g" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#e9ecef"/><stop offset="1" stop-color="#9aa1a9"/></linearGradient>` +
-      `<linearGradient id="bn-led-g" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#b3150c"/><stop offset="0.45" stop-color="#ff3b2a"/><stop offset="1" stop-color="#a5130b"/></linearGradient></defs>`;
+    const g2 = (id, a, stops, attrs) => `<${a} id="${id}" ${attrs || ''}>${stops.map(([o, c, op]) => `<stop offset="${o}" stop-color="${c}"${op !== undefined ? ` stop-opacity="${op}"` : ''}/>`).join('')}</${a}>`;
+    s += '<defs>' +
+      '<filter id="bn-sh" x="-20%" y="-10%" width="150%" height="130%"><feDropShadow dx="5" dy="12" stdDeviation="8" flood-color="#000" flood-opacity=".5"/></filter>' +
+      '<filter id="bn-sh-s" x="-40%" y="-40%" width="180%" height="190%"><feDropShadow dx="2" dy="5" stdDeviation="3.5" flood-color="#000" flood-opacity=".42"/></filter>' +
+      g2('bn-glow-g', 'radialGradient', [[0, '#ff6a4a', 0.95], [0.3, '#ff3b2a', 0.5], [0.65, '#ff3b2a', 0.14], [1, '#ff3b2a', 0]]) +
+      g2('bn-spill', 'radialGradient', [[0, '#ff4b3a', 0.45], [0.6, '#ff4b3a', 0.12], [1, '#ff4b3a', 0]]) +
+      g2('bn-glow-rgb', 'radialGradient', [[0, '#7fb6ff', 0.85], [1, '#7f6bff', 0]]) +
+      g2('bn-pcb-g', 'linearGradient', [[0, '#2c3038'], [0.5, '#1a1c21'], [1, '#101115']], 'x1="0" y1="0" x2="1" y2="1"') +
+      g2('bn-can-g', 'linearGradient', [[0, '#f4f6f8'], [0.5, '#c3c8ce'], [1, '#8e959e']], 'x1="0" y1="0" x2="1" y2="1"') +
+      g2('bn-sheen', 'linearGradient', [[0, '#fff', 0], [0.42, '#fff', 0], [0.5, '#fff', 0.55], [0.58, '#fff', 0], [1, '#fff', 0]], 'x1="0" y1="0" x2="1" y2="1"') +
+      g2('bn-gold', 'linearGradient', [[0, '#f7dc8f'], [0.5, '#d9a93a'], [1, '#a87b1c']], 'x1="0" y1="0" x2="1" y2="1"') +
+      g2('bn-pin-g', 'radialGradient', [[0, '#ffffff'], [0.45, '#c9ced4'], [1, '#6b7179']], 'cx=".35" cy=".35" r=".7"') +
+      g2('bn-metal', 'linearGradient', [[0, '#f1f3f5'], [0.5, '#b7bdc4'], [1, '#7d848c']], 'x1="0" y1="0" x2="0" y2="1"') +
+      g2('bn-led-g', 'radialGradient', [[0, '#ff9a80'], [0.35, '#ff3b2a'], [0.8, '#b3150c'], [1, '#7d0d07']], 'cx=".35" cy=".3" r=".8"') +
+      g2('bn-led-on-g', 'radialGradient', [[0, '#fff6d6'], [0.3, '#ffb199'], [0.6, '#ff4b33'], [1, '#e0230f']], 'cx=".4" cy=".35" r=".75"') +
+      g2('bn-rgb-g', 'radialGradient', [[0, '#ffffff'], [0.6, '#e3ebf6'], [1, '#aebcd0']], 'cx=".35" cy=".3" r=".8"') +
+      g2('bn-res-g', 'linearGradient', [[0, '#f6e2bb'], [0.45, '#e3bb7d'], [1, '#a87b42']], 'x1="0" y1="0" x2="0" y2="1"') +
+      g2('bn-cyl-g', 'linearGradient', [[0, '#fff', 0.45], [0.35, '#fff', 0], [0.7, '#000', 0], [1, '#000', 0.3]], 'x1="0" y1="0" x2="0" y2="1"') +
+      g2('bn-cap-g', 'radialGradient', [[0, '#3a3e46'], [1, '#0b0c0e']], 'cx=".4" cy=".35" r=".7"') +
+      g2('bn-buz-g', 'radialGradient', [[0, '#4d525b'], [0.7, '#1d1f24'], [1, '#0d0e10']], 'cx=".4" cy=".35" r=".75"') +
+      g2('bn-pir-g', 'radialGradient', [[0, '#ffffff'], [0.7, '#eceff2'], [1, '#c2c8cf']], 'cx=".4" cy=".35" r=".75"') +
+      g2('bn-tx-g', 'radialGradient', [[0, '#f8f9fa'], [0.7, '#c1c7ce'], [1, '#848b94']], 'cx=".4" cy=".35" r=".75"') +
+      g2('bn-bb-g', 'linearGradient', [[0, '#fdfdfb'], [1, '#e9e9e2']], 'x1="0" y1="0" x2="0" y2="1"') +
+      '</defs>';
+    s += '<g class="bn-cam">';
     s += board(cols);
     // το GND και το 5V από την αριστερή πλευρά, κατευθείαν στις γραμμές από κάτω (δεν κόβουν άλλα καλώδια)
     const actions = [];
@@ -295,7 +337,7 @@
     s += L.parts.map(partSvg).join('');
     s += esp32();
     s += `<g class="bn-tags">${tags}</g>`;
-    s += '</svg>';
+    s += '<g class="bn-fx"></g></g></svg>';
 
     const names = L.parts.map(pl => pl.p.name);
     const hasRes = L.resistors.length > 0;
@@ -313,7 +355,10 @@
     const materials = [['esp32', 'ESP32 DevKit']].concat(L.parts.map(pl => [pl.p.t, pl.p.name === 'LED' ? 'LED' : pl.p.name[0].toUpperCase() + pl.p.name.slice(1)]));
     if (hasRes) materials.push(['resistor', 'Αντίσταση 220 Ω']);
     materials.push(['bb', 'Breadboard'], ['wire', `Καλώδια (${actions.length})`]);
-    return { html: s, steps, actions, materials, layout: L, nets: n };
+    // πού «κοιτάζει η κάμερα» σε κάθε βήμα
+    const px = L.parts.flatMap(pl => [pl.x0, pl.x1]);
+    const focus = { esp: [ESP.x + ESP.w / 2 + 40, (ESP.y + ESP.b) / 2, 1.16], parts: px.length ? [(Math.min(...px) + Math.max(...px)) / 2 - 40, 230, 1.22] : null };
+    return { html: s, steps, actions, materials, layout: L, nets: n, W, H, focus };
   }
 
   // ------------------------------------------------------------ παράθυρο «Πάγκος»
@@ -378,13 +423,48 @@
     const timers = [], anims = [];
     let step = 0, playing = false;
     const later = (ms, fn) => timers.push(setTimeout(fn, ms));
-    const clear = () => { timers.forEach(clearTimeout); timers.length = 0; anims.forEach(a => { try { a.finish(); } catch (e) { /* ήδη */ } }); anims.length = 0; };
+    const clear = () => { timers.forEach(clearTimeout); timers.length = 0; anims.forEach(a => { try { a.finish(); } catch (e) { /* ήδη */ } }); anims.length = 0; const f = svg.querySelector('.bn-fx'); if (f) f.innerHTML = ''; };
     const anim = (node, kf, o) => {
       if (!(node && node.animate && motion())) return null;
       const a = node.animate(kf, Object.assign({ fill: 'none' }, o));
       anims.push(a);
       later((o.duration || 300) + 200, () => { try { a.finish(); } catch (e) { /* ήδη */ } }); // αν ο browser «παγώσει» τις κινήσεις (καρτέλα στο παρασκήνιο)
       return a;
+    };
+    const cam = svg.querySelector('.bn-cam'), fx = svg.querySelector('.bn-fx');
+    const NS = 'http://www.w3.org/2000/svg';
+    // «κάμερα»: απαλό ζουμ εκεί που γίνεται το βήμα (χωρίς ζουμ με «λιγότερη κίνηση»)
+    const look = f => {
+      if (!f || !motion()) { cam.style.transform = ''; return; }
+      const [x0, y0, z] = f, hw = B.W / (2 * z), hh = B.H / (2 * z);
+      const fxp = Math.min(Math.max(x0, hw), B.W - hw), fyp = Math.min(Math.max(y0, hh), B.H - hh);
+      cam.style.transform = `translate(${B.W / 2}px, ${B.H / 2}px) scale(${z}) translate(${-fxp}px, ${-fyp}px)`;
+    };
+    // κυματάκι εκεί που ένα πόδι/βύσμα μπαίνει στην τρύπα
+    const ripple = (x, y, color) => {
+      if (!motion()) return;
+      const c = doc.createElementNS(NS, 'circle');
+      c.setAttribute('cx', x); c.setAttribute('cy', y); c.setAttribute('r', 6);
+      c.setAttribute('class', 'bn-ripple');
+      if (color) c.style.stroke = color;
+      fx.appendChild(c);
+      anim(c, [{ transform: 'scale(.6)', opacity: 0.95 }, { transform: 'scale(3.4)', opacity: 0 }], { duration: 650, easing: 'cubic-bezier(.2,.8,.3,1)', fill: 'forwards' });
+      later(800, () => c.remove());
+    };
+    // σπίθα που τρέχει πάνω στο καλώδιο όσο «ζωγραφίζεται»
+    const spark = (path, dur, color) => {
+      if (!motion() || !path || !path.getTotalLength) return;
+      const len = path.getTotalLength();
+      const kf = [];
+      for (let k = 0; k <= 24; k++) { const p = path.getPointAtLength(len * k / 24); kf.push({ transform: `translate(${p.x}px, ${p.y}px)` }); }
+      const g = doc.createElementNS(NS, 'g');
+      g.setAttribute('class', 'bn-spark');
+      g.style.setProperty('--wc', color);
+      g.innerHTML = '<circle r="11" class="bn-spark-o"/><circle r="4.5" class="bn-spark-i"/>';
+      g.style.transform = kf[0].transform;
+      fx.appendChild(g);
+      anim(g, kf, { duration: dur, easing: 'cubic-bezier(.45,0,.2,1)', fill: 'forwards' });
+      later(dur + 60, () => g.remove());
     };
     const say = t => { cap.textContent = t; cap.classList.remove('pop'); void cap.offsetWidth; cap.classList.add('pop'); };
     const all = q => [...svg.querySelectorAll(q)];
@@ -414,26 +494,43 @@
       if (st < 3) paint(st); else if (st === 3) paint(3, motion() ? -1 : undefined); else paint(4);
       say(S0.text);
       if (st === 1) {
-        anim($('.bn-esp'), [{ transform: 'translateY(-60px) scale(1.04)', opacity: 0 }, { transform: 'translateY(4px)', opacity: 1, offset: 0.75 }, { transform: 'none', opacity: 1 }], { duration: 700, easing: 'cubic-bezier(.2,.9,.3,1)' });
-        sfx('click');
-        if (auto) later(motion() ? 2600 : 3200, () => goStep(2, true));
+        look(B.focus.esp);
+        const esp = $('.bn-esp');
+        anim(esp, [{ transform: 'translateY(-90px) scale(1.06)', opacity: 0 }, { transform: 'translateY(-90px) scale(1.06)', opacity: 0, offset: 0.25 }, { transform: 'translateY(5px) scale(.995)', opacity: 1, offset: 0.8 }, { transform: 'none', opacity: 1 }], { duration: 1100, easing: 'cubic-bezier(.2,.9,.3,1)' });
+        later(motion() ? 900 : 0, () => {
+          sfx('click');
+          esp.classList.add('bn-snap');
+          [0, 6, 12, 18].forEach(i => { ripple(ESP.lx, PIN_Y(i)); ripple(ESP.rx, PIN_Y(i)); });
+          later(900, () => esp.classList.remove('bn-snap'));
+        });
+        if (auto) later(motion() ? 3200 : 3200, () => goStep(2, true));
       } else if (st === 2) {
+        look(B.focus.parts);
         const parts = all('.bn-part');
         parts.forEach((p, i) => {
           if (motion()) p.classList.add('bn-hide');
-          later(i * 380, () => { p.classList.remove('bn-hide'); anim(p, [{ transform: 'translateY(-46px)', opacity: 0 }, { transform: 'translateY(3px)', opacity: 1, offset: 0.7 }, { transform: 'none', opacity: 1 }], { duration: 520, easing: 'ease-out' }); sfx('tick'); });
+          later(500 + i * 520, () => {
+            p.classList.remove('bn-hide');
+            anim(p, [{ transform: 'translateY(-70px) scale(1.08)', opacity: 0 }, { transform: 'translateY(4px) scale(.99)', opacity: 1, offset: 0.72 }, { transform: 'translateY(-2px)', opacity: 1, offset: 0.88 }, { transform: 'none', opacity: 1 }], { duration: 640, easing: 'cubic-bezier(.3,.7,.4,1)' });
+            later(motion() ? 450 : 0, () => { sfx('tick'); p.querySelectorAll('.bn-foot').forEach(f => ripple(+f.getAttribute('cx'), +f.getAttribute('cy'))); });
+          });
         });
-        if (auto) later(parts.length * 380 + 2800, () => goStep(3, true));
+        if (auto) later(500 + parts.length * 520 + 2600, () => goStep(3, true));
       } else if (st === 3) {
         if (!motion()) { say(S0.text + ' ' + B.actions.map(a => a.text).join(' ')); if (auto) later(5000, () => goStep(4, true)); return; }
+        look(null);
         const STEP = 2300;
-        B.actions.forEach((a, i) => later(400 + i * STEP, () => {
+        B.actions.forEach((a, i) => later(600 + i * STEP, () => {
           paint(3, a.k);
           const g = svg.querySelector(`.bn-wire[data-k="${a.k}"]`);
           if (g) {
             g.classList.add('bn-now');
-            g.querySelectorAll('.bn-w-ol, .bn-w, .bn-w-hl').forEach(p => anim(p, [{ strokeDasharray: '1 1', strokeDashoffset: 1 }, { strokeDasharray: '1 1', strokeDashoffset: 0 }], { duration: 900, easing: 'cubic-bezier(.45,0,.2,1)' }));
-            anim(g.querySelector('.bn-plug'), [{ transform: 'scale(0)', opacity: 0 }, { transform: 'scale(0)', opacity: 0, offset: 0.8 }, { transform: 'scale(1.5)', opacity: 1, offset: 0.92 }, { transform: 'none', opacity: 1 }], { duration: 1100 });
+            const fp = g.querySelector('.bn-flow');
+            const dur = Math.round(Math.min(1500, Math.max(700, (fp && fp.getTotalLength ? fp.getTotalLength() : 500) * 1.5)));
+            g.querySelectorAll('.bn-w-ol, .bn-w, .bn-w-hl').forEach(p => anim(p, [{ strokeDasharray: '1 1', strokeDashoffset: 1 }, { strokeDasharray: '1 1', strokeDashoffset: 0 }], { duration: dur, easing: 'cubic-bezier(.45,0,.2,1)' }));
+            spark(fp, dur, getComputedStyle(g).getPropertyValue('--wc'));
+            anim(g.querySelector('.bn-plug'), [{ transform: 'translateY(-14px)', opacity: 0 }, { transform: 'translateY(-14px)', opacity: 0, offset: 0.82 }, { transform: 'translateY(2px)', opacity: 1, offset: 0.94 }, { transform: 'none', opacity: 1 }], { duration: dur + 250 });
+            later(dur, () => { const last = fp && fp.getTotalLength ? fp.getPointAtLength(fp.getTotalLength()) : null; if (last) ripple(last.x, last.y, getComputedStyle(g).getPropertyValue('--wc')); });
             later(STEP - 100, () => g.classList.remove('bn-now'));
           }
           const t = svg.querySelector(`.bn-tag[data-tag="${a.k}"]`);
@@ -441,8 +538,9 @@
           say(`${i + 1}/${B.actions.length}. ${a.text}`);
           later(880, () => sfx('tick'));
         }));
-        later(400 + B.actions.length * STEP, () => { paint(3); if (auto) goStep(4, true); else say('Όλα τα καλώδια μπήκαν. Πάτα «Εκτέλεση» ή το βήμα 4 για να τρέξει ο κώδικας.'); });
+        later(600 + B.actions.length * STEP, () => { paint(3); if (auto) goStep(4, true); else say('Όλα τα καλώδια μπήκαν. Πάτα «Εκτέλεση» ή το βήμα 4 για να τρέξει ο κώδικας.'); });
       } else {
+        look(null);
         svg.classList.toggle('bn-still', !motion());
         sfx('win');
         if (auto) later(6000, () => { playing = false; setPlay(); say(S0.text + ' Πάτα «Επαναφορά» για να το ξαναδείς.'); });
@@ -452,7 +550,7 @@
     const setPlay = () => { $('#bn-play').classList.toggle('on', playing); $('#bn-play').setAttribute('aria-pressed', String(playing)); };
     function play() { playing = true; setPlay(); goStep(step >= 1 && step < 4 ? step : 1, true); }
     function stop() { playing = false; setPlay(); clear(); paint(step || 1); svg.classList.remove('bn-run'); say('Σταμάτησε. Πάτα «Εκτέλεση» για να συνεχίσει ή μια τελεία για να πας σε βήμα.'); }
-    function reset() { playing = false; setPlay(); clear(); step = 1; paint(1); svg.classList.remove('bn-run'); say(B.steps[0].text); }
+    function reset() { playing = false; setPlay(); clear(); look(null); step = 1; paint(1); svg.classList.remove('bn-run'); say(B.steps[0].text); }
 
     $('#bn-play').onclick = play;
     $('#bn-stop').onclick = stop;
