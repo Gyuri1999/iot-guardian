@@ -103,3 +103,46 @@ button:focus-visible, a:focus-visible, input:focus-visible, textarea:focus-visib
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { scroll-behavior: auto !important; transition-duration: .01ms !important; }
 }
+
+
+/* ---------- Interactive standalone 3D breadboard lab */
+.iot3dbb-modal {
+  position: fixed; inset: 0; z-index: 10000; display: grid; place-items: center;
+  padding: clamp(8px, 2vw, 24px); background: rgba(3, 9, 18, .84); backdrop-filter: blur(12px);
+}
+.iot3dbb-panel {
+  width: min(1240px, 100%); height: min(920px, 100%); min-height: min(520px, 100%);
+  display: flex; flex-direction: column; overflow: hidden; border-radius: 18px;
+  border: 1px solid rgba(94, 175, 224, .45); color: #e7f2ff;
+  background: linear-gradient(150deg, #132842, #09182b 68%); box-shadow: 0 24px 80px rgba(0,0,0,.48);
+}
+.iot3dbb-head { display:flex; align-items:center; justify-content:space-between; gap:16px; padding:18px 22px 12px; }
+.iot3dbb-head small { color:#55c8f5; font:700 .68rem var(--font-code); letter-spacing:.14em; }
+.iot3dbb-head h2 { margin:3px 0; font:700 clamp(1.25rem,2vw,1.8rem) var(--font-label); }
+.iot3dbb-head p { margin:0; color:#a8bed4; font-size:.88rem; }
+.iot3dbb-close { width:38px;height:38px;border:1px solid #36516e;border-radius:10px;background:#172f4a;color:#eaf5ff;font-size:1.7rem;cursor:pointer; }
+.iot3dbb-tools { display:flex;align-items:end;gap:10px;flex-wrap:wrap;padding:8px 22px 14px;border-bottom:1px solid rgba(123,174,209,.16); }
+.iot3dbb-tools label { display:grid;gap:5px;color:#9bb4cc;font-size:.72rem;font-weight:700;letter-spacing:.04em; }
+.iot3dbb-tools select,.iot3dbb-tools button { min-height:36px;padding:0 11px;border:1px solid #36516e;border-radius:8px;background:#10243a;color:#e7f2ff;font:600 .82rem var(--font-label); }
+.iot3dbb-tools button { cursor:pointer; }
+.iot3dbb-tools .iot3dbb-add { border-color:#128eca;background:linear-gradient(135deg,#0c9bd5,#0873b4);color:white; }
+.iot3dbb-stage { position:relative;flex:1;min-height:260px;overflow:hidden;background:radial-gradient(ellipse at 50% 45%,rgba(30,116,165,.2),transparent 68%),#091625; }
+.iot3dbb-canvas { position:absolute;inset:0; }
+.iot3dbb-canvas canvas { display:block;width:100%;height:100%;touch-action:none;cursor:grab; }
+.iot3dbb-canvas canvas:active { cursor:grabbing; }
+.iot3dbb-status { position:absolute;left:50%;top:14px;transform:translateX(-50%);max-width:calc(100% - 30px);padding:9px 14px;border:1px solid rgba(94,175,224,.36);border-radius:10px;background:rgba(8,25,43,.9);color:#d8edff;font-size:.85rem;text-align:center;pointer-events:none; }
+.iot3dbb-status[data-kind="ok"] { border-color:#2bbf88;color:#a5f4d1; }
+.iot3dbb-status[data-kind="warn"] { border-color:#e1a53a;color:#ffe2a3; }
+.iot3dbb-status[data-kind="err"] { border-color:#ec635a;color:#ffc2bd; }
+.iot3dbb-help { position:absolute;bottom:12px;left:50%;transform:translateX(-50%);padding:6px 11px;border-radius:999px;background:rgba(8,25,43,.76);color:#91aec8;font-size:.72rem;white-space:nowrap;pointer-events:none; }
+.iot3dbb-foot { display:flex;justify-content:space-between;gap:12px;padding:11px 22px;color:#9bb4cc;font-size:.78rem;background:#0c1c30; }
+.iot3dbb-count { color:#55c8f5;font-weight:700; }
+@media(max-width:680px) {
+  .iot3dbb-panel {height:100%;min-height:0;border-radius:12px;}
+  .iot3dbb-head {padding:12px 14px 8px;}
+  .iot3dbb-tools {padding:8px 14px 12px;gap:7px;}
+  .iot3dbb-tools label {flex:1;min-width:130px;}
+  .iot3dbb-tools select {width:100%;}
+  .iot3dbb-foot {padding:9px 14px;flex-direction:column;gap:3px;}
+  .iot3dbb-help {bottom:7px;font-size:.65rem;}
+}
