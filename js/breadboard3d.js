@@ -27,7 +27,6 @@
         <div class="iot3dbb-tools">
           <label>Τύπος πλακέτας <select data-size><option value="mini">Mini breadboard</option><option value="full">Full-size breadboard</option></select></label>
           <label>Χρώμα καλωδίου <select data-color>${COLORS.map((c,i)=>`<option value="${i}">${c.name}</option>`).join('')}</select></label>
-          <label>Pin ESP32 <select data-pin>${PINS.map(p=>`<option>${p}</option>`).join('')}</select></label>
           <button type="button" class="iot3dbb-add">+ Νέο καλώδιο</button>
           <button type="button" class="iot3dbb-reset">Επαναφορά</button>
         </div>
@@ -41,7 +40,6 @@
     const stage = host.querySelector('.iot3dbb-canvas');
     const status = host.querySelector('.iot3dbb-status');
     const colorSelect = host.querySelector('[data-color]');
-    const pinSelect = host.querySelector('[data-pin]');
     const sizeSelect = host.querySelector('[data-size]');
     const count = host.querySelector('.iot3dbb-count');
     let renderer, scene, camera, board, esp, raycaster, pointer, drag = null, wires = [], holeMeshes = [], pinMeshes = [];
@@ -78,7 +76,6 @@
       host.querySelector('.iot3dbb-add').onclick=addWire;
       sizeSelect.onchange=()=>{ clearWires(); buildBoard(); };
       colorSelect.onchange=()=>{ if(drag) drag.color=COLORS[+colorSelect.value].hex; };
-      pinSelect.onchange=()=>{ if(drag){ drag.pin=pinSelect.value; placeWire(drag); } };
       host.addEventListener('keydown',e=>{if(e.key==='Escape') close();});
       resize(); render();
       addWire();
@@ -168,7 +165,7 @@
     function onPointerDown(e){
       if(e.button!==0)return;
       const pinHit=pick(e,pinMeshes);
-      if(pinHit){const pin=pinHit.object;drag={pin:pin.userData.name,color:COLORS[+colorSelect.value].hex,mesh:makeLoose(pin),pointer:e.pointerId};renderer.domElement.setPointerCapture(e.pointerId);setStatus(`Καλώδιο από ${drag.pin}: σύρε το στην επιθυμητή οπή.`,'');return;}
+      if(pinHit){const pin=pinHit.object;drag=Object.assign(makeLoose(pin),{pointer:e.pointerId});renderer.domElement.setPointerCapture(e.pointerId);setStatus(`Καλώδιο από ${drag.pin}: σύρε το στην επιθυμητή οπή.`,'');return;}
       orbit={x:e.clientX,y:e.clientY,yaw,pitch};
       renderer.domElement.setPointerCapture(e.pointerId);
     }
@@ -189,7 +186,7 @@
       const group=new THREE.Group();board.add(group);
       const start=pin.getWorldPosition(V(0,0,0));start.y+=.7;
       const mesh=new THREE.Mesh(new THREE.BufferGeometry(),material(COLORS[+colorSelect.value].hex,.35,.15));group.add(mesh);
-      const d={mesh:group,start,pin:pin.userData.name,color:COLORS[+colorSelect.value].hex};updateLoose(d,start.clone().add(V(0,1,0)));return group;
+      const d={mesh:group,start,pin:pin.userData.name,color:COLORS[+colorSelect.value].hex};updateLoose(d,start.clone().add(V(0,1,0)));return d;
     }
     function updateLoose(d,end){
       const curve=new THREE.CatmullRomCurve3([d.start,d.start.clone().add(V(0,4,0)),end.clone().add(V(0,3,0)),end]);
@@ -234,7 +231,7 @@
     }
     function stopParticles(){liveParticles.forEach(p=>board.remove(p.dot));liveParticles=[];}
     function updateParticles(){if(!liveParticles.length)return;const t=performance.now()*.0006;liveParticles.forEach(p=>p.curve.getPointAt((t+p.offset)%1,p.dot.position));}
-    function addWire(){setStatus(`Επίλεξε pin από τη λίστα και σύρε το αντίστοιχο pin της πλακέτας στο breadboard. Χρώμα: ${COLORS[+colorSelect.value].name}.`,'');}
+    function addWire(){setStatus(`Σύρε ένα pin της ESP32 στο breadboard. Χρώμα καλωδίου: ${COLORS[+colorSelect.value].name}.`,'');}
     function clearWires(){wires.forEach(w=>{board.remove(w.mesh,w.plug);});wires=[];stopParticles();if(ledLens){ledLens.material.emissive.setHex(0);ledLens.material.emissiveIntensity=0;}setCount();}
     function reset(){clearWires();setStatus('Οι συνδέσεις καθαρίστηκαν. Ξεκίνα ξανά από το GPIO 2.','');}
     function setCount(){count.textContent=wires.length+' συνδέσεις';}
