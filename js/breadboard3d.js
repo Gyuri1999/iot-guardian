@@ -44,6 +44,7 @@
     let renderer, scene, camera, board, esp, raycaster, pointer, drag = null, wires = [], holeMeshes = [], pinMeshes = [];
     let raf = 0, disposed = false, yaw = .72, pitch = .76, zoom = 1, orbit = null, ledLens = null, liveParticles = [];
     const setStatus = (text, kind) => { status.textContent = text; status.dataset.kind = kind || ''; };
+    const motionAllowed = () => !(opts.reducedMotion && opts.reducedMotion());
     const V = (x,y,z) => new THREE.Vector3(x,y,z);
     const material = (color, roughness=.65, metalness=0) => new THREE.MeshStandardMaterial({ color, roughness, metalness });
     const addBox = (parent, x,y,z, sx,sy,sz, mat, radius) => {
@@ -183,10 +184,10 @@
       if(orbit){yaw=orbit.yaw-(e.clientX-orbit.x)*.009;pitch=Math.max(.18,Math.min(1.45,orbit.pitch+(e.clientY-orbit.y)*.006));}
     }
     function onPointerUp(e){
-      if(drag&&drag.pointer===e.pointerId){const d=drag;drag=null;try{renderer.domElement.releasePointerCapture(e.pointerId);}catch(_){}setPointer(e);const finalHit=raycaster.intersectObjects(holeMeshes,false)[0];if(d.target)d.target.material.color.setHex(d.target.userData.baseColor);d.target=finalHit?finalHit.object:null;if(d.target){d.target.material.color.setHex(d.target.userData.baseColor);commitWire(d,d.target);}else{board.remove(d.mesh);setStatus('Το καλώδιο επέστρεψε στο pin. Άφησέ το πάνω σε μία οπή.','err');}return;}
+      if(drag&&drag.pointer===e.pointerId){const d=drag;drag=null;try{renderer.domElement.releasePointerCapture(e.pointerId);}catch(_){}setPointer(e);const finalHit=raycaster.intersectObjects(holeMeshes,false)[0];if(d.target)d.target.material.color.setHex(d.target.userData.baseColor);d.target=finalHit?finalHit.object:null;if(d.target){d.target.material.color.setHex(d.target.userData.baseColor);commitWire(d,d.target);}else{board.remove(d.mesh);disposeTree(d.mesh);setStatus('Το καλώδιο επέστρεψε στο pin. Άφησέ το πάνω σε μία οπή.','err');}return;}
       orbit=null;
     }
-    function cancelDrag(){if(drag){if(drag.target)drag.target.material.color.setHex(drag.target.userData.baseColor);board.remove(drag.mesh);drag=null;}orbit=null;}
+    function cancelDrag(){if(drag){if(drag.target)drag.target.material.color.setHex(drag.target.userData.baseColor);board.remove(drag.mesh);disposeTree(drag.mesh);drag=null;}orbit=null;}
     function onWheel(e){e.preventDefault();zoom=Math.max(.55,Math.min(2.8,zoom*(e.deltaY>0?.91:1.1)));}
     function rayOnBoard(e){
       const p=pick(e,[board.children[0]]);return p?p.point:V(0,2,0);
@@ -203,7 +204,7 @@
     }
     function commitWire(d,hole){
       const from=pinMeshes.find(p=>p.userData.name===d.pin);
-      if(wires.some(w=>w.pin===d.pin)){board.remove(d.mesh);setStatus('Αυτό το GPIO έχει ήδη καλώδιο. Επίλεξε άλλο pin.','err');return;}
+      if(wires.some(w=>w.pin===d.pin)){board.remove(d.mesh);disposeTree(d.mesh);setStatus('Αυτό το GPIO έχει ήδη καλώδιο. Επίλεξε άλλο pin.','err');return;}
       const start=from.getWorldPosition(V(0,0,0));start.y+=.7;
       const end=hole.getWorldPosition(V(0,0,0));end.y+=.24;
       const mid1=start.clone().add(V(0,5,0)),mid2=end.clone().add(V(0,5,0));
@@ -218,9 +219,10 @@
       animateConnection(curve);
     }
     function animateConnection(curve){
+      if(!motionAllowed())return;
       const ball=new THREE.Mesh(new THREE.SphereGeometry(.22,12,8),material(0xffffff,.25,.1));
       board.add(ball);const t0=performance.now(),duration=700;
-      const step=()=>{if(disposed||!ball.parent)return;const t=Math.min(1,(performance.now()-t0)/duration);curve.getPointAt(t,ball.position);if(t<1)requestAnimationFrame(step);else board.remove(ball);};step();
+      const step=()=>{if(disposed||!ball.parent)return;const t=Math.min(1,(performance.now()-t0)/duration);curve.getPointAt(t,ball.position);if(t<1)requestAnimationFrame(step);else{board.remove(ball);ball.geometry.dispose();ball.material.dispose();}};step();
     }
     function validateCircuit(){
       const byPin=pin=>wires.find(w=>w.pin===pin);
@@ -234,11 +236,11 @@
       else if(wires.length){setStatus('Η σύνδεση καταγράφηκε, αλλά το κύκλωμα δεν είναι ακόμη σωστό. Χρειάζεται μόνο GPIO 2 και GND στις σωστές λωρίδες. Αν έβαλες λάθος καλώδιο, πάτα Επαναφορά.','warn');stopParticles();}
     }
     function startParticles(){
-      if(liveParticles.length)return;
+      if(liveParticles.length||!motionAllowed())return;
       const curves=wires.map(w=>w.curve);
       curves.forEach(curve=>{const dot=new THREE.Mesh(new THREE.SphereGeometry(.16,8,6),material(0xfff4a8,.2));board.add(dot);liveParticles.push({dot,curve,offset:Math.random()});});
     }
-    function stopParticles(){liveParticles.forEach(p=>board.remove(p.dot));liveParticles=[];}
+    function stopParticles(){liveParticles.forEach(p=>{board.remove(p.dot);p.dot.geometry.dispose();p.dot.material.dispose();});liveParticles=[];}
     function updateParticles(){if(!liveParticles.length)return;const t=performance.now()*.0006;liveParticles.forEach(p=>p.curve.getPointAt((t+p.offset)%1,p.dot.position));}
     function addWire(){setStatus(`Σύρε ένα pin της ESP32 στο breadboard. Χρώμα καλωδίου: ${COLORS[+colorSelect.value].name}.`,'');}
     function clearWires(){wires.forEach(w=>{board.remove(w.mesh,w.plug);disposeTree(w.mesh);disposeTree(w.plug);});wires=[];stopParticles();if(ledLens){ledLens.material.emissive.setHex(0);ledLens.material.emissiveIntensity=0;}setCount();}
