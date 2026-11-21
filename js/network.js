@@ -361,7 +361,7 @@
     deliver(c, s, msg, asRetained, dup) {
       msg.to.push(s.clientId);
       this.packet(c, 'down', s.port, s.tls, `Publish Message [${msg.topic}]${asRetained ? ' (retained)' : ''}${dup ? ' (DUP)' : ''}`, { mqtt: { type: 'PUBLISH', topic: msg.topic, payload: msg.payload, retain: asRetained, qos: msg.qos, dup: !!dup } });
-      const item = { topic: msg.topic, payload: msg.payload, retained: asRetained, dup: !!dup, t: this.now() };
+      const item = { topic: msg.topic, payload: msg.payload, retained: asRetained, dup: !!dup, t: this.now(), self: msg.client === c };
       this.inboxes.get(c).push(item);
       this.lastDelivered.set(c, item);
       const sim = this.simClients.get(c);

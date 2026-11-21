@@ -1040,5 +1040,13 @@ test('Android: η Rust εφαρμογή έχει lib με mobile_entry_point κ�
   eq(cargo.match(/^version = "([^"]+)"/m)[1], v);
 });
 
+test('MQTT: publish σε topic που ακούει η ίδια η συσκευή δίνει σαφές μήνυμα (όχι «βρόχος»)', () => {
+  const l = IoTLessons.lessons.find(x => x.id === 'c7-l4');
+  const code = l.initialCode.replace('home/Led/set', 'home/led/set');
+  const res = IoTValidator.runTests(code, l.validationTests, l);
+  assert(res.every(r => !r.pass), 'δεν πρέπει να περνά');
+  assert(/δικό της μήνυμα/.test(res[0].message) && !/20\.000/.test(res[0].message), res[0].message);
+});
+
 console.log(`\n${passed} πέρασαν, ${failed} απέτυχαν\n`);
 process.exit(failed ? 1 : 0);

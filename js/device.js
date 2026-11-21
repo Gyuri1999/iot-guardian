@@ -490,6 +490,12 @@
           if (!this.net) return B(false);
           const m = this.net.readNext('device');
           this.mqtt.current = m;
+          // Η συσκευή διαβάζει ξανά και ξανά τα δικά της μηνύματα: publish σε topic που η ίδια ακούει.
+          this.mqtt.echo = m && m.self ? (this.mqtt.echo || 0) + 1 : 0;
+          if (this.mqtt.echo > 50) {
+            throw err(`Η συσκευή λαμβάνει ξανά και ξανά το δικό της μήνυμα στο «${m.topic}». Στέλνει (publish) σε topic που η ίδια ακούει (subscribe), οπότε κάθε μήνυμα της επιστρέφει και ο κύκλος δεν τελειώνει.`, line,
+              'Χρησιμοποίησε άλλο topic για να στέλνεις την κατάσταση (π.χ. …/state) από αυτό που ακούς για εντολές (…/set).');
+          }
           return B(!!m);
         }
         case 'mqtt.topic': return S(this.mqtt.current ? this.mqtt.current.topic : '');
