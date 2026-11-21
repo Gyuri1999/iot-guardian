@@ -1,0 +1,105 @@
+/* IoT Guardian — visual polish layer
+   Keeps the existing simulator and lesson logic intact. */
+:root {
+  --guardian-bg: #071426;
+  --guardian-panel: #101f35;
+  --guardian-panel-2: #142742;
+  --guardian-line: #294768;
+  --guardian-cyan: #16b8f4;
+  --guardian-cyan-soft: #75dcff;
+  --guardian-glow: rgba(22,184,244,.18);
+}
+body {
+  background:
+    radial-gradient(ellipse at 52% 8%, rgba(15,93,145,.20), transparent 48%),
+    linear-gradient(145deg, #071426 0%, #0b1930 55%, #081426 100%);
+}
+.app { background: transparent; }
+.card {
+  border-color: color-mix(in srgb, var(--line-strong) 72%, #2b80b5);
+  border-radius: 14px;
+  box-shadow: 0 10px 28px rgba(0,0,0,.16), inset 0 1px 0 rgba(255,255,255,.035);
+}
+.ws { gap: 1.15rem; }
+.scene-wrap {
+  height: clamp(29rem, 68vh, 49rem);
+  border: 1px solid rgba(70,143,194,.48);
+  border-radius: 18px;
+  background:
+    radial-gradient(ellipse at 50% 42%, rgba(17,109,161,.16), transparent 58%),
+    linear-gradient(rgba(46,105,151,.08) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(46,105,151,.08) 1px, transparent 1px),
+    #0a172a;
+  background-size: auto, 24px 24px, 24px 24px, auto;
+  box-shadow: inset 0 0 55px rgba(0,0,0,.22), 0 16px 40px rgba(0,0,0,.22);
+}
+.scene-wrap > svg.scene-bg { opacity: .88; }
+.inputs-card {
+  width: min(15.5rem, 38%);
+  border: 1px solid rgba(91,160,207,.58);
+  border-radius: 14px;
+  background: linear-gradient(155deg, rgba(19,39,65,.96), rgba(10,25,45,.94));
+  box-shadow: 0 12px 30px rgba(0,0,0,.24), inset 0 1px 0 rgba(255,255,255,.05);
+  backdrop-filter: blur(12px);
+}
+.scene-ctl {
+  gap: .28rem;
+  padding: .32rem;
+  border: 1px solid rgba(91,160,207,.58);
+  border-radius: 13px;
+  background: rgba(12,29,51,.94);
+  box-shadow: 0 8px 26px rgba(0,0,0,.28);
+  backdrop-filter: blur(12px);
+}
+.sc-b {
+  width: 2.35rem;
+  height: 2.35rem;
+  border-radius: 9px;
+  transition: background .18s ease, color .18s ease, transform .18s ease;
+}
+.sc-b:hover { background: rgba(22,184,244,.14); color: var(--guardian-cyan-soft); }
+.sc-b:active { transform: scale(.94); }
+.sc-b.sc-3d.on {
+  background: linear-gradient(135deg, #0ba9e8, #0877c5);
+  color: #fff;
+  box-shadow: 0 0 18px rgba(22,184,244,.24);
+}
+.scene-hint {
+  border: 1px solid rgba(125,196,231,.22);
+  border-radius: 999px;
+  background: rgba(13,31,54,.92);
+  color: #d7eafa;
+  padding: .35rem .85rem;
+  box-shadow: 0 5px 18px rgba(0,0,0,.2);
+}
+.part-info, .oled-pop {
+  border-color: rgba(22,184,244,.55);
+  border-radius: 13px;
+  background: rgba(13,31,54,.97);
+  box-shadow: 0 14px 34px rgba(0,0,0,.32);
+  color: #e6f2ff;
+}
+.part-info { border-left-color: var(--guardian-cyan); }
+.callout .co-box { stroke: rgba(22,184,244,.7); }
+.callout .co-ring { stroke: var(--guardian-cyan); }
+.link { stroke: #8ba6c7; opacity: .62; }
+.link.on { stroke: var(--guardian-cyan); filter: drop-shadow(0 0 4px rgba(22,184,244,.7)); }
+.packet { fill: #64dcff; filter: drop-shadow(0 0 4px rgba(22,184,244,.8)); }
+.wire.on { filter: drop-shadow(0 0 3px currentColor); }
+.editor, .terminal, .codebox {
+  border-radius: 12px;
+}
+button, .btn, .tab {
+  transition: transform .16s ease, box-shadow .16s ease, border-color .16s ease;
+}
+button:focus-visible, a:focus-visible, input:focus-visible, textarea:focus-visible {
+  outline: 2px solid var(--guardian-cyan);
+  outline-offset: 3px;
+}
+@media (max-width: 720px) {
+  .scene-wrap { min-height: 0; border-radius: 13px; }
+  .inputs-card { border-radius: 12px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { scroll-behavior: auto !important; transition-duration: .01ms !important; }
+}
