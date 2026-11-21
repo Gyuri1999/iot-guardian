@@ -29,7 +29,7 @@ jobs:
           ID=$(gh api repos/${{ github.repository }}/releases --jq ".[] | select(.draft and .tag_name==\"$TAG\") | .id" | head -1)
           if [ -z "$ID" ]; then
             ID=$(gh api repos/${{ github.repository }}/releases -f tag_name="$TAG" -f target_commitish="${{ github.sha }}" -f name="IoT Guardian v$VER" -F draft=true \
-              -f body='Κατέβασε το αρχείο για τον υπολογιστή σου (macOS: .dmg, Windows: .msi ή .exe, Linux: .AppImage ή .deb). Δεν χρειάζεται internet για να παίξεις.' --jq .id)
+              -f body='Κατέβασε το αρχείο για τη συσκευή σου: macOS .dmg, Windows .msi ή .exe, Linux .AppImage ή .deb, Android .apk. Σε iPhone/iPad: άνοιξε https://gyuri1999.github.io/iot-guardian/ στο Safari → Κοινοποίηση → «Προσθήκη στην οθόνη Αφετηρίας». Δεν χρειάζεται internet για να παίξεις.' --jq .id)
           fi
           echo "id=$ID" >> "$GITHUB_OUTPUT"
 

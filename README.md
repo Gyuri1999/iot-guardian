@@ -211,6 +211,13 @@ cd desktop && npm ci && npm run build
 
 Το `desktop/copy-web.js` αντιγράφει μόνο το `index.html`, το `css/` και το `js/` στο `desktop/dist`. Τα tests, τα docs και ο real-lab δεν μπαίνουν στην εφαρμογή. Στο macOS βγαίνει το `desktop/src-tauri/target/release/bundle/macos/IoT Guardian.app` (~4 MB). Οι γραμματοσειρές έρχονται από το Google Fonts όταν υπάρχει internet, αλλιώς χρησιμοποιούνται του συστήματος.
 
+## Στο κινητό (Android, iPhone, iPad)
+
+- **Android:** κατέβασε το `IoT-Guardian_<έκδοση>_android.apk` από τα [Releases](https://github.com/Gyuri1999/iot-guardian/releases/latest) και άνοιξέ το. Το τηλέφωνο θα ζητήσει άδεια για «εγκατάσταση από άγνωστη πηγή». Είναι η ίδια Rust/Tauri εφαρμογή με του υπολογιστή.
+- **iPhone / iPad** (και κάθε κινητό): άνοιξε το https://gyuri1999.github.io/iot-guardian/ στο Safari, πάτα *Κοινοποίηση* και μετά *Προσθήκη στην οθόνη Αφετηρίας*. Το παιχνίδι μπαίνει σαν εφαρμογή και παίζει και χωρίς internet.
+
+Το web κομμάτι το κάνει ένας service worker (`sw.js`). Τον γράφει το `tools/write-html.js` μαζί με το `manifest.webmanifest`. Το Android `.apk` το φτιάχνει το `.github/workflows/android.yml` σε κάθε tag `v*`.
+
 ## Αληθινό ESP32 και αληθινός broker (προαιρετικό)
 
 Ο ίδιος κώδικας φλασάρεται σε αληθινό ESP32 και τα μηνύματα περνούν από αληθινό Mosquitto στον υπολογιστή σου. Τρέξε μία φορά το `node real-lab/helper.js --setup` και μετά το `node real-lab/helper.js`. Άνοιξε το `http://localhost:8787`. Οδηγίες και συνδεσμολογία υπάρχουν στο [real-lab/README.md](real-lab/README.md).

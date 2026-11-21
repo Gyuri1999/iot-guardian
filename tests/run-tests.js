@@ -1015,5 +1015,30 @@ test('desktop: Tauri ρυθμίσεις δείχνουν στο dist και δε
   });
 }
 
+test('PWA: ο service worker κρατά όλα τα αρχεία του index.html και το manifest είναι σωστό', () => {
+  const fs = require('fs'), path = require('path'), R = path.join(__dirname, '..');
+  const html = fs.readFileSync(path.join(R, 'index.html'), 'utf8');
+  const sw = fs.readFileSync(path.join(R, 'sw.js'), 'utf8');
+  const assets = JSON.parse(sw.match(/const ASSETS = (\[.*\]);/)[1]);
+  const refs = [...html.matchAll(/(?:src|href)="((?:js|css)\/[^"]+)"/g)].map(m => m[1]);
+  assert(refs.length > 40, 'αρχεία στο index.html');
+  for (const r of refs) assert(assets.includes(r), 'λείπει από τον service worker: ' + r);
+  for (const a of assets) if (a !== './') assert(fs.existsSync(path.join(R, a.split('?')[0])), 'δεν υπάρχει: ' + a);
+  const m = JSON.parse(fs.readFileSync(path.join(R, 'manifest.webmanifest'), 'utf8'));
+  eq(m.start_url, './');
+  assert(m.icons.some(i => i.sizes === '512x512') && m.icons.some(i => i.sizes === '192x192'), 'εικονίδια 192/512');
+  assert(/location\.protocol === 'https:'/.test(html) && /tauri/.test(html), 'ο SW μόνο σε https και όχι στο Tauri');
+});
+test('Android: η Rust εφαρμογή έχει lib με mobile_entry_point και ίδια έκδοση παντού', () => {
+  const fs = require('fs'), path = require('path'), D = path.join(__dirname, '..', 'desktop');
+  const lib = fs.readFileSync(path.join(D, 'src-tauri', 'src', 'lib.rs'), 'utf8');
+  assert(/mobile_entry_point/.test(lib), 'mobile_entry_point');
+  const cargo = fs.readFileSync(path.join(D, 'src-tauri', 'Cargo.toml'), 'utf8');
+  assert(/crate-type = \["staticlib", "cdylib", "rlib"\]/.test(cargo), 'crate-type');
+  const v = JSON.parse(fs.readFileSync(path.join(D, 'src-tauri', 'tauri.conf.json'), 'utf8')).version;
+  eq(JSON.parse(fs.readFileSync(path.join(D, 'package.json'), 'utf8')).version, v);
+  eq(cargo.match(/^version = "([^"]+)"/m)[1], v);
+});
+
 console.log(`\n${passed} πέρασαν, ${failed} απέτυχαν\n`);
 process.exit(failed ? 1 : 0);
