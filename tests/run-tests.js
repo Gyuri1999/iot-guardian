@@ -976,5 +976,44 @@ test('desktop: Tauri ρυθμίσεις δείχνουν στο dist και δε
   assert(!/real-lab|secrets/.test(cp.replace(/\/\*[\s\S]*?\*\//, '')), 'το copy-web δεν πρέπει να αντιγράφει real-lab');
 });
 
+// ------------------------------------------------------------ Πάγκος (js/bench.js): συναρμολόγηση σε 4 βήματα
+{
+  const fs = require('fs'), path = require('path'), vm = require('vm');
+  const ctx = vm.createContext({ console, Math, JSON, Object, Array, Number, String, Set, Map });
+  ctx.globalThis = ctx;
+  for (const f of ['scene.js', 'bbview.js', 'bench.js']) vm.runInContext(fs.readFileSync(path.join(__dirname, '..', 'js', f), 'utf8'), ctx, { filename: f });
+  const SC = ctx.IoTScene, BN = ctx.IoTBench;
+  const labels = { 'w-led': 'GPIO 2', 'w-gnd': 'GND', 'w-btn': 'GPIO 15', 'w-pir': 'GPIO 4', 'w-buz': 'GPIO 23' };
+  const combos = [['led'], ['led', 'button'], ['led', 'button', 'pir'], ['button', 'buzzer'], ['rgb', 'button', 'pir'], ['ultrasonic'], ['traffic'], ['buzzer']];
+  test('πάγκος: 4 βήματα, κάθε καλώδιο με λεζάντα και ετικέτα pin', () => {
+    for (const hw of combos) {
+      SC.labScene(hw, {});
+      const B = BN.build(SC.manifest, labels, SC);
+      eq(B.steps.length, 4, hw.join('+'));
+      assert(B.actions.length > 0 && B.actions.every(a => a.text.length > 20), `${hw}: λεζάντες`);
+      const wires = (B.html.match(/class="bn-wire /g) || []).length;
+      eq(wires, B.actions.length, `${hw}: ένα καλώδιο για κάθε λεζάντα`);
+      assert(/data-st="1"/.test(B.html) && /data-st="2"/.test(B.html), `${hw}: ESP32 και εξαρτήματα`);
+      assert(!/NaN|undefined/.test(B.html), `${hw}: χωρίς NaN/undefined στο σχέδιο`);
+      for (const w of B.layout.wires) assert(w.pts && w.pts.length >= 3, `${hw}: διαδρομή καλωδίου`);
+    }
+  });
+  test('πάγκος: LED με αντίσταση — GPIO 2, GND στη μπλε γραμμή, το LED ανάβει στο βήμα 4', () => {
+    SC.labScene(['led'], {});
+    const B = BN.build(SC.manifest, labels, SC);
+    assert(B.html.includes('>GPIO 2<') && B.html.includes('>GND<'), 'ετικέτες GPIO 2 / GND');
+    eq(B.layout.resistors.length, 1);
+    const w = B.layout.wires.find(x => x.cls === 'w-led');
+    eq(w.col, B.layout.resistors[0].c0, 'το καλώδιο στη στήλη της αντίστασης');
+    assert(B.actions.some(a => a.kind === 'gnd') && B.actions.some(a => a.kind === 'jump'), 'γείωση και μικρό καλώδιο');
+    assert(/data-glow/.test(B.html) && /αναβοσβήνει/.test(B.steps[3].text), 'φως στο βήμα 4');
+    assert(B.materials.some(m => m[1] === 'Αντίσταση 220 Ω'), 'υλικά');
+  });
+  test('πάγκος: φορτώνεται πριν από το ui.js', () => {
+    const html = fs.readFileSync(path.join(__dirname, '..', 'index.html'), 'utf8');
+    assert(html.indexOf('js/bench.js') > 0 && html.indexOf('js/bench.js') < html.indexOf('js/ui.js'));
+  });
+}
+
 console.log(`\n${passed} πέρασαν, ${failed} απέτυχαν\n`);
 process.exit(failed ? 1 : 0);

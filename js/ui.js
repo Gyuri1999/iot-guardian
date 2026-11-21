@@ -328,6 +328,20 @@
     const view = BV.svg(man, wireLabels(), undefined, { board: isPi() ? 'pi' : 'esp32' });
     if (!view.nets.parts.length) return;
     ctl.insertAdjacentHTML('beforeend', `<button class="sc-b sc-3d" id="sc-xray" aria-pressed="false" title="Δες τι ενώνεται μέσα στο breadboard" aria-label="Δες τι ενώνεται μέσα στο breadboard">${icon('xray')}<span>Μέσα</span></button>`);
+    // «Πάγκος» (js/bench.js): εικονογράφηση της συναρμολόγησης σε 4 βήματα, για το ESP32
+    const bench = !!(window.IoTBench && !isPi());
+    if (bench) ctl.insertAdjacentHTML('beforeend', `<button class="sc-b sc-3d" id="sc-bench" title="Δες βήμα-βήμα πώς συναρμολογείται" aria-label="Συναρμολόγηση βήμα-βήμα">${icon('play')}<span>Συναρμολόγηση</span></button>`);
+    const openBench = () => {
+      const hl = $('#hl');
+      window.IoTBench.open({
+        manifest: man, labels: wireLabels(), title: S.task ? S.task.title : 'Πώς συνδέεται',
+        code: hl && hl.textContent.trim() ? hl.innerHTML : '',
+        objectives: S.task && S.task.objectives, sfx,
+        reducedMotion: () => !motionOK(),
+        speak: window.IoTSpeak && window.IoTSpeak.supported() ? t => window.IoTSpeak.say(t) : null
+      });
+    };
+    if (bench) $('#sc-bench').onclick = openBench;
     const btn = $('#sc-xray');
     wrap.insertAdjacentHTML('afterend', `<div class="xray-note" hidden>
       <div class="xn-head"><strong>Μέσα στο breadboard: τι ενώνεται;</strong><span class="spacer"></span>${window.IoTBBAssemble ? `<button class="btn sm" id="xn-build">▶ Δες πώς συνδέεται</button>` : ''}${window.IoTBBPractice ? `<button class="btn sm" id="xn-practice" aria-pressed="false">✋ Σύνδεσέ το μόνος σου</button>` : ''}${window.IoTSpeak && window.IoTSpeak.supported() ? `<button class="btn quiet sm" id="xn-say">${icon('speaker')} Άκουσε</button>` : ''}</div>
@@ -364,7 +378,7 @@
         onEnd: () => { if (S.bbv) S.bbv.build = null; bBtn.textContent = '↻ Ξανά: πώς συνδέεται'; BV.sync(bvEl, S.scene, view.nets, wiredCls); }
       });
     };
-    if (bBtn) bBtn.onclick = () => (S.bbv && S.bbv.build ? stopBuild() : startBuild());
+    if (bBtn) bBtn.onclick = () => (bench ? openBench() : S.bbv && S.bbv.build ? stopBuild() : startBuild());
     const stopPractice = () => {
       if (!S.bbv || !S.bbv.practice) return;
       S.bbv.practice.destroy();
@@ -406,7 +420,7 @@
       if (!on) { stopPractice(); stopBuild(); }
       if (on) BV.sync(bvEl, S.scene, view.nets, wiredCls);
       // την πρώτη φορά σε κάθε επίσκεψη: δείξε μόνο του πώς συνδέονται πλακέτα και breadboard
-      if (on && !S.bbBuildSeen && window.IoTBBAssemble && motionOK()) { S.bbBuildSeen = true; startBuild(); }
+      if (on && !bench && !S.bbBuildSeen && window.IoTBBAssemble && motionOK()) { S.bbBuildSeen = true; startBuild(); }
     };
     btn.onclick = () => {
       show(!S.xray);
