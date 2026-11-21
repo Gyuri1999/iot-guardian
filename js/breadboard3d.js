@@ -13,7 +13,6 @@
     { name: 'Κίτρινο', hex: '#eab308' }, { name: 'Μπλε', hex: '#3b82f6' },
     { name: 'Πράσινο', hex: '#22a06b' }, { name: 'Πορτοκαλί', hex: '#f97316' }
   ];
-  const PINS = ['GPIO 2', 'GPIO 4', 'GPIO 5', 'GPIO 15', 'GPIO 18', 'GPIO 19', 'GPIO 21', 'GPIO 22', 'GPIO 23', '3V3', 'GND'];
   const esc = s => String(s).replace(/[&<>"']/g, c => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c]));
 
   function open(opts) {
@@ -110,21 +109,24 @@
       const ex=centerX-width*.12-5.5;
       addBox(esp,ex,2,0,7.5,.55,23,material(0x171d26,.46,.35));
       addBox(esp,ex,2.3,1,4.8,.25,9,material(0x323b47,.4,.2));
-      const pinNames=['GPIO 2','GPIO 4','GPIO 5','GPIO 15','GPIO 18','GPIO 19','GPIO 21','GPIO 22','GPIO 23','3V3','GND'];
-      pinNames.forEach((name,i)=>{
-        const z=-10+i*1.95, x=ex+ (i%2?3:-3);
+      const pinRows=[
+        {x:ex-3.9,side:-1,names:['GPIO 2','GPIO 4','GPIO 5','GPIO 15','GPIO 18','GPIO 19']},
+        {x:ex+3.9,side:1,names:['GPIO 21','GPIO 22','GPIO 23','3V3','GND']}
+      ];
+      pinRows.forEach(row=>row.names.forEach((name,i)=>{
+        const z=-9.5+i*(19/Math.max(1,row.names.length-1)),x=row.x;
         const pin=addBox(esp,x,1.55,z,.65,1.2,.65,material(0xc8a75b,.3,.7));
-        pin.userData={type:'pin',name}; pinMeshes.push(pin);
+        pin.userData={type:'pin',name};pinMeshes.push(pin);
         const cap=addBox(esp,x,2.35,z,.95,.25,.95,material(0x111821,.5));
-        cap.userData={type:'pin-cap',name}; cap.userData.pin=pin;
+        cap.userData={type:'pin-cap',name};cap.userData.pin=pin;
         const labelCanvas=document.createElement('canvas');labelCanvas.width=256;labelCanvas.height=72;
         const ctx=labelCanvas.getContext('2d');ctx.fillStyle='rgba(7,20,35,.96)';ctx.beginPath();ctx.roundRect(4,4,248,64,12);ctx.fill();
         ctx.strokeStyle='#4d82aa';ctx.lineWidth=3;ctx.stroke();
         ctx.fillStyle='#e8f5ff';ctx.font='bold 34px sans-serif';ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillText(name,128,37);
         const tex=new THREE.CanvasTexture(labelCanvas);tex.encoding=THREE.sRGBEncoding;
         const tag=new THREE.Sprite(new THREE.SpriteMaterial({map:tex,transparent:true,depthWrite:false}));
-        tag.position.set(x+(i%2?2.5:-2.5),3.2,z);tag.scale.set(4.2,1.18,1);esp.add(tag);
-      });
+        tag.position.set(x+row.side*2.8,3.2,z);tag.scale.set(4.2,1.18,1);esp.add(tag);
+      }));
       // Physical path: GPIO2 → resistor across the centre gap → LED → GND.
       const c0=full?Math.floor((cols-9)/2):1;
       const holeAt=(col,row)=>V(centerX+col*1.1,.55,row<5?-3.2+row*1.1:3.2+(row-5)*1.1);
@@ -181,10 +183,10 @@
       if(orbit){yaw=orbit.yaw-(e.clientX-orbit.x)*.009;pitch=Math.max(.18,Math.min(1.45,orbit.pitch+(e.clientY-orbit.y)*.006));}
     }
     function onPointerUp(e){
-      if(drag&&drag.pointer===e.pointerId){const d=drag;drag=null;renderer.domElement.releasePointerCapture(e.pointerId);setPointer(e);const finalHit=raycaster.intersectObjects(holeMeshes,false)[0];if(finalHit)d.target=finalHit.object;if(d.target){d.target.material.color.setHex(d.target.userData.baseColor);commitWire(d,d.target);}else{board.remove(d.mesh);setStatus('Το καλώδιο επέστρεψε στο pin. Άφησέ το πάνω σε μία οπή.','err');}return;}
+      if(drag&&drag.pointer===e.pointerId){const d=drag;drag=null;try{renderer.domElement.releasePointerCapture(e.pointerId);}catch(_){}setPointer(e);const finalHit=raycaster.intersectObjects(holeMeshes,false)[0];if(d.target)d.target.material.color.setHex(d.target.userData.baseColor);d.target=finalHit?finalHit.object:null;if(d.target){d.target.material.color.setHex(d.target.userData.baseColor);commitWire(d,d.target);}else{board.remove(d.mesh);setStatus('Το καλώδιο επέστρεψε στο pin. Άφησέ το πάνω σε μία οπή.','err');}return;}
       orbit=null;
     }
-    function cancelDrag(){if(drag){board.remove(drag.mesh);drag=null;}orbit=null;}
+    function cancelDrag(){if(drag){if(drag.target)drag.target.material.color.setHex(drag.target.userData.baseColor);board.remove(drag.mesh);drag=null;}orbit=null;}
     function onWheel(e){e.preventDefault();zoom=Math.max(.55,Math.min(2.8,zoom*(e.deltaY>0?.91:1.1)));}
     function rayOnBoard(e){
       const p=pick(e,[board.children[0]]);return p?p.point:V(0,2,0);
@@ -239,7 +241,7 @@
     function stopParticles(){liveParticles.forEach(p=>board.remove(p.dot));liveParticles=[];}
     function updateParticles(){if(!liveParticles.length)return;const t=performance.now()*.0006;liveParticles.forEach(p=>p.curve.getPointAt((t+p.offset)%1,p.dot.position));}
     function addWire(){setStatus(`Σύρε ένα pin της ESP32 στο breadboard. Χρώμα καλωδίου: ${COLORS[+colorSelect.value].name}.`,'');}
-    function clearWires(){wires.forEach(w=>{board.remove(w.mesh,w.plug);});wires=[];stopParticles();if(ledLens){ledLens.material.emissive.setHex(0);ledLens.material.emissiveIntensity=0;}setCount();}
+    function clearWires(){wires.forEach(w=>{board.remove(w.mesh,w.plug);disposeTree(w.mesh);disposeTree(w.plug);});wires=[];stopParticles();if(ledLens){ledLens.material.emissive.setHex(0);ledLens.material.emissiveIntensity=0;}setCount();}
     function reset(){clearWires();setStatus('Οι συνδέσεις καθαρίστηκαν. Ξεκίνα ξανά από το GPIO 2.','');}
     function setCount(){count.textContent=wires.length+' συνδέσεις';}
     function disposeTree(obj){obj.traverse(o=>{if(o.geometry)o.geometry.dispose();if(o.material){const list=Array.isArray(o.material)?o.material:[o.material];list.forEach(m=>{if(m.map)m.map.dispose();m.dispose();});}});}
